@@ -1,0 +1,156 @@
+
+.join-page {
+  min-height: 100vh;
+  background: var(--canvas);
+  color: var(--foreground);
+}
+
+.join-container {
+  width: min(850px, 90%);
+  margin: 0 auto;
+  padding: 65px 0 90px;
+}
+
+.join-heading {
+  text-align: center;
+  margin-bottom: 45px;
+}
+
+.join-heading h1 {
+  font-size: clamp(36px, 5vw, 48px);
+  margin: 15px 0 10px;
+}
+
+.join-heading p,
+.avatar-heading p {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.back-link {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.back-link:hover {
+  color: var(--g-blue-strong);
+}
+
+.registration-section {
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 28px;
+  margin-bottom: 22px;
+}
+
+.registration-section > label {
+  display: block;
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+.registration-section input {
+  width: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--background);
+  color: var(--foreground);
+  outline: none;
+}
+
+.registration-section input:focus {
+  border-color: var(--g-blue-strong);
+  box-shadow: 0 0 0 4px rgba(66, 133, 244, 0.16);
+}
+
+.input-hint {
+  display: block;
+  margin-top: 9px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.avatar-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.avatar-heading h2 {
+  font-size: 19px;
+  margin: 0;
+}
+
+.avatar-heading p {
+  margin-bottom: 0;
+}
+
+.selected-preview {
+  background: var(--g-blue-soft);
+  border-radius: 14px;
+  padding: 5px;
+}
+
+.form-error {
+  color: var(--g-red);
+  font-size: 13px;
+  font-weight: 600;
+  margin: 12px 0;
+}
+
+.registration-success {
+  background: var(--g-green-soft);
+  border-radius: 14px;
+  padding: 18px;
+  margin: 20px 0;
+  color: var(--foreground);
+}
+
+.registration-success p {
+  font-size: 13px;
+  margin: 7px 0;
+}
+
+.registration-success span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.join-button {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 40px;
+  background: var(--g-blue-strong);
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+  transition: transform 200ms ease;
+}
+
+.join-button:hover {
+  transform: translateY(-2px);
+}
+
+.join-button:active {
+  transform: scale(0.97);
+}
+
+@media (max-width: 600px) {
+  .join-container {
+    padding-top: 45px;
+  }
+
+  .registration-section {
+    padding: 20px 16px;
+  }
+
+  .avatar-heading {
+    align-items: flex-start;
+  }
+}

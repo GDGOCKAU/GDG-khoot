@@ -1,0 +1,118 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Noto+Sans+Arabic:wght@400;500;600;700&display=swap');
+
+:root {
+  --g-blue: #4285f4;
+  --g-red: #ea4335;
+  --g-yellow: #f9ab00;
+  --g-green: #34a853;
+
+  --g-blue-strong: #1a73e8;
+
+  --g-blue-soft: #e8f0fe;
+  --g-red-soft: #fce8e6;
+  --g-yellow-soft: #fef7e0;
+  --g-green-soft: #e6f4ea;
+
+  --background: #ffffff;
+  --canvas: #f5f7fa;
+  --surface: #f7f8fa;
+  --surface-2: #eff1f4;
+  --surface-3: #e6e9ee;
+
+  --border: #e3e6eb;
+  --border-strong: #cfd4dc;
+
+  --foreground: #1f2328;
+  --muted: #5f6570;
+  --faint: #686d77;
+
+  --shadow-sm: 0 1px 2px rgb(16 24 40 / 6%),
+               0 1px 3px rgb(16 24 40 / 8%);
+  --shadow-lg: 0 12px 24px -6px rgb(16 24 40 / 12%),
+               0 4px 8px -4px rgb(16 24 40 / 6%);
+
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+
+  font-family: "Google Sans", "Noto Sans Arabic", system-ui, sans-serif;
+  color: var(--foreground);
+  background: var(--background);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--g-blue-strong);
+  outline-offset: 3px;
+}
+
+/* Dark theme foundation */
+
+.dark {
+  --g-blue: #8ab4f8;
+  --g-red: #f28b82;
+  --g-yellow: #fdd663;
+  --g-green: #81c995;
+
+  --g-blue-soft: rgba(138, 180, 248, .14);
+  --g-red-soft: rgba(242, 139, 130, .14);
+  --g-yellow-soft: rgba(253, 214, 99, .14);
+  --g-green-soft: rgba(129, 201, 149, .14);
+
+  --background: #16171a;
+  --canvas: #0f1012;
+  --surface: #1c1d21;
+  --surface-2: #24262b;
+  --surface-3: #2e3137;
+
+  --border: #2e3137;
+  --border-strong: #454952;
+
+  --foreground: #e8eaed;
+  --muted: #a0a6b0;
+  --faint: #858b95;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
