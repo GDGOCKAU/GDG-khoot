@@ -48,27 +48,38 @@ function JoinQuiz() {
   }
 
   function handleSubmit(event) {
-    event.preventDefault();
+  event.preventDefault();
 
-    if (!nickname.trim()) {
-      setError("Please enter a nickname.");
-      return;
-    }
+  const cleanNickname = nickname.trim();
 
-    if (!selectedAvatar) {
-      setError("Please choose your Devu avatar.");
-      return;
-    }
-
-    setError("");
-
-    navigate(`/lobby/${quizId}`, {
-      state: {
-        nickname: nickname.trim(),
-        avatar: selectedAvatar,
-      },
-    });
+  if (!cleanNickname) {
+    setError("Please enter a nickname.");
+    return;
   }
+
+  if (!selectedAvatar) {
+    setError("Please choose your Devu avatar.");
+    return;
+  }
+
+  setError("");
+
+  // Save player information for the gameplay screen
+  localStorage.setItem("gdgNickname", cleanNickname);
+  localStorage.setItem(
+    "gdgAvatar",
+    JSON.stringify(selectedAvatar)
+  );
+
+  navigate(`/lobby/${quizId}`, {
+    state: {
+      nickname: cleanNickname,
+      avatar: selectedAvatar,
+      quizTitle,
+      pin: gamePin,
+    },
+  });
+}
 
   return (
     <div className="join-page">

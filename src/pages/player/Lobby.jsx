@@ -1,189 +1,98 @@
 
-import { useState } from "react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import Devu from "../../components/common/Devu";
 import "./Lobby.css";
 
-const mockPlayers = [
-  {
-    id: 1,
-    nickname: "PixelMaster",
-    avatar: { color: "blue", number: 3 },
-  },
-  {
-    id: 2,
-    nickname: "QuizWizard",
-    avatar: { color: "red", number: 7 },
-  },
-  {
-    id: 3,
-    nickname: "BrainyBee",
-    avatar: { color: "yellow", number: 2 },
-  },
-  {
-    id: 4,
-    nickname: "CodeNinja",
-    avatar: { color: "green", number: 5 },
-  },
-];
-
 function Lobby() {
-  const { quizId } = useParams();
   const location = useLocation();
 
-  const nickname = location.state?.nickname || "Guest Player";
+  // Retrieve player information from navigation state or localStorage
+  const nickname =
+    location.state?.nickname ||
+    localStorage.getItem("gdgNickname") ||
+    "Guest Player";
 
-  const avatar = location.state?.avatar || {
-    color: "blue",
-    number: 1,
+  let savedAvatar = { color: "blue", number: 1 };
+
+  try {
+    savedAvatar = JSON.parse(
+      localStorage.getItem("gdgAvatar") ||
+        '{"color":"blue","number":1}'
+    );
+  } catch {
+    savedAvatar = { color: "blue", number: 1 };
+  }
+
+  const avatar = location.state?.avatar || savedAvatar;
+
+  const teamNames = {
+    blue: "Blue",
+    red: "Red",
+    yellow: "Yellow",
+    green: "Green",
   };
 
-  const [copied, setCopied] = useState(false);
-
-  // Temporary players until backend integration
-  const players = [
-    {
-      id: "you",
-      nickname,
-      avatar,
-      isYou: true,
-    },
-    ...mockPlayers,
-  ];
-
-  const gamePin = "482916";
-
-  async function copyPin() {
-    try {
-      await navigator.clipboard.writeText(gamePin);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Fallback for browsers without clipboard access
-      const textArea = document.createElement("textarea");
-
-      textArea.value = gamePin;
-      textArea.style.position = "fixed";
-      textArea.style.opacity = "0";
-
-      document.body.appendChild(textArea);
-      textArea.select();
-
-      const successful = document.execCommand("copy");
-      document.body.removeChild(textArea);
-
-      if (successful) {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } else {
-        alert(`Your game PIN is ${gamePin}`);
-      }
-    }
-  }
+  const teamName = teamNames[avatar.color] || "Blue";
 
   return (
     <main className="lobby-page">
       <header className="lobby-header">
         <Link to="/" className="lobby-brand">
-          <span className="brand-dots">
+          <span className="brand-dots" aria-hidden="true">
             <span />
             <span />
             <span />
             <span />
           </span>
 
-          GDG KAU <span>Quiz</span>
+          <span className="lobby-brand-name">
+            GDG KAU <strong>Quiz</strong>
+          </span>
         </Link>
-
-        <span className="demo-label">DEMO LOBBY</span>
       </header>
 
       <section className="lobby-content">
-        {/* Welcome message */}
-        <div className="lobby-heading">
-          <div className="lobby-success-icon">✓</div>
+        <div className="lobby-center">
+          <div className="lobby-avatar">
+            <Devu
+              color={avatar.color}
+              number={avatar.number}
+              size={170}
+            />
+          </div>
 
-          <p className="lobby-eyebrow">YOU'RE IN!</p>
+          <h1 className="lobby-title">
+            You're in<span>!</span>
+          </h1>
 
-          <h1>Waiting for the host</h1>
-
-          <p>
-            You're all set, <strong>{nickname}</strong>!
-            The quiz will begin when the host starts the game.
-          </p>
-        </div>
-
-        {/* Game PIN */}
-        <section className="pin-card">
-          <p className="pin-label">GAME PIN</p>
-
-          <div className="pin-number">{gamePin}</div>
-
-          <button
-            className="copy-pin-button"
-            onClick={copyPin}
-            type="button"
-          >
-            {copied ? "✓ Copied!" : "Copy PIN"}
-          </button>
-
-          <p className="pin-hint">
-            Share this PIN with other players to join.
-          </p>
-        </section>
-
-        {/* Players */}
-        <section className="players-section">
-          <div className="players-heading">
-            <div>
-              <h2>Players</h2>
-              <p>Everyone who's joined the lobby</p>
-            </div>
-
-            <span className="player-count">
-              {players.length} players
+          <p className="lobby-message">
+            {nickname}, you're in! Waiting for the host
+            to start the game
+            <span className="waiting-ellipsis" aria-label="Loading">
+              <span>.</span>
+              <span>.</span>
+              <span>.</span>
             </span>
-          </div>
+          </p>
 
-          <div className="players-grid">
-            {players.map((player) => (
-              <article
-                className={`player-card ${
-                  player.isYou ? "your-player-card" : ""
-                }`}
-                key={player.id}
-              >
-                <div className="player-avatar">
-                  <Devu
-                    color={player.avatar.color}
-                    number={player.avatar.number}
-                  />
-                </div>
+          <span className={`lobby-team-chip team-${avatar.color}`}>
+            Team {teamName}
+          </span>
 
-                <div className="player-info">
-                  <span className="player-name">
-                    {player.nickname}
-                  </span>
-
-                  {player.isYou && (
-                    <span className="you-label">YOU</span>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        {/* Waiting status */}
-        <div className="waiting-message" role="status">
-          <span className="waiting-dot" />
-          Waiting for the host to start the quiz...
+          <span className="lobby-host-link">
+            Open the host screen to start
+          </span>
         </div>
-
-        <p className="lobby-demo-note">
-          Demo mode · Other players shown are sample players.
-        </p>
       </section>
+
+      <footer className="lobby-footer">
+        <div className="lobby-colorbar" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+      </footer>
     </main>
   );
 }
