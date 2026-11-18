@@ -450,96 +450,116 @@ function Game() {
         )}
 
         {/* LEADERBOARD */}
-        {phase === "leaderboard" && (
-          <section className="host-leaderboard-screen">
-            <div className="host-results-heading">
-              <span className="host-eyebrow">
-                CORRECT ANSWER ·{" "}
-                {currentQuestion.answers[currentQuestion.correctAnswer]}
-              </span>
+        
+{phase === "leaderboard" && (
+  <section className="host-leaderboard-screen">
+    <div className="host-leaderboard-heading">
+      <span className="host-eyebrow">
+        Correct answer ·{" "}
+        {currentQuestion.answers[currentQuestion.correctAnswer]}
+      </span>
 
-              <h1>Leaderboard</h1>
+      <h1>Leaderboard</h1>
 
-              <p>
-                After question {questionIndex + 1} of {totalQuestions}
-                {" · "}
-                {phaseTime}s
-              </p>
+      <p>
+        After question {questionIndex + 1} of {totalQuestions}
+        {" · "}
+        {questionIndex === totalQuestions - 1
+          ? "Team results"
+          : "Next question"}{" "}
+        in <strong>{phaseTime}</strong>s
+      </p>
+    </div>
+
+    <div className="host-leaderboard-layout">
+      <div className="host-leaderboard">
+        {rankedPlayers.slice(0, 8).map((player, index) => (
+          <div
+            className={`host-leaderboard-row ${
+              index < 3 ? "top-player" : ""
+            }`}
+            key={player.id}
+            style={{ "--player-team": {
+              blue: "#4285f4",
+              red: "#ea4335",
+              yellow: "#f9ab00",
+              green: "#188038",
+            }[player.color] }}
+          >
+            <span className="host-rank">{index + 1}</span>
+
+            <Devu
+              color={player.color}
+              number={player.number}
+              size={44}
+            />
+
+            <strong className="host-player-name">
+              {player.name}
+            </strong>
+
+            <span className={`host-player-team team-${player.color}`}>
+              {teamNames[player.color]}
+            </span>
+
+            <span className="host-last-points">
+              +{player.lastPoints.toLocaleString()}
+            </span>
+
+            <strong className="host-player-score">
+              {player.score.toLocaleString()}
+            </strong>
+          </div>
+        ))}
+      </div>
+
+      <aside className="host-team-panel">
+        <div className="host-team-heading">
+          <strong>Team standings</strong>
+          <span>Avg points per player</span>
+        </div>
+
+        {teamStats.map((team, index) => (
+          <div className="host-team-row" key={team.color}>
+            <div className="host-team-row-top">
+              <span className="host-team-rank">{index + 1}</span>
+
+              <Devu
+                color={team.color}
+                number={1}
+                size={30}
+              />
+
+              <strong>Team {team.name}</strong>
+
+              <b>{team.average.toLocaleString()}</b>
             </div>
 
-            <div className="host-leaderboard-layout">
-              <div className="host-leaderboard">
-                {rankedPlayers.slice(0, 8).map((player, index) => (
-                  <div
-                    className="host-leaderboard-row"
-                    key={player.id}
-                  >
-                    <span className="host-rank">{index + 1}</span>
-
-                    <Devu
-                      color={player.color}
-                      number={player.number}
-                      size={42}
-                    />
-
-                    <strong className="host-player-name">
-                      {player.name}
-                    </strong>
-
-                    <span className="host-last-points">
-                      +{player.lastPoints.toLocaleString()}
-                    </span>
-
-                    <strong className="host-player-score">
-                      {player.score.toLocaleString()}
-                    </strong>
-                  </div>
-                ))}
-              </div>
-
-              <aside className="host-team-panel">
-                <div className="host-team-heading">
-                  <strong>Team standings</strong>
-                  <span>Average points per player</span>
-                </div>
-
-                {teamStats.map((team, index) => (
-                  <div className="host-team-row" key={team.color}>
-                    <div className="host-team-row-top">
-                      <span>{index + 1}</span>
-
-                      <span className={`host-team-dot ${team.color}`} />
-
-                      <strong>Team {team.name}</strong>
-
-                      <b>{team.average.toLocaleString()}</b>
-                    </div>
-
-                    <div className="host-team-bar">
-                      <span
-                        className={`host-team-bar-fill ${team.color}`}
-                        style={{
-                          width: `${
-                            (team.average /
-                              Math.max(
-                                ...teamStats.map((item) => item.average),
-                                1
-                              )) *
-                            100
-                          }%`,
-                        }}
-                      />
-                    </div>
-
-                    <small>
-                      {team.count} player{team.count === 1 ? "" : "s"}
-                    </small>
-                  </div>
-                ))}
-              </aside>
+            <div className="host-team-bar">
+              <span
+                className={`host-team-bar-fill ${team.color}`}
+                style={{
+                  width: `${
+                    (team.average /
+                      Math.max(
+                        ...teamStats.map((item) => item.average),
+                        1
+                      )) * 100
+                  }%`,
+                }}
+              />
             </div>
-          </section>
-        )}
+
+            <small>
+              {team.count} player{team.count === 1 ? "" : "s"}
+            </small>
+          </div>
+        ))}
+      </aside>
+    </div>
+  </section>
+)}
+
 
         {/* NEXT QUESTION */}
         {phase === "next" && (
