@@ -12,9 +12,13 @@ const proxy = {
   '/socket.io': { target: api, changeOrigin: true, ws: true },
 }
 
+/* Vite refuses unknown Host headers; IPs and localhost are always allowed. Quick Cloudflare
+   tunnels (the event-day fallback) use *.trycloudflare.com. */
+const allowedHosts = ['.trycloudflare.com']
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  server: { proxy },
-  preview: { proxy },
+  server: { proxy, allowedHosts },
+  preview: { proxy, allowedHosts },
 })
