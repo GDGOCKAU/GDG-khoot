@@ -71,13 +71,16 @@ function setPhase(phase, ms) {
 /* live host: the server opens the question (POST /start or /next); the screen follows its closesAt */
 let liveHostOpen = null;
 export function onLiveHostOpen(f) { liveHostOpen = f; }
+/* live host hooks set by live.js: reveal, finish, cancel */
+const liveHooks = {};
+export function setLiveHooks(h) { Object.assign(liveHooks, h); }
 function startQuestion(i) {
   if (G.liveHost && liveHostOpen) {
     const g = G;
     G.phaseEnd = 0; // hold the countdown screen until the server answers
     liveHostOpen(i).then((q) => {
       if (G !== g) return;
-      G.qi = i; G.answers = {};
+      G.qi = i; G.answers = {}; G.liveAnswered = 0;
       G.phase = 'question';
       G.phaseEnd = Date.now() + Math.max(0, new Date(q.closesAt).getTime() - Date.now());
       G.phaseStart = G.phaseEnd - q.timeLimitSecs * 1000;
@@ -105,6 +108,18 @@ export function answer(pid, choice) {
   if (Object.keys(G.answers).length >= G.players.length) setTimeout(() => { if (G && G.phase === 'question') endQuestion(); }, 600);
 }
 function endQuestion() {
+  if (G.liveHost && liveHooks.reveal) {
+    if (G.revealing) return;
+    const g = G;
+    G.revealing = true; G.phaseEnd = 0;
+    liveHooks.reveal().then((r) => {
+      if (G !== g) return;
+      G.revealing = false;
+      applyStandings(r, r.choices);
+      setPhase('reveal', 5500);
+    }).catch(() => { if (G === g) { G.revealing = false; G.phaseEnd = Date.now() + 2000; notify(); } });
+    return;
+  }
   const qq = curQ();
   const limit = qq.time * 1000;
   G.prevIdx = {}; G.prevTeams = {};
@@ -144,7 +159,12 @@ function tick() {
   if (!G) return;
   const now = Date.now();
   /* live player: the server moves the phases; locally we only redraw timers */
-  if (G.live) { tickN += 1; tickSubs.forEach((f) => f()); return; }
+  if (G.live) {
+    /* display only: reveal -> leaderboard -> next-countdown, then wait for the server */
+    if (G.phaseEnd && now >= G.phaseEnd && (G.phase === 'reveal' || G.phase === 'leaderboard')) { advance(); return; }
+    if (G.phaseEnd && now >= G.phaseEnd) G.phaseEnd = 0;
+    tickN += 1; tickSubs.forEach((f) => f()); return;
+  }
   if (G.phase === 'question') {
     const el = now - G.phaseStart;
     G.players.forEach((p) => { if (p.bot && p.plan && !G.answers[p.id] && el >= p.plan.at) answer(p.id, p.plan.choice); });
@@ -157,9 +177,12 @@ function advance() {
   switch (G.phase) {
     case 'ready': startQuestion(0); break;
     case 'question': endQuestion(); break;
-    case 'reveal': if (hosted()) setPhase('leaderboard', 7000); else setPhase('answers', 4500); break;
+    case 'reveal': if (hosted() || G.live) setPhase('leaderboard', 7000); else setPhase('answers', 4500); break;
     case 'answers': setPhase('leaderboard', 7000); break;
-    case 'leaderboard': if (last) setPhase('teams', 8000); else setPhase('next', 3000); break;
+    case 'leaderboard':
+      if (G.live) { if (!last) setPhase('next', 3000); else G.phaseEnd = 0; break; }
+      if (last) { if (G.liveHost && liveHooks.finish) liveHooks.finish(); setPhase('teams', 8000); } else setPhase('next', 3000);
+      break;
     case 'next': startQuestion(G.qi + 1); break;
     case 'teams': setPhase('podium', 9000); break;
     case 'podium': recordGame(); setPhase('final', 0); break;
@@ -174,6 +197,7 @@ export function startGame() { clearTimeout(G.joinTimer); setPhase('ready', 3000)
 export function skip() { G.phaseEnd = Date.now(); }
 export function endGame() { recordGame(); if (G.me) { G.ended = true; clearInterval(G.timer); notify(); } else stopGame(); }
 export function exitGame() {
+  if (G && G.liveHost && liveHooks.cancel && G.phase !== 'final') liveHooks.cancel();
   const hadMe = G && G.me ? { title: G.quiz.title, name: G.me.name } : null;
   stopGame(false); UI.closed = hadMe; notify();
   return hadMe;
@@ -233,7 +257,9 @@ export function liveQuestion(q) {
     type: q.type || 'mc', text: q.text, questionId: q.questionId,
     answers: (q.options || []).map((o) => o.text), optionIds: (q.options || []).map((o) => o.id),
     correct: -1, time: q.timeLimitSecs, points: 1, img: null,
-    code: q.code || '', lang: q.language || 'Dart', pics: q.pictureUrls || [], word: '',
+    code: q.code || '', lang: q.language || 'Dart', pics: q.pictureUrls || [],
+    /* only the letter count is known until Reveal */
+    word: q.type === 'pic' ? 'X'.repeat(q.wordLength || 0) : '',
   };
   if (G.qi !== q.order) G.answers = {};
   G.qi = q.order;
@@ -257,4 +283,32 @@ function liveAnswer(choice) {
   G.answers.me = { choice, t: Date.now() - G.phaseStart };
   notify();
   if (liveAnswerHandler) liveAnswerHandler(qq, choice);
+}
+
+const mascotIdx = (m) => { const n = Number(String(m || '').split('-')[1]); return Number.isInteger(n) ? n : 0; };
+/* standings from the server (reveal/final) become the players everyone's screens rank and animate.
+   choices (host only): participantId -> option index, or true/false for picture questions */
+export function applyStandings(r, choices) {
+  if (!G || !r) return;
+  const qq = curQ();
+  G.prevIdx = {}; G.prevTeams = {};
+  ranked().forEach((p, i) => { p.prevRank = i + 1; G.prevIdx[p.id] = i; p.prevScore = p.score; });
+  teamStats().forEach((t, i) => { G.prevTeams[t.key] = { idx: i, avg: t.avg }; });
+  if (qq && Number.isInteger(r.correctIndex) && r.correctIndex >= 0) qq.correct = r.correctIndex;
+  if (qq && r.word) qq.word = r.word;
+  if (choices && qq) {
+    G.answers = {};
+    Object.entries(choices).forEach(([pid, c]) => { G.answers[pid] = { choice: typeof c === 'boolean' ? (c ? qq.word : '') : c, t: 0 }; });
+  }
+  const byId = new Map(G.players.map((p) => [p.id, p]));
+  const next = (r.standings || []).map((st) => {
+    const id = G.live && st.id === G.participantId ? 'me' : st.id;
+    const p = byId.get(id) || { id, bot: false, prevRank: 0, img: mascot(st.team, mascotIdx(st.mascot)) };
+    const choice = id === 'me' ? (G.answers.me ? G.answers.me.choice : null) : (G.answers[st.id] ? G.answers[st.id].choice : null);
+    Object.assign(p, { name: st.name, team: st.team, score: st.score, streak: st.streak, correct: st.correct,
+      last: r.questionId ? { choice: st.answered ? choice : null, ok: st.lastOk, pts: st.lastPts } : p.last });
+    return p;
+  });
+  if (G.me && !next.includes(G.me)) next.push(G.me);
+  G.players = next;
 }

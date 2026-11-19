@@ -4,7 +4,7 @@
 import { apiRequest, getStoredToken } from '../api/client';
 import { connectSocket } from '../api/socket';
 import { mascot } from './constants';
-import { G, exitGame, livePhase, liveQuestion, onLiveAnswer, onLiveHostOpen } from './engine';
+import { G, applyStandings, exitGame, livePhase, liveQuestion, onLiveAnswer, onLiveHostOpen, setLiveHooks, skip } from './engine';
 import { notify } from './store';
 import { toast } from './ui';
 
@@ -33,15 +33,25 @@ export function connectLivePlayer(sessionId, participantId) {
     });
   });
   socket.on('question', (q) => liveQuestion(q));
-  socket.on('reveal', () => livePhase('reveal'));
-  socket.on('final', () => livePhase('final'));
+  socket.on('reveal', (r) => {
+    if (!G || !G.live) return;
+    applyStandings(r);
+    G.phase = 'reveal'; G.phaseStart = Date.now(); G.phaseEnd = Date.now() + 5500;
+    notify();
+  });
+  socket.on('final', (f) => {
+    if (!G || !G.live) return;
+    applyStandings({ standings: f.standings });
+    livePhase('final');
+  });
   socket.on('session_cancelled', () => exitGame());
   onLiveAnswer((qq, choice) => {
-    const optionId = qq.optionIds ? qq.optionIds[choice] : null;
-    if (!optionId) return;
+    const pic = qq.type === 'pic';
+    const optionId = !pic && qq.optionIds ? qq.optionIds[choice] : undefined;
+    if (!pic && !optionId) return;
     apiRequest(`/api/v1/sessions/${sessionId}/answers`, {
       method: 'POST',
-      body: JSON.stringify({ participantId, questionId: qq.questionId, optionId }),
+      body: JSON.stringify(pic ? { participantId, questionId: qq.questionId, text: String(choice) } : { participantId, questionId: qq.questionId, optionId }),
     }).catch((error) => {
       if (error.status !== 409) toast(error.body?.error === 'answer_closed' ? "Time's up, your answer didn't count." : 'Your answer could not be sent.');
     });
@@ -66,6 +76,19 @@ export function connectLiveHost(sessionId) {
       bot: false, score: 0, streak: 0, correct: 0, last: null, prevRank: 0,
     });
     notify();
+  });
+  socket.on('answer_count', ({ count }) => {
+    if (!G || G.phase !== 'question') return;
+    G.liveAnswered = Math.max(G.liveAnswered || 0, count);
+    notify();
+    /* everyone is in: close early, like the practice game does */
+    if (G.liveAnswered >= G.players.length) { const g = G; setTimeout(() => { if (G === g && G.phase === 'question' && !G.revealing) skip(); }, 600); }
+  });
+  const post = (path) => apiRequest(`/api/v1/sessions/${sessionId}/${path}`, { method: 'POST', body: JSON.stringify({ quizId: G.quiz.id }) });
+  setLiveHooks({
+    reveal: () => post('reveal').catch((error) => { toast('Could not reveal on the server. Retrying…'); throw error; }),
+    finish: () => post('next').catch(() => toast('Could not finish the game on the server.')),
+    cancel: () => post('cancel').catch(() => {}),
   });
   onLiveHostOpen((i) => {
     const path = i === 0 ? 'start' : 'next';

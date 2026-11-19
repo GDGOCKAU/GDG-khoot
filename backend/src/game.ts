@@ -46,6 +46,7 @@ export interface GameRepository {
   createAnswer(answer: Omit<Answer, "id">): Promise<Answer>;
   updateParticipantScore(participantId: string, score: number, streak: number): Promise<void>;
   countAnswers(sessionId: string, questionId: string): Promise<number>;
+  listAnswers(sessionId: string): Promise<Answer[]>;
 }
 
 export class MemoryGameRepository implements GameRepository {
@@ -108,6 +109,9 @@ export class MemoryGameRepository implements GameRepository {
   async countAnswers(sessionId: string, questionId: string) {
     return [...this.answers.values()].filter((answer) => answer.sessionId === sessionId && answer.questionId === questionId).length;
   }
+  async listAnswers(sessionId: string) {
+    return [...this.answers.values()].filter((answer) => answer.sessionId === sessionId);
+  }
 }
 
 export type GameErrorCode =
@@ -137,9 +141,23 @@ function publicQuestion(question: QuizQuestion, session: GameSession, questionCo
     code: question.type === "code" ? question.code : undefined,
     language: question.type === "code" ? question.language : undefined,
     pictureUrls: question.type === "pic" ? question.pictureUrls : undefined,
-    options: question.options.map(({ id, text }) => ({ id, text })),
+    wordLength: question.type === "pic" ? normWord(picWord(question)).length : undefined,
+    // A picture question's options hold the answer word, so they never leave the server.
+    options: question.type === "pic" ? [] : question.options.map(({ id, text }) => ({ id, text })),
   };
 }
+
+export const normWord = (value: unknown) => String(value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+/** The word for a picture question: the saved word, else the correct option's text (how the editor saves it). */
+function picWord(question: QuizQuestion) {
+  return question.word || question.options.find((option) => option.isCorrect)?.text || "";
+}
+/** What every screen may know about the right answer, once revealed. */
+function revealedAnswer(question: QuizQuestion) {
+  if (question.type === "pic") return { correctIndex: null, word: normWord(picWord(question)) };
+  return { correctIndex: question.options.findIndex((option) => option.isCorrect), word: null };
+}
+export type AnswerChoice = { optionId?: string; text?: string };
 
 export class GameService {
   constructor(
@@ -254,7 +272,8 @@ export class GameService {
     this.emit(session.id, "question", payload);
     return payload;
   }
-  async answer(sessionId: string, participantId: string, questionId: string, optionId: string) {
+  async answer(sessionId: string, participantId: string, questionId: string, choice: string | AnswerChoice) {
+    const pick: AnswerChoice = typeof choice === "string" ? { optionId: choice } : choice;
     const session = await this.gameRepository.findById(sessionId);
     if (!session) throw new GameError("session_not_found");
     if (session.status !== "ACTIVE") throw new GameError("invalid_phase");
@@ -266,8 +285,18 @@ export class GameService {
     if (!quiz) throw new GameError("quiz_not_found");
     const question = quiz.questions.find((item) => item.id === questionId);
     if (!question || question.order !== session.currentQuestionOrder) throw new GameError("question_not_found");
-    const option = question.options.find((item) => item.id === optionId);
-    if (!option) throw new GameError("invalid_option");
+    let option: QuizQuestion["options"][number] | undefined;
+    if (question.type === "pic") {
+      // graded on the server against the saved word; stored as the matching option id
+      if (typeof pick.text !== "string") throw new GameError("invalid_option");
+      const right = normWord(pick.text) !== "" && normWord(pick.text) === normWord(picWord(question));
+      option = question.options.find((item) => item.isCorrect === right) ?? (right ? undefined : question.options.find((item) => !item.isCorrect));
+      if (!option) throw new GameError("invalid_option");
+    } else {
+      option = question.options.find((item) => item.id === pick.optionId);
+      if (!option) throw new GameError("invalid_option");
+    }
+    const optionId = option.id;
 
     const elapsedMs = this.clock().getTime() - (session.questionStartedAt?.getTime() ?? this.clock().getTime());
     const elapsedRatio = Math.max(0, Math.min(1, elapsedMs / (question.timeLimitSecs * 1000)));
@@ -291,15 +320,39 @@ export class GameService {
     const session = await this.gameRepository.findById(sessionId);
     if (!quiz || !session || session.hostId !== hostId) throw new GameError("session_not_found");
     if (session.status !== "ACTIVE") throw new GameError("invalid_phase");
+    const question = quiz.questions.find((item) => item.order === session.currentQuestionOrder);
+    if (!question) throw new GameError("question_not_found");
     session.status = "REVEAL";
     session.closesAt = this.clock();
     await this.gameRepository.save(session);
-    const question = quiz.questions.find((item) => item.order === session.currentQuestionOrder);
-    if (!question) throw new GameError("question_not_found");
-    const payload = { questionId: question.id, correctOptionId: question.options.find((option) => option.isCorrect)?.id ?? null };
+    const { standings, answers } = await this.standings(sessionId, question.id);
+    const payload = { questionId: question.id, order: question.order, ...revealedAnswer(question), standings };
+    // host only: which option each player picked (pic: whether they got the word)
+    const choices: Record<string, number | boolean> = {};
+    for (const answer of answers) {
+      choices[answer.participantId] = question.type === "pic" ? answer.isCorrect : question.options.findIndex((option) => option.id === answer.optionId);
+    }
     this.emit(session.id, "phase", { phase: "REVEAL", questionId: question.id });
     this.emit(session.id, "reveal", payload);
-    return payload;
+    return { ...payload, choices };
+  }
+  /** Per-player standings computed from stored answers (score, streak, correct count, this question's result). */
+  private async standings(sessionId: string, questionId: string | null) {
+    const session = await this.gameRepository.findById(sessionId);
+    if (!session) throw new GameError("session_not_found");
+    const all = await this.gameRepository.listAnswers(sessionId);
+    const answers = questionId ? all.filter((answer) => answer.questionId === questionId) : [];
+    const standings = session.participants.filter((participant) => !participant.leftAt).map((participant) => {
+      const mine = all.filter((answer) => answer.participantId === participant.id);
+      const last = answers.find((answer) => answer.participantId === participant.id);
+      return {
+        id: participant.id, name: participant.name, team: participant.team, mascot: participant.mascot,
+        score: participant.score, streak: participant.streak,
+        correct: mine.filter((answer) => answer.isCorrect).length,
+        answered: !!last, lastOk: !!last?.isCorrect, lastPts: last?.points ?? 0,
+      };
+    }).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    return { standings, answers };
   }
   leaderboard(sessionId: string) {
     return this.buildLeaderboard(sessionId);
@@ -308,9 +361,14 @@ export class GameService {
     const session = await this.gameRepository.findById(sessionId);
     if (!session) throw new GameError("session_not_found");
     const players = session.participants.filter((participant) => !participant.leftAt).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
-    const teams = new Map<string, number>();
-    for (const player of players) teams.set(player.team, (teams.get(player.team) ?? 0) + player.score);
-    const payload = { players, teams: [...teams].map(([team, score]) => ({ team, score })).sort((a, b) => b.score - a.score) };
+    // a team scores the average of its members, so team size is not rewarded
+    const teams = new Map<string, { total: number; count: number }>();
+    for (const player of players) {
+      const team = teams.get(player.team) ?? { total: 0, count: 0 };
+      team.total += player.score; team.count += 1;
+      teams.set(player.team, team);
+    }
+    const payload = { players, teams: [...teams].map(([team, { total, count }]) => ({ team, score: Math.round(total / count), members: count })).sort((a, b) => b.score - a.score) };
     this.emit(sessionId, "leaderboard", payload);
     return payload;
   }
@@ -318,12 +376,14 @@ export class GameService {
     const quiz = await this.quizRepository.getQuiz(quizId, hostId);
     const session = await this.gameRepository.findById(sessionId);
     if (!quiz || !session || session.hostId !== hostId) throw new GameError("session_not_found");
+    // a question is always closed by a reveal before moving on; a closed question never reopens
+    if (session.status !== "REVEAL") throw new GameError("invalid_phase");
     const nextOrder = (session.currentQuestionOrder ?? -1) + 1;
     if (quiz.questions.some((question) => question.order === nextOrder)) return this.showQuestion(quiz, hostId, session, nextOrder);
     session.status = "FINISHED";
     session.closesAt = this.clock();
     await this.gameRepository.save(session);
-    const final = await this.buildLeaderboard(sessionId);
+    const final = { ...(await this.buildLeaderboard(sessionId)), standings: (await this.standings(sessionId, null)).standings };
     this.emit(sessionId, "phase", { phase: "FINISHED" });
     this.emit(sessionId, "final", final);
     return final;

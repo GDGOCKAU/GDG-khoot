@@ -50,7 +50,7 @@ export function Ring({ size, stroke, frac, color, children }) {
 /* live timer widgets: they re-render 10× a second, nothing else does */
 export function Secs() { useTick(); return <>{liveTime().secs}</>; }
 export function Count() { useTick(); return <>{Math.max(1, liveTime().secs)}</>; }
-export function Answered() { useTick(); return <>{G ? Object.keys(G.answers).length : 0}</>; }
+export function Answered() { useTick(); return <>{!G ? 0 : G.liveHost && G.phase === 'question' ? (G.liveAnswered || 0) : Object.keys(G.answers).length}</>; }
 export function LiveBar({ style }) { useTick(); return <i style={{ ...style, width: (100 * liveTime().frac) + '%' }} />; }
 export function LiveRing(props) { useTick(); return <Ring {...props} frac={liveTime().frac} />; }
 

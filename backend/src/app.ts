@@ -189,8 +189,13 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
     });
     app.post<{ Params: { id: string }; Body: { participantId: string; questionId: string; optionId: string } }>("/api/v1/sessions/:id/answers", async (request, reply) => {
       try {
-        const body = z.object({ participantId: z.string().uuid(), questionId: z.string().uuid(), optionId: z.string().uuid() }).parse(request.body);
-        return reply.code(201).send(await gameService.answer(request.params.id, body.participantId, body.questionId, body.optionId));
+        const body = z.object({
+          participantId: z.string().uuid(), questionId: z.string().uuid(),
+          optionId: z.string().uuid().optional(), text: z.string().max(100).optional(),
+        }).refine((value) => value.optionId || value.text !== undefined).parse(request.body);
+        const result = await gameService.answer(request.params.id, body.participantId, body.questionId, { optionId: body.optionId, text: body.text });
+        // the player learns whether they were right only at Reveal
+        return reply.code(201).send({ accepted: true, questionId: result.questionId });
       } catch (error) { return gameError(reply, error); }
     });
     app.post<{ Params: { id: string }; Body: { participantId: string } }>("/api/v1/sessions/:id/leave", async (request, reply) => {

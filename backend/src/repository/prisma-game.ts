@@ -82,6 +82,10 @@ export class PrismaGameRepository implements GameRepository {
   async countAnswers(sessionId: string, questionId: string) {
     return this.prisma.answer.count({ where: { sessionId, questionId } });
   }
+  async listAnswers(sessionId: string) {
+    const answers = await this.prisma.answer.findMany({ where: { sessionId } });
+    return answers.map((answer) => this.mapAnswer(answer));
+  }
 
   private mapParticipant(participant: {
     id: string; sessionId: string; name: string; mascot: string; team: string;
