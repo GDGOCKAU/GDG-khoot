@@ -304,7 +304,7 @@ export function Story({ kind }) {
   const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   const head = <div className="sb"><Logo /><span>GDG KAU<b style={{ color: '#1a73e8' }}>HOOT</b><small>Google Developer Group · KAU</small></span></div>;
   const foot = <>
-    <div className="foot"><span>Instagram · TikTok @GDGteam_</span><b style={{ color: '#1f2328' }}>gdgkau.com</b></div>
+    <div className="foot"><span>@gdgteam_ · @gdgockau</span><b style={{ color: '#1f2328' }}>gdgkau.com</b></div>
     <div className="stripe">{['#4285f4', '#ea4335', '#f9ab00', '#34a853'].map((c) => <span key={c} style={{ background: c }} />)}</div>
   </>;
   if (kind === 'me') {

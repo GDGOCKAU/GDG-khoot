@@ -70,7 +70,7 @@ async function drawStory(kind) {
     const win = teamStats()[0];
     if (win) { x.fillStyle = '#fff'; rr(x, 90, 1560, W - 180, 150, 30); x.fill(); x.fillStyle = '#1f2328'; x.font = F(700, 44); x.fillText(`Team ${TEAMS[win.key].name} wins!`, W / 2, 1630); x.fillStyle = '#5f6570'; x.font = F(400, 30); x.fillText(`${G.players.length} players · ${G.qs.length} questions`, W / 2, 1680); }
   }
-  x.textAlign = 'left'; x.fillStyle = '#5f6570'; x.font = F(400, 28); x.fillText('Instagram · TikTok @GDGteam_', 70, 1840);
+  x.textAlign = 'left'; x.fillStyle = '#5f6570'; x.font = F(400, 28); x.fillText('@gdgteam_ · @gdgockau', 70, 1840);
   x.textAlign = 'right'; x.fillStyle = '#1f2328'; x.font = F(700, 28); x.fillText('gdgkau.com', W - 70, 1840);
   ['#4285f4', '#ea4335', '#f9ab00', '#34a853'].forEach((col, i) => { x.fillStyle = col; x.fillRect(i * W / 4, H - 16, W / 4, 16); });
   return new Promise((res) => c.toBlob(res, 'image/png'));

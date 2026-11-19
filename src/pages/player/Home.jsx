@@ -5,6 +5,7 @@ import { DB, ready, topicNames, useAppState } from '../../lib/store';
 import { G, UI, hosted } from '../../lib/engine';
 import { toast } from '../../lib/ui';
 import { ColorBar, Hang, Ico, Logo, ThemeButton, TopicChip, TopicIcon } from '../../components/common/UI';
+import SiteFooter from '../../components/common/SiteFooter';
 
 const SECTIONS = ['join', 'quizzes', 'how'];
 
@@ -124,7 +125,7 @@ function Home() {
         </div>
       </div></section>
     </main>
-    <footer className="site-foot"><div className="in"><span>GDG on Campus · King Abdulaziz University</span><Link to="/admin" style={{ color: 'var(--muted)' }}>Admin sign in</Link></div><ColorBar /></footer>
+    <SiteFooter />
   </>;
 }
 
