@@ -6,6 +6,7 @@ type Ack = (result: { ok: boolean; error?: string; state?: unknown }) => void;
 
 export const playerRoom = (sessionId: string) => `game:${sessionId}`;
 export const hostRoom = (sessionId: string) => `host:${sessionId}`;
+export const participantRoom = (participantId: string) => `p:${participantId}`;
 
 export type RealtimeDeps = {
   gameService: GameService;
@@ -27,7 +28,7 @@ export function attachRealtime(httpServer: HttpServer, deps: RealtimeDeps) {
       }
       try {
         const state = await deps.gameService.participantState(sessionId, participantId);
-        await socket.join(playerRoom(sessionId));
+        await socket.join([playerRoom(sessionId), participantRoom(participantId)]);
         socket.data.sessionId = sessionId;
         socket.data.participantId = participantId;
         ack?.({ ok: true, state });
@@ -53,7 +54,9 @@ export function attachRealtime(httpServer: HttpServer, deps: RealtimeDeps) {
 /** Routes game events: "host" events never reach the player room. */
 export function roomEmitter(io: Server) {
   return (sessionId: string, event: string, payload: unknown, audience: EventAudience = "all") => {
-    const target = audience === "host" ? io.to(hostRoom(sessionId)) : io.to(playerRoom(sessionId)).to(hostRoom(sessionId));
+    const target = audience === "host" ? io.to(hostRoom(sessionId))
+      : audience === "all" ? io.to(playerRoom(sessionId)).to(hostRoom(sessionId))
+      : io.to(participantRoom(audience.participantId));
     target.emit(event, payload);
   };
 }

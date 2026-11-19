@@ -82,6 +82,10 @@ export class PrismaGameRepository implements GameRepository {
   async countAnswers(sessionId: string, questionId: string) {
     return this.prisma.answer.count({ where: { sessionId, questionId } });
   }
+  async listSessions(hostId: string) {
+    const sessions = await this.prisma.gameSession.findMany({ where: { hostId }, include: { participants: true } });
+    return sessions.map((session) => this.mapSession(session));
+  }
   async listAnswers(sessionId: string) {
     const answers = await this.prisma.answer.findMany({ where: { sessionId } });
     return answers.map((answer) => this.mapAnswer(answer));
@@ -101,7 +105,7 @@ export class PrismaGameRepository implements GameRepository {
   }
   private mapSession(session: {
     id: string; quizId: string; hostId: string; pin: string; status: string;
-    currentQuestionOrder: number | null; questionStartedAt: Date | null; closesAt: Date | null;
+    currentQuestionOrder: number | null; questionStartedAt: Date | null; closesAt: Date | null; updatedAt: Date;
     participants: Array<{ id: string; sessionId: string; name: string; mascot: string; team: string; score: number; streak: number; leftAt: Date | null }>;
   }): GameSession {
     return {

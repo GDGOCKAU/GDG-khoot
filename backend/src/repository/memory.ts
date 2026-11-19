@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Admin, Question, Quiz, Repository } from "../domain.js";
+import type { Admin, Question, Quiz, Repository, SaveQuestionInput } from "../domain.js";
 
 export class MemoryRepository implements Repository {
   readonly admins: Admin[] = [];
@@ -69,8 +69,9 @@ export class MemoryRepository implements Repository {
     hostId: string;
     title: string;
     description?: string;
+    topic?: string;
     isPublished: boolean;
-    questions: Array<{ text: string; order: number; timeLimitSecs: number; options: Array<{ text: string; isCorrect: boolean }> }>;
+    questions: SaveQuestionInput[];
   }) {
     let quiz = input.quizId ? await this.getQuiz(input.quizId, input.hostId) : null;
     if (!quiz) {
@@ -79,12 +80,20 @@ export class MemoryRepository implements Repository {
       Object.assign(quiz, { title: input.title, description: input.description, isPublished: input.isPublished });
     }
     quiz.isPublished = input.isPublished;
+    quiz.topic = input.topic ?? null;
     quiz.questions = input.questions.map((question) => ({
       id: randomUUID(),
       quizId: quiz!.id,
       text: question.text,
       order: question.order,
       timeLimitSecs: question.timeLimitSecs,
+      type: question.type ?? "mc",
+      code: question.code ?? null,
+      language: question.language ?? null,
+      pictureUrls: question.pictureUrls ?? null,
+      word: question.word ?? null,
+      imageUrl: question.imageUrl ?? null,
+      points: question.points ?? 1,
       options: question.options.map((option) => ({ id: randomUUID(), text: option.text, isCorrect: option.isCorrect })),
     }));
     return quiz;

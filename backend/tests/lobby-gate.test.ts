@@ -26,7 +26,7 @@ async function setup() {
       ],
     }],
   });
-  const gameService = new GameService(repository, new MemoryGameRepository());
+  const gameService = new GameService(repository, new MemoryGameRepository(), undefined, undefined, { ready: 20, reveal: 2000, earlyClose: 20 });
   const app = buildApp(repository, "test-secret-that-is-long", gameService);
   await app.ready();
   const io: Server = attachRealtime(app.server, { gameService, verifyHostToken: (t) => app.jwt.verify<{ id: string }>(t).id });
@@ -133,10 +133,21 @@ describe("lobby gate (server enforced)", () => {
     await emitAck(watcher, "game:join", session.id, b.id);
     const seen: Array<{ event: string; payload: unknown }> = [];
     watcher.onAny((event, payload) => seen.push({ event, payload }));
-    await app.inject({ method: "POST", url: `/api/v1/sessions/${session.id}/start`, headers: auth, payload: { quizId: QUIZ_ID } });
-    await app.inject({ method: "POST", url: `/api/v1/sessions/${session.id}/answers`, payload: { participantId: a.id, questionId: Q1, optionId: "33333333-3333-4333-8333-333333333333" } });
-    await wait(200);
+    const gotQuestion = new Promise((resolve) => watcher.once("question", resolve));
+    await app.inject({ method: "POST", url: `/api/v1/sessions/${session.id}/start`, headers: auth, payload: {} });
+    await gotQuestion;
+    const answered = await app.inject({ method: "POST", url: `/api/v1/sessions/${session.id}/answers`, payload: { participantId: a.id, questionId: Q1, optionId: "33333333-3333-4333-8333-333333333333" } });
+    expect(answered.json()).toEqual({ accepted: true, questionId: Q1 });
+    await wait(150);
     expect(JSON.stringify(seen)).not.toContain("isCorrect");
     expect(seen.map((s) => s.event)).not.toContain("answer_count");
+    // at reveal B gets only B's own result; the host-only reveal never reaches a phone
+    await app.inject({ method: "POST", url: `/api/v1/sessions/${session.id}/skip`, headers: auth, payload: {} });
+    await wait(200);
+    const results = seen.filter((s) => s.event === "result").map((s) => s.payload as { answered: boolean; correct: boolean });
+    expect(results).toEqual([expect.objectContaining({ answered: false, correct: false })]);
+    expect(seen.map((s) => s.event)).toContain("reveal");
+    expect(seen.map((s) => s.event)).not.toContain("reveal_host");
+    expect(seen.map((s) => s.event)).not.toContain("leaderboard");
   });
 });

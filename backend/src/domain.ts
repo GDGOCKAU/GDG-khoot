@@ -12,11 +12,15 @@ export type Question = {
   language?: string | null;
   pictureUrls?: string[] | null;
   word?: string | null;
+  imageUrl?: string | null;
+  /** 0 = no points, 1 = standard, 2 = double; null/undefined = 1 */
+  points?: number | null;
 };
 export type Quiz = {
   id: string;
   title: string;
   description?: string | null;
+  topic?: string | null;
   isPublished: boolean;
   hostId: string;
   questions: Question[];
@@ -41,17 +45,22 @@ export interface Repository {
     hostId: string;
     title: string;
     description?: string;
+    topic?: string;
     isPublished: boolean;
-    questions: Array<{
-      text: string;
-      order: number;
-      timeLimitSecs: number;
-      options: Array<{ text: string; isCorrect: boolean }>;
-      type?: string;
-      code?: string;
-      language?: string;
-      pictureUrls?: string[];
-      word?: string;
-    }>;
+    questions: SaveQuestionInput[];
   }): Promise<Quiz>;
 }
+
+export type SaveQuestionInput = {
+  text: string;
+  order: number;
+  timeLimitSecs: number;
+  options: Array<{ text: string; isCorrect: boolean }>;
+  type?: string;
+  code?: string;
+  language?: string;
+  pictureUrls?: string[];
+  word?: string;
+  imageUrl?: string | null;
+  points?: number;
+};

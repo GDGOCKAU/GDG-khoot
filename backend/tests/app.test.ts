@@ -75,7 +75,7 @@ describe("backend API foundation", () => {
 
     const draft = await app.inject({
       method: "POST", url: "/api/v1/quizzes/save", headers,
-      payload: { title: "Draft quiz", description: "Editable", isPublished: false, questions: [] },
+      payload: { title: "Draft quiz", description: "Editable", isPublished: false, questions: [{ text: "", order: 0, timeLimitSecs: 20, options: [] }] },
     });
     expect(draft.statusCode).toBe(201);
     expect(draft.json().isPublished).toBe(false);
@@ -194,5 +194,40 @@ describe("backend API foundation", () => {
     const saved = await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: { title: "P", isPublished: true, questions: [question([url, url])] } });
     expect(saved.statusCode).toBe(201);
     await app.close();
+  });
+
+  it("validates quizzes like the editor: limits on every save, completeness on publish", async () => {
+    const { app } = setup();
+    const token = (await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "admin@example.com", password: "secret" } })).json().token;
+    const save = (payload: Record<string, unknown>) => app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: { authorization: `Bearer ${token}` }, payload });
+    const q = (extra: Record<string, unknown>) => ({ text: "Question", order: 0, timeLimitSecs: 20, options: [{ text: "A", isCorrect: true }, { text: "B", isCorrect: false }], ...extra });
+    // limits
+    expect((await save({ title: "x".repeat(61), isPublished: false, questions: [q({})] })).statusCode).toBe(400);
+    expect((await save({ title: "T", description: "d".repeat(91), isPublished: false, questions: [q({})] })).statusCode).toBe(400);
+    expect((await save({ title: "T", isPublished: false, questions: [q({ text: "t".repeat(161) })] })).statusCode).toBe(400);
+    expect((await save({ title: "T", isPublished: false, questions: [q({ timeLimitSecs: 25 })] })).statusCode).toBe(400);
+    expect((await save({ title: "T", isPublished: false, questions: [q({ points: 3 })] })).statusCode).toBe(400);
+    expect((await save({ title: "T", isPublished: false, questions: [q({ type: "pic", word: "NO-DASH" })] })).statusCode).toBe(400);
+    // drafts may be incomplete, publishing may not
+    const half = { title: "T", isPublished: false, questions: [q({ type: "code", code: "" })] };
+    expect((await save(half)).statusCode).toBe(201);
+    const refused = await save({ ...half, isPublished: true });
+    expect(refused.statusCode).toBe(400);
+    expect(refused.json()).toMatchObject({ error: "invalid_publish_quiz", problems: [{ index: 0, problem: "needs code" }] });
+    expect((await save({ title: "T", isPublished: true, questions: [q({ type: "pic", pictureUrls: ["/uploads/a.png"], word: "DOOR" })] })).json().problems[0].problem).toBe("needs 2 pictures");
+    expect((await save({ title: "T", isPublished: true, questions: [q({ options: [{ text: "A", isCorrect: true }] })] })).json().problems[0].problem).toBe("needs 2 answers");
+    // the server owns picture options (from the word) and keeps points / image / topic
+    const ok = await save({ title: "T", topic: "Cloud", isPublished: true, questions: [
+      q({ type: "pic", pictureUrls: ["/uploads/a.png", "/uploads/b.png"], word: "door man", options: [] }),
+      q({ order: 1, points: 2, imageUrl: "/uploads/c.png" }),
+      q({ order: 2, points: 0, options: [{ text: "A", isCorrect: true }, { text: "", isCorrect: false }, { text: "C", isCorrect: false }, { text: "", isCorrect: false }] }),
+    ] });
+    expect(ok.statusCode).toBe(201);
+    const saved = ok.json();
+    expect(saved.topic).toBe("Cloud");
+    expect(saved.questions[0]).toMatchObject({ word: "DOORMAN", options: [{ text: "DOORMAN", isCorrect: true }, { text: "NOT_DOORMAN", isCorrect: false }] });
+    expect(saved.questions[1]).toMatchObject({ points: 2, imageUrl: "/uploads/c.png" });
+    expect(saved.questions[2].options.map((o: { text: string }) => o.text)).toEqual(["A", "C"]);
+    expect(saved.questions[2].points).toBe(0);
   });
 });

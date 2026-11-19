@@ -21,6 +21,7 @@ model Quiz {
   id          String     @id @default(uuid())
   title       String
   description String?
+  topic       String?
   isPublished Boolean    @default(false)
   hostId      String
   host        Admin      @relation(fields: [hostId], references: [id], onDelete: Cascade)
@@ -44,6 +45,8 @@ model Question {
   language      String?
   pictureUrls   Json?
   word          String?
+  imageUrl      String?
+  points        Int?
   options       Option[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

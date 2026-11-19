@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-import type { Repository } from "../domain.js";
+import type { Repository, SaveQuestionInput } from "../domain.js";
 
 export class PrismaRepository implements Repository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -77,7 +77,8 @@ export class PrismaRepository implements Repository {
     title: string;
     description?: string;
     isPublished: boolean;
-    questions: Array<{ text: string; order: number; timeLimitSecs: number; options: Array<{ text: string; isCorrect: boolean }>; type?: string; code?: string; language?: string; pictureUrls?: string[]; word?: string }>;
+    topic?: string;
+    questions: SaveQuestionInput[];
   }) {
     return this.prisma.$transaction(async (tx) => {
       const quiz = input.quizId
@@ -88,10 +89,10 @@ export class PrismaRepository implements Repository {
       const saved = quiz
         ? await tx.quiz.update({
             where: { id: quiz.id },
-            data: { title: input.title, description: input.description ?? null, isPublished: input.isPublished },
+            data: { title: input.title, description: input.description ?? null, topic: input.topic ?? null, isPublished: input.isPublished },
           })
         : await tx.quiz.create({
-            data: { title: input.title, description: input.description ?? null, isPublished: input.isPublished, hostId: input.hostId },
+            data: { title: input.title, description: input.description ?? null, topic: input.topic ?? null, isPublished: input.isPublished, hostId: input.hostId },
           });
 
       await tx.question.deleteMany({ where: { quizId: saved.id } });
@@ -106,6 +107,8 @@ export class PrismaRepository implements Repository {
           language: question.language,
           pictureUrls: question.pictureUrls ?? undefined,
           word: question.word,
+          imageUrl: question.imageUrl ?? null,
+          points: question.points ?? 1,
         })),
       });
       const savedQuestions = await tx.question.findMany({
