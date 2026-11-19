@@ -63,7 +63,7 @@ export function AdminShell({ children }) {
           <NavLink to="/admin" end className={({ isActive }) => (isActive ? 'on' : '')} title="Dashboard"><Ico n="grid" /><span className="lbl">Dashboard</span></NavLink>
           <NavLink to="/admin/new" className={({ isActive }) => (isActive ? 'on' : '')} title="Create quiz"><Ico n="plusc" /><span className="lbl">Create quiz</span></NavLink>
         </nav>
-        {!sideClosed && <Hang width={190} style="top:50px;left:-48px;width:190px;height:calc(100vh - 120px);min-height:420px" />}
+        {!sideClosed && <Hang width={190} style="top:50px;left:-48px;width:190px;height:calc(100vh - 190px);min-height:420px" />}
         <div style={{ flexGrow: 1 }} />
         <div className="sess" style={{ background: 'var(--bg)' }}>
           <span className="lock"><Ico n="lock" /></span>
