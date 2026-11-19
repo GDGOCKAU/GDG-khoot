@@ -9,6 +9,7 @@ import { toast, useAnims, useWide } from '../../lib/ui';
 import { Bounce, Ico, LiveBar, LiveRing, MePill, Secs, Count, Answered } from '../../components/common/UI';
 import { AnswersBlock, Boxes, ChosenPill, FinalBlock, LbBlock, PlayerAnswerArea, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
 import { LapShell, PShell } from '../../components/layout/Shells';
+import { CodeSnack, PokeDevu } from '../../components/player/WaitFun';
 import GameOver from './GameOver';
 import GameClosed from './GameClosed';
 
@@ -120,9 +121,9 @@ function PlayerView() {
       return shell(
         <div className="center-col">
           <span className="chip">{qLabel}</span>
-          {av(wide ? 170 : 130)}
-          <h1 style={{ fontSize: wide ? 60 : 40, display: 'flex', alignItems: 'baseline' }}>Waiting<Bounce /></h1>
+          <PokeDevu me={me} team={T} size={wide ? 170 : 130} />
           <ChosenPill qq={qq} choice={a.choice} big={wide} />
+          <CodeSnack />
           <p style={css('margin:0;color:var(--muted)')} className={wide ? 'lead18' : ''}>Waiting for the others… <b style={{ color: 'var(--ink)' }}><Answered /></b> / {G.players.length} answered</p>
           <div style={css('display:flex;align-items:center;gap:12px')}><div className="tbar"><LiveBar /></div><span className="num" style={css('color:var(--muted);font-size:16px;font-weight:600')}><Secs />s</span></div>
           <p style={css('margin:0;font-size:15px;color:var(--muted)')}>{wide ? 'Look at the big screen. The answer shows when time is up.' : 'The answer shows when time is up.'}</p>

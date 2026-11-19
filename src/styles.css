@@ -799,3 +799,29 @@ html.dark .danger-zone { border-color: #5c2b29; }
 
 .brand > span { white-space: nowrap; }
 @media (max-width: 700px) { .host-top { flex-wrap: wrap; } .host-top .brand { font-size: 16px; } .host-top .brand svg { width: 40px; height: 22px; } .host-top > div > .chip { font-size: 12px; padding: 4px 10px; } }
+
+/* ---------- waiting screen: poke Devu + code snack ---------- */
+.poke { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.poke-btn { position: relative; display: inline-flex; padding: 0; border: 0; background: none; border-radius: 50%; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.poke-btn:focus-visible { outline: 3px solid var(--blue, #1a73e8); outline-offset: 6px; }
+.poke-btn:hover .avatar { transform: scale(1.03); }
+.poke-btn .avatar { transition: transform .15s var(--ease, ease); }
+.poke-pop { animation: poke-squish .45s cubic-bezier(.3,1.6,.5,1); }
+@keyframes poke-squish { 0% { transform: scale(1); } 25% { transform: scale(.86, 1.08) rotate(-6deg); } 55% { transform: scale(1.08, .94) rotate(4deg); } 100% { transform: scale(1); } }
+.poke-float { position: absolute; top: 4%; right: 6%; font-weight: 800; font-size: 20px; color: var(--ink); pointer-events: none; animation: poke-float .8s ease-out forwards; }
+@keyframes poke-float { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-36px); } }
+.poke-count { position: absolute; bottom: 4%; right: 2%; min-width: 34px; height: 34px; padding: 0 8px; border-radius: 999px; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 15px; border: 3px solid var(--canvas); }
+.poke-line { margin: 0; font-size: 20px; font-weight: 700; min-height: 1.4em; }
+.snack { display: block; width: min(100%, 420px); padding: 0; cursor: pointer; font: inherit; transition: transform .15s; }
+.snack:active { transform: scale(.98); }
+.snack:focus-visible { outline: 3px solid var(--blue, #1a73e8); outline-offset: 3px; }
+.snack .codebar { padding: 7px 12px; }
+.snack-dots { display: inline-flex; gap: 5px; } .snack-dots i { width: 9px; height: 9px; border-radius: 50%; background: #f28b82; } .snack-dots i:nth-child(2) { background: #fdd663; } .snack-dots i:nth-child(3) { background: #81c995; }
+.snack-tap { font-weight: 500; letter-spacing: 0; text-transform: none; opacity: .8; }
+.snack-body { display: block; padding: 14px 16px; min-height: 3.2em; font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; line-height: 1.6; text-align: left; white-space: normal; overflow-wrap: anywhere; animation: snack-in .35s ease-out; }
+@keyframes snack-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.snack-note { color: #8a919c; font-style: italic; }
+.snack-prompt { color: #81c995; font-weight: 700; }
+.snack-cursor { display: inline-block; width: .55em; height: 1.1em; margin-left: 3px; vertical-align: -.18em; background: #8ab4f8; animation: snack-blink 1s steps(1) infinite; }
+@keyframes snack-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .poke-pop, .poke-float, .snack-body, .snack-cursor { animation: none !important; } .poke-float { display: none; } }
