@@ -16,10 +16,10 @@ CREATE TABLE "GameSession" (
 
 CREATE TABLE "Participant" (
     "id" TEXT NOT NULL,
-    "sessionId" TEXT NOT NOT NULL,
+    "sessionId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "mascot" TEXT NOT NULL,
-    "team" TEXT NOT NOT NULL,
+    "team" TEXT NOT NULL,
     "score" INTEGER NOT NULL DEFAULT 0,
     "streak" INTEGER NOT NULL DEFAULT 0,
     "leftAt" TIMESTAMP(3),

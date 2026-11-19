@@ -105,7 +105,11 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
     app.post("/api/v1/sessions/join", async (request, reply) => {
       try {
         const body = z.object({ pin: z.string().regex(/^\d{6}$/), name: z.string().trim().min(1).max(40), mascot: z.string().trim().min(1).max(40), team: z.string().trim().min(1).max(40) }).parse(request.body);
-        return reply.code(201).send(await gameService.joinByPin(body.pin, body));
+        return reply.code(201).send(await gameService.joinByPin(body.pin, {
+          name: body.name,
+          mascot: body.mascot,
+          team: body.team,
+        }));
       } catch (error) { return gameError(reply, error); }
     });
     app.post<{ Params: { id: string }; Body: { quizId: string } }>("/api/v1/sessions/:id/start", { onRequest: [app.authenticate] }, async (request, reply) => {
