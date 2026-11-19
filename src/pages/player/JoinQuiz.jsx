@@ -49,7 +49,7 @@ function JoinQuiz({ quiz, live }) {
       newLiveGame(quiz, { name, team: look.team, img: mascot(look.team, look.idx) }, { sessionId: participant.sessionId, participantId: participant.id });
       connectLivePlayer(participant.sessionId, participant.id);
     } catch (error) {
-      toast(error.status === 409
+      toast(error.body?.error === 'game_locked' ? 'The host has locked this game.' : error.status === 409
         ? 'That nickname is already in this session. Choose another.'
         : error.status === 404
           ? 'This live session no longer exists.'

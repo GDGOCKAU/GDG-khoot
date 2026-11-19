@@ -45,10 +45,12 @@ export class PrismaGameRepository implements GameRepository {
     });
     if (existing) return "duplicate";
     try {
-      const participant = await this.prisma.participant.create({ data: { sessionId, ...input } });
+      const participant = await this.prisma.participant.create({ data: { sessionId, name: input.name, mascot: input.mascot, team: input.team } });
       return this.mapParticipant(participant);
-    } catch {
-      return "duplicate";
+    } catch (error) {
+      // only a unique-name clash is a duplicate; anything else is a real error
+      if ((error as { code?: string }).code === "P2002") return "duplicate";
+      throw error;
     }
   }
   async leave(sessionId: string, participantId: string) {

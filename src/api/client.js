@@ -1,7 +1,7 @@
+/* Same origin by default: the page's own address (LAN IP, localhost or a tunnel URL);
+   Vite forwards /api, /socket.io and /uploads to the backend. VITE_API_URL overrides it. */
 const configuredApiUrl = import.meta.env.VITE_API_URL;
-const browserApiUrl = typeof window !== "undefined" && window.location.hostname
-  ? `${window.location.protocol}//${window.location.hostname}:3000`
-  : "http://localhost:3000";
+const browserApiUrl = typeof window !== "undefined" && window.location.origin ? window.location.origin : "";
 export const API_URL = (configuredApiUrl || browserApiUrl).replace(/\/$/, "");
 
 /* uploaded images are stored as /uploads/... on the API server */

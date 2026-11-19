@@ -55,19 +55,23 @@ function backendQuestions(d) {
       language: type === 'code' ? String(question.lang || '') : undefined,
       pictureUrls: type === 'pic' ? (question.pics || []).map(storedUrl) : undefined,
       word: type === 'pic' ? norm(question.word) : undefined,
+      points: [0, 1, 2].includes(question.points) ? question.points : 1,
+      imageUrl: (type === 'mc' || type === 'tf') && question.img ? storedUrl(question.img) : null,
     };
   });
 }
 /* pictures are uploaded as files first; only their URL is saved with the quiz */
 const storedUrl = (u) => (typeof u === 'string' && u.startsWith(API_URL + '/uploads/') ? u.slice(API_URL.length) : u);
+const upload = async (src) => {
+  if (typeof src !== 'string' || !src.startsWith('data:')) return src;
+  const { url } = await apiRequest('/api/v1/uploads', { method: 'POST', body: JSON.stringify({ dataUrl: src }) });
+  return API_URL + url;
+};
 async function uploadPictures(d) {
   for (const question of d.questions) {
-    if (qType(question) !== 'pic') continue;
-    question.pics = await Promise.all((question.pics || []).map(async (src) => {
-      if (typeof src !== 'string' || !src.startsWith('data:')) return src;
-      const { url } = await apiRequest('/api/v1/uploads', { method: 'POST', body: JSON.stringify({ dataUrl: src }) });
-      return API_URL + url;
-    }));
+    const t = qType(question);
+    if (t === 'pic') question.pics = await Promise.all((question.pics || []).map(upload));
+    if ((t === 'mc' || t === 'tf') && question.img) question.img = await upload(question.img);
   }
 }
 async function saveBackend(d, ed, setSaveState) {
@@ -79,6 +83,7 @@ async function saveBackend(d, ed, setSaveState) {
         quizId: isUuid(d.id) ? d.id : undefined,
         title: d.title.trim() || 'Untitled Quiz',
         description: d.desc || '',
+        topic: d.topic || undefined,
         isPublished: d.status === 'ready',
         questions: backendQuestions(d),
       }),
@@ -139,7 +144,10 @@ function CreateQuiz({ quiz }) {
     if (!d.title.trim()) { toast('Give the quiz a title.'); document.querySelector('[data-f="title"]')?.focus(); return; }
     const i = d.questions.findIndex(qProblem);
     if (i >= 0) { ed.cur = i; rerender(); toast(`Question ${i + 1} ${qProblem(d.questions[i])}.`); return; }
-    upsertQuiz(d); ed.dirty = 0; rerender(); toast('Changes saved');
+    saveBackend(d, ed, setSaveState).then((saved) => {
+      if (!saved) return;
+      ed.dirty = 0; rerender(); toast('Changes saved');
+    });
   }
   function discard() {
     ed.draft = JSON.parse(JSON.stringify(stored)); ed.dirty = 0; ed.cur = Math.min(ed.cur, ed.draft.questions.length - 1);

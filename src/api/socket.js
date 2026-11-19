@@ -1,9 +1,8 @@
 import { io } from "socket.io-client";
 
 const configuredSocketUrl = import.meta.env.VITE_SOCKET_URL;
-const browserSocketUrl = typeof window !== "undefined" && window.location.hostname
-  ? `${window.location.protocol}//${window.location.hostname}:3000`
-  : "http://localhost:3000";
+/* same origin as the page (see api/client.js); Vite forwards /socket.io to the backend */
+const browserSocketUrl = typeof window !== "undefined" && window.location.origin ? window.location.origin : "";
 export const SOCKET_URL = (configuredSocketUrl || browserSocketUrl).replace(/\/$/, "");
 
 export function connectSocket() {

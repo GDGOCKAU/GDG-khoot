@@ -41,7 +41,7 @@ export function newGame(quiz, mode, me, opts = {}) {
   const free = () => names.filter((n) => !G.players.some((p) => p.name.toLowerCase() === n.toLowerCase()));
   if (mode === 'player') { free().slice(0, 11).forEach((n) => G.players.push(makeBot(n))); setPhase('ready', 3000); }
   else if (opts.live) {
-    /* live host: real players arrive from the server, never practice bots */
+    /* live host: real players arrive from the server, never practice bots; the server owns the phases */
     G.liveHost = true;
     G.join = () => {};
   } else {
@@ -69,26 +69,7 @@ function setPhase(phase, ms) {
   G.phase = phase; G.phaseStart = Date.now(); G.phaseEnd = ms ? Date.now() + ms : 0;
   notify();
 }
-/* live host: the server opens the question (POST /start or /next); the screen follows its closesAt */
-let liveHostOpen = null;
-export function onLiveHostOpen(f) { liveHostOpen = f; }
-/* live host hooks set by live.js: reveal, finish, cancel */
-const liveHooks = {};
-export function setLiveHooks(h) { Object.assign(liveHooks, h); }
 function startQuestion(i) {
-  if (G.liveHost && liveHostOpen) {
-    const g = G;
-    G.phaseEnd = 0; // hold the countdown screen until the server answers
-    liveHostOpen(i).then((q) => {
-      if (G !== g) return;
-      G.qi = i; G.answers = {}; G.liveAnswered = 0;
-      G.phase = 'question';
-      G.phaseEnd = Date.now() + Math.max(0, new Date(q.closesAt).getTime() - Date.now());
-      G.phaseStart = G.phaseEnd - q.timeLimitSecs * 1000;
-      notify();
-    }).catch(() => { if (G === g) notify(); });
-    return;
-  }
   G.qi = i; G.answers = {};
   const qq = curQ();
   G.players.forEach((p) => {
@@ -103,24 +84,12 @@ function startQuestion(i) {
 }
 export function answer(pid, choice) {
   if (!G || G.phase !== 'question' || G.answers[pid]) return;
-  if (G.live) { if (pid === 'me') liveAnswer(choice); return; }
+  if (G.live) { if (pid === 'me' && live.answer) { G.answers.me = { choice, t: Date.now() - G.phaseStart }; notify(); live.answer(curQ(), choice); } return; }
   G.answers[pid] = { choice, t: Date.now() - G.phaseStart };
   if (pid === 'me') notify();
   if (Object.keys(G.answers).length >= G.players.length) setTimeout(() => { if (G && G.phase === 'question') endQuestion(); }, 600);
 }
 function endQuestion() {
-  if (G.liveHost && liveHooks.reveal) {
-    if (G.revealing) return;
-    const g = G;
-    G.revealing = true; G.phaseEnd = 0;
-    liveHooks.reveal().then((r) => {
-      if (G !== g) return;
-      G.revealing = false;
-      applyStandings(r, r.choices);
-      setPhase('reveal', 5500);
-    }).catch(() => { if (G === g) { G.revealing = false; G.phaseEnd = Date.now() + 2000; notify(); } });
-    return;
-  }
   const qq = curQ();
   const limit = qq.time * 1000;
   G.prevIdx = {}; G.prevTeams = {};
@@ -140,7 +109,8 @@ function endQuestion() {
   setPhase('reveal', hosted() ? 5500 : 3500);
 }
 export function ranked() { return G.players.slice().sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)); }
-export function rankOf(p) { return ranked().indexOf(p) + 1; }
+/* live phones only know their own rank, from the server's result */
+export function rankOf(p) { return p && p.liveRank ? p.liveRank : ranked().indexOf(p) + 1; }
 export function teamStats() {
   return TEAM_KEYS.map((k) => {
     const ps = G.players.filter((p) => p.team === k);
@@ -159,13 +129,8 @@ export function recordGame() {
 function tick() {
   if (!G) return;
   const now = Date.now();
-  /* live player: the server moves the phases; locally we only redraw timers */
-  if (G.live) {
-    /* display only: reveal -> leaderboard -> next-countdown, then wait for the server */
-    if (G.phaseEnd && now >= G.phaseEnd && (G.phase === 'reveal' || G.phase === 'leaderboard')) { advance(); return; }
-    if (G.phaseEnd && now >= G.phaseEnd) G.phaseEnd = 0;
-    tickN += 1; tickSubs.forEach((f) => f()); return;
-  }
+  /* live game: the server moves the phases; locally only the timers redraw */
+  if (G.live || G.liveHost) { tickN += 1; tickSubs.forEach((f) => f()); return; }
   if (G.phase === 'question') {
     const el = now - G.phaseStart;
     G.players.forEach((p) => { if (p.bot && p.plan && !G.answers[p.id] && el >= p.plan.at) answer(p.id, p.plan.choice); });
@@ -178,12 +143,9 @@ function advance() {
   switch (G.phase) {
     case 'ready': startQuestion(0); break;
     case 'question': endQuestion(); break;
-    case 'reveal': if (hosted() || G.live) setPhase('leaderboard', 7000); else setPhase('answers', 4500); break;
+    case 'reveal': if (hosted()) setPhase('leaderboard', 7000); else setPhase('answers', 4500); break;
     case 'answers': setPhase('leaderboard', 7000); break;
-    case 'leaderboard':
-      if (G.live) { if (!last) setPhase('next', 3000); else G.phaseEnd = 0; break; }
-      if (last) { if (G.liveHost && liveHooks.finish) liveHooks.finish(); setPhase('teams', 8000); } else setPhase('next', 3000);
-      break;
+    case 'leaderboard': if (last) setPhase('teams', 8000); else setPhase('next', 3000); break;
     case 'next': startQuestion(G.qi + 1); break;
     case 'teams': setPhase('podium', 9000); break;
     case 'podium': recordGame(); setPhase('final', 0); break;
@@ -193,12 +155,16 @@ function advance() {
 
 /* host controls */
 export function startHost(quiz, opts = {}) { newGame(quiz, 'host', null, opts); }
-export function toggleLock() { G.locked = !G.locked; clearTimeout(G.joinTimer); if (!G.locked) G.joinTimer = setTimeout(G.join, 700); notify(); }
-export function startGame() { clearTimeout(G.joinTimer); setPhase('ready', 3000); }
-export function skip() { G.phaseEnd = Date.now(); }
-export function endGame() { if (G && G.resumeKey) localStorage.removeItem(G.resumeKey); recordGame(); if (G.me) { G.ended = true; clearInterval(G.timer); notify(); } else stopGame(); }
+export function toggleLock() {
+  if (G.liveHost) { if (live.lock) live.lock(!G.locked); return; }
+  G.locked = !G.locked; clearTimeout(G.joinTimer); if (!G.locked) G.joinTimer = setTimeout(G.join, 700); notify();
+}
+export function startGame() { if (G.liveHost) { if (live.start) live.start(); return; } clearTimeout(G.joinTimer); setPhase('ready', 3000); }
+export function skip() { if (G.liveHost) { if (live.skip) live.skip(); return; } G.phaseEnd = Date.now(); }
+export function endGame() {
+  if (G && G.resumeKey) localStorage.removeItem(G.resumeKey); recordGame(); if (G.me) { G.ended = true; clearInterval(G.timer); notify(); } else stopGame(); }
 export function exitGame() {
-  if (G && G.liveHost && liveHooks.cancel && G.phase !== 'final') liveHooks.cancel();
+  if (G && G.liveHost && live.cancel && G.phase !== 'final') live.cancel();
   if (G && G.resumeKey) localStorage.removeItem(G.resumeKey);
   const hadMe = G && G.me ? { title: G.quiz.title, name: G.me.name } : null;
   stopGame(false); UI.closed = hadMe; notify();
@@ -240,94 +206,112 @@ export function joinGame(look, quiz) {
   return '';
 }
 
-/* ---------- LIVE PLAYER (server-driven) ----------
-   The player gets no questions up front. It sits in 'lobby' until the server sends
-   the first "question" event, which only happens after the host's /start. */
+/* ---------- LIVE GAME (server-driven) ----------
+   Host and phones show whatever phase the server pushes. live.js wires the socket and
+   fills these hooks; the engine never moves a live game by itself. */
+export const live = { answer: null, start: null, skip: null, lock: null, cancel: null };
+const mascotIdx = (m) => { const n = Number(String(m || '').split('-')[1]); return Number.isInteger(n) ? n : 0; };
+let clockOffset = 0; // server clock minus this device's clock
+
+/* a phone that joined: no questions, no bots, waits in the lobby */
 export function newLiveGame(quiz, me, { sessionId, participantId }) {
   stopGame(false);
-  G = { quiz, qs: Array.from({ length: quiz.questionCount || 0 }, () => null), mode: 'player', live: true, pin: quiz.livePin, backendSessionId: sessionId, participantId, players: [], qi: -1, phase: 'lobby', phaseStart: Date.now(), phaseEnd: 0, answers: {}, locked: false, me: null, timer: null, joinTimer: null, recorded: false, socket: null };
+  G = { quiz, qs: Array.from({ length: quiz.questionCount || 0 }, () => null), mode: 'player', live: true, pin: quiz.livePin, backendSessionId: sessionId, participantId, players: [], qi: -1, phase: 'lobby', phaseStart: Date.now(), phaseEnd: 0, answers: {}, locked: false, me: null, timer: null, joinTimer: null, recorded: false, socket: null, power: null };
   UI.showOver = false; UI.closed = null;
   addMe(me);
   G.timer = setInterval(tick, 100);
   notify();
 }
-/* a question as the server sends it: options carry ids, never correctness */
-export function liveQuestion(q) {
-  if (!G || !G.live || !q) return;
-  while (G.qs.length < (q.questionCount || 0)) G.qs.push(null);
-  G.qs[q.order] = {
+
+/* a server question in the shape the screens already use; options keep their ids */
+function toLocalQuestion(q) {
+  return {
     type: q.type || 'mc', text: q.text, questionId: q.questionId,
     answers: (q.options || []).map((o) => o.text), optionIds: (q.options || []).map((o) => o.id),
-    correct: -1, time: q.timeLimitSecs, points: 1, img: null,
+    correct: -1, time: q.timeLimitSecs, points: q.points ?? 1, img: q.imageUrl ? assetUrl(q.imageUrl) : null,
     code: q.code || '', lang: q.language || 'Dart', pics: (q.pictureUrls || []).map(assetUrl),
     /* only the letter count is known until Reveal */
     word: q.type === 'pic' ? 'X'.repeat(q.wordLength || 0) : '',
   };
-  if (G.qi !== q.order) G.answers = {};
-  G.qi = q.order;
-  G.phase = 'question';
-  /* the timer follows the server's closesAt */
-  const left = Math.max(0, new Date(q.closesAt).getTime() - Date.now());
-  G.phaseEnd = Date.now() + left;
-  G.phaseStart = G.phaseEnd - q.timeLimitSecs * 1000;
-  notify();
 }
-export function livePhase(phase) {
-  if (!G || !G.live) return;
-  G.phase = phase; G.phaseEnd = 0;
-  notify();
-}
-let liveAnswerHandler = null;
-export function onLiveAnswer(f) { liveAnswerHandler = f; }
-function liveAnswer(choice) {
-  const qq = curQ();
-  if (!qq) return;
-  G.answers.me = { choice, t: Date.now() - G.phaseStart };
-  notify();
-  if (liveAnswerHandler) liveAnswerHandler(qq, choice);
-}
+function ensureSlots(n) { while (G.qs.length < n) G.qs.push(null); }
 
-const mascotIdx = (m) => { const n = Number(String(m || '').split('-')[1]); return Number.isInteger(n) ? n : 0; };
-/* standings from the server (reveal/final) become the players everyone's screens rank and animate.
-   choices (host only): participantId -> option index, or true/false for picture questions */
-export function applyStandings(r, choices) {
+/* phase event: { phase, index, endsAt, durationMs, serverNow, upcoming, locked, powerUps } */
+export function livePhaseEvent(p) {
+  if (!G || !p) return;
+  clockOffset = p.serverNow - Date.now();
+  ensureSlots(p.questionCount || 0);
+  /* the countdown screens only need the next question's type and points */
+  if (p.upcoming && !G.qs[p.upcoming.index]) G.qs[p.upcoming.index] = { type: p.upcoming.type, points: p.upcoming.points, text: '', answers: ['', '', '', ''], correct: -1, pics: [], word: '' };
+  if (p.index >= 0) G.qi = p.index;
+  G.locked = !!p.locked;
+  G.powerUps = !!p.powerUps;
+  /* players stay on their result while the host shows the leaderboard */
+  const phase = G.live && p.phase === 'leaderboard' ? 'reveal' : p.phase;
+  if (phase === 'cancelled') { exitGame(); return; }
+  if (phase === 'question' && G.phase !== 'question') G.answers = {};
+  G.phase = phase;
+  G.phaseEnd = p.endsAt ? p.endsAt - clockOffset : 0;
+  G.phaseStart = p.endsAt ? G.phaseEnd - (p.durationMs || 1) : Date.now();
+  notify();
+}
+export function liveQuestion(q) {
+  if (!G || !q) return;
+  ensureSlots(q.questionCount || 0);
+  if (G.qi !== q.order) G.answers = {};
+  G.qs[q.order] = toLocalQuestion(q);
+  G.qi = q.order;
+  G.liveAnswered = 0;
+  if (G.live) G.removed = [];
+  notify();
+}
+/* reveal (everyone): the right answer; host-only extras: who picked what and the leaderboard */
+export function liveReveal(r, host) {
   if (!G || !r) return;
-  const qq = curQ();
+  const qq = G.qs[r.index];
+  if (qq) {
+    if (Number.isInteger(r.correctIndex) && r.correctIndex >= 0) qq.correct = r.correctIndex;
+    if (r.word) qq.word = r.word;
+  }
+  if (host) applyStandings(host.standings, host.choices, qq);
+  notify();
+}
+/* result (one phone): my answer, points, streak, rank and total */
+export function liveResult(res) {
+  if (!G || !G.me || !res) return;
+  const me = G.me;
+  me.prevScore = me.score;
+  Object.assign(me, { score: res.total, streak: res.streak, liveRank: res.rank, correct: (me.correct || 0) + (res.correct ? 1 : 0) });
+  me.last = { choice: res.answered ? (res.choice ?? (G.answers.me ? G.answers.me.choice : null)) : null, ok: res.correct, pts: res.points, doubled: res.doubled };
+  G.livePlayers = res.players;
+  notify();
+}
+/* final: team standings, top 3 and the full ranking for every screen */
+export function liveFinal(f) {
+  if (!G || !f) return;
+  applyStandings(f.ranking || []);
+  if (G.me) delete G.me.liveRank;
+  notify();
+}
+/* standings -> the players the shared screens rank and animate */
+export function applyStandings(standings, choices, qq) {
+  if (!G) return;
   G.prevIdx = {}; G.prevTeams = {};
   ranked().forEach((p, i) => { p.prevRank = i + 1; G.prevIdx[p.id] = i; p.prevScore = p.score; });
   teamStats().forEach((t, i) => { G.prevTeams[t.key] = { idx: i, avg: t.avg }; });
-  if (qq && Number.isInteger(r.correctIndex) && r.correctIndex >= 0) qq.correct = r.correctIndex;
-  if (qq && r.word) qq.word = r.word;
   if (choices && qq) {
     G.answers = {};
     Object.entries(choices).forEach(([pid, c]) => { G.answers[pid] = { choice: typeof c === 'boolean' ? (c ? qq.word : '') : c, t: 0 }; });
   }
   const byId = new Map(G.players.map((p) => [p.id, p]));
-  const next = (r.standings || []).map((st) => {
+  const next = (standings || []).map((st) => {
     const id = G.live && st.id === G.participantId ? 'me' : st.id;
     const p = byId.get(id) || { id, bot: false, prevRank: 0, img: mascot(st.team, mascotIdx(st.mascot)) };
-    const choice = id === 'me' ? (G.answers.me ? G.answers.me.choice : null) : (G.answers[st.id] ? G.answers[st.id].choice : null);
+    const choice = G.answers[id === 'me' ? 'me' : st.id] ? G.answers[id === 'me' ? 'me' : st.id].choice : null;
     Object.assign(p, { name: st.name, team: st.team, score: st.score, streak: st.streak, correct: st.correct,
-      last: r.questionId ? { choice: st.answered ? choice : null, ok: st.lastOk, pts: st.lastPts } : p.last });
+      last: choices ? { choice: st.answered ? choice : null, ok: st.lastOk, pts: st.lastPts } : p.last });
     return p;
   });
   if (G.me && !next.includes(G.me)) next.push(G.me);
   G.players = next;
-}
-
-/* host screen re-attached after a refresh: rebuild players and pick the phase up from the server */
-export function applyHostState(st) {
-  if (!G || !st) return;
-  if (st.pin) G.pin = st.pin;
-  applyStandings({ standings: st.standings || [] });
-  if (st.status === 'ACTIVE' && st.question) {
-    G.qi = st.question.order; G.answers = {}; G.liveAnswered = 0;
-    G.phase = 'question';
-    G.phaseEnd = Date.now() + Math.max(0, new Date(st.question.closesAt).getTime() - Date.now());
-    G.phaseStart = G.phaseEnd - st.question.timeLimitSecs * 1000;
-    notify();
-  } else if (st.status === 'REVEAL') {
-    G.qi = st.currentQuestionOrder ?? 0;
-    setPhase('leaderboard', 4000);
-  } else notify();
 }

@@ -265,7 +265,8 @@ export class GameService {
     const live = await this.ensureLive(session);
     if (live.phase !== "lobby") throw new GameError("invalid_phase");
     if (live.locked) throw new GameError("game_locked");
-    const participant = await this.gameRepository.join(session.id, input);
+    // only these three fields are stored (callers may pass a whole request body)
+    const participant = await this.gameRepository.join(session.id, { name: input.name, mascot: input.mascot, team: input.team });
     if (participant === "duplicate") throw new GameError("duplicate_participant");
     this.emit(session.id, "player_joined", { participant }, "host");
     return participant;

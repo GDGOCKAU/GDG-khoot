@@ -9,6 +9,7 @@ import { toast, useAnims } from '../../lib/ui';
 import { Answered, ColorBar, Count, Ico, LiveRing, Modal, Secs, TopicChip } from '../../components/common/UI';
 import { AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
 import { HostShell } from '../../components/layout/Shells';
+import { setSettings } from '../../lib/live';
 
 function PChip({ p }) {
   const t = TEAMS[p.team];
@@ -28,7 +29,7 @@ function HostGame() {
   const pinChip = <span className="chip chip-blue">Game PIN {pinFmt(G.pin)}</span>;
   const over = <span className="chip">Game over · {n} of {n} questions</span>;
   const shell = (right, children, main) => <HostShell right={right} main={main} onExit={() => setAskExit(true)}>{children}</HostShell>;
-  const joinUrl = `${window.location.protocol}//${window.location.hostname}:${window.location.port || '5173'}/join/${G.quiz.id}?pin=${encodeURIComponent(G.pin)}${G.backendSessionId ? `&session=${encodeURIComponent(G.backendSessionId)}` : ''}`;
+  const joinUrl = `${window.location.origin}/join/${G.quiz.id}?pin=${encodeURIComponent(G.pin)}${G.backendSessionId ? `&session=${encodeURIComponent(G.backendSessionId)}` : ''}`;
 
   const exitModal = askExit && (
     <Modal id="exitT" icon="door" title="Are you sure you want to exit the game?" onClose={() => setAskExit(false)}>
@@ -64,6 +65,7 @@ function HostGame() {
               <span style={css('color:var(--muted);font-size:14px;flex:1')}>{G.locked ? 'Game locked. No one else can join.' : cnt ? 'Start when everyone is in.' : 'Waiting for players to join…'}</span>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAskExit(true)}>Cancel game</button>
               <button type="button" className="btn btn-outline btn-sm" onClick={toggleLock} aria-pressed={G.locked}><Ico n="lock" />{G.locked ? 'Unlock game' : 'Lock game'}</button>
+              {G.liveHost && <button type="button" className="btn btn-outline btn-sm" onClick={() => setSettings({ powerUps: !G.powerUps })} aria-pressed={!!G.powerUps}><Ico n="star" />{G.powerUps ? 'Power-ups on' : 'Power-ups off'}</button>}
               <button type="button" className="btn btn-primary" onClick={startGame} disabled={!cnt}>Start game <Ico n="arrow" /></button>
             </div>
           </div>

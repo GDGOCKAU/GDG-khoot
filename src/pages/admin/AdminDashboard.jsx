@@ -4,6 +4,7 @@ import { DB, upsertQuiz, useAppState } from '../../lib/store';
 import { Ico, TopicChip } from '../../components/common/UI';
 import { AdminShell } from '../../components/layout/Shells';
 import { apiRequest, assetUrl } from '../../api/client';
+import { notify } from '../../lib/store';
 
 let lastFilter = 'All', lastSearch = '';
 
@@ -14,17 +15,20 @@ function AdminDashboard() {
   const setFilter = (v) => { lastFilter = v; setFilterS(v); };
   const setSearch = (v) => { lastSearch = v; setSearchS(v); };
 
+  /* totals come from finished games on the server */
+  const [stats, setStats] = useState(null);
   useEffect(() => {
-    apiRequest('/api/v1/quizzes')
-      .then((items) => {
+    Promise.all([apiRequest('/api/v1/quizzes'), apiRequest('/api/v1/stats').catch(() => null)])
+      .then(([items, st]) => {
+        setStats(st);
         items.forEach((quiz) => upsertQuiz({
           id: quiz.id,
           title: quiz.title,
-          topic: 'Other',
+          topic: quiz.topic || 'Other',
           desc: quiz.description || '',
           status: quiz.isPublished ? 'ready' : 'draft',
           pin: String(100000 + Math.floor(Math.random() * 900000)),
-          lastHosted: null,
+          lastHosted: st && st.lastHosted[quiz.id] ? Date.parse(st.lastHosted[quiz.id]) : null,
           questions: (quiz.questions || []).map((question) => {
             const type = question.type || 'mc', options = question.options || [];
             const answers = type === 'pic' ? ['', '', '', ''] : options.map((option) => option.text);
@@ -35,8 +39,8 @@ function AdminDashboard() {
               answers,
               correct: type === 'pic' ? -1 : options.findIndex((option) => option.isCorrect),
               time: question.timeLimitSecs,
-              points: 1,
-              img: null,
+              points: question.points ?? 1,
+              img: question.imageUrl ? assetUrl(question.imageUrl) : null,
               code: question.code || '',
               lang: question.language || 'Dart',
               pics: (question.pictureUrls || []).map(assetUrl),
@@ -44,13 +48,14 @@ function AdminDashboard() {
             };
           }),
         }));
+        notify();
       })
       .catch(() => {});
   }, []);
 
-  const games = DB.games.filter((g) => g.mode === 'host');
-  const acc = DB.games.length ? Math.round(100 * DB.games.reduce((s, g) => s + g.accuracy, 0) / DB.games.length) + '%' : '—';
-  const players = DB.games.reduce((s, g) => s + g.players, 0);
+  const games = { length: stats ? stats.gamesHosted : 0 };
+  const acc = stats && stats.accuracy !== null ? Math.round(100 * stats.accuracy) + '%' : '—';
+  const players = stats ? stats.players : 0;
   const term = search.trim().toLowerCase();
   const list = DB.quizzes.filter((x) => (filter === 'All' || (filter === 'Ready' ? x.status === 'ready' : x.status === 'draft')) && (!term || x.title.toLowerCase().includes(term)));
 

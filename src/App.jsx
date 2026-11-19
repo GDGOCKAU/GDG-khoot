@@ -44,7 +44,7 @@ function JoinRoute() {
       })
       .catch((error) => {
         if (cancelled) return;
-        setLiveError(error.status === 409
+        setLiveError(error.body?.error === 'game_locked' ? 'The host has locked this game.' : error.status === 409
           ? 'This game has already started.'
           : error.status === 410
             ? 'This game has ended.'
