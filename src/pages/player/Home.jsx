@@ -58,9 +58,13 @@ function Home() {
       UI.look = { key: 'live:' + live.quiz.id, quizId: live.quiz.id, live: true, sessionId: live.sessionId, pin: p, name: UI.look ? UI.look.name : '', team: 'blue', idx: 0 };
       navigate('/join/' + live.quiz.id);
     } catch (error) {
-      setPinError(error.status === 404
-        ? 'No live session with that PIN. Wait until the host opens the lobby.'
-        : 'This game is not accepting players yet.');
+      setPinError(error.status === 409
+        ? 'This game has already started.'
+        : error.status === 410
+          ? 'This game has ended.'
+          : error.status === 404
+            ? 'No live session with that PIN. Wait until the host opens the lobby.'
+            : 'This game is not accepting players yet.');
     }
     if (pinRef.current) pinRef.current.focus();
   };

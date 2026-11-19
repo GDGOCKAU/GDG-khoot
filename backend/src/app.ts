@@ -127,7 +127,8 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
       if (error instanceof GameError) {
         const status = error.code === "session_not_found" || error.code === "quiz_not_found" || error.code === "participant_not_found"
           ? 404
-          : error.code === "answer_already_submitted" || error.code === "duplicate_participant" ? 409 : 400;
+          : error.code === "answer_already_submitted" || error.code === "duplicate_participant" || error.code === "game_started" ? 409
+          : error.code === "game_closed" ? 410 : 400;
         return reply.code(status).send({ error: error.code });
       }
       throw error;

@@ -109,7 +109,7 @@ export class MemoryGameRepository implements GameRepository {
 export type GameErrorCode =
   | "session_not_found" | "quiz_not_found" | "invalid_phase" | "duplicate_participant"
   | "participant_not_found" | "question_not_found" | "answer_closed" | "answer_already_submitted"
-  | "invalid_option";
+  | "invalid_option" | "game_started" | "game_closed";
 
 export class GameError extends Error {
   constructor(public readonly code: GameErrorCode, message = code) { super(message); }
@@ -132,7 +132,8 @@ export class GameService {
   async lookupByPin(pin: string) {
     const session = await this.gameRepository.findByPin(pin);
     if (!session) throw new GameError("session_not_found");
-    if (session.status !== "LOBBY") throw new GameError("invalid_phase");
+    if (session.status === "ACTIVE" || session.status === "REVEAL") throw new GameError("game_started");
+    if (session.status === "FINISHED" || session.status === "CANCELLED") throw new GameError("game_closed");
     const quiz = await this.quizRepository.getQuiz(session.quizId, session.hostId);
     if (!quiz || !quiz.isPublished || quiz.questions.length === 0) throw new GameError("invalid_phase");
     return {

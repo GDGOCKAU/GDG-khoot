@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { G, UI, hosted, startHost, stopGame } from './lib/engine';
-import { isAdmin, quizById, useAppState } from './lib/store';
+import { isAdmin, notify, quizById, useAppState } from './lib/store';
 import { installSpiderDrag } from './lib/ui';
 import { toast } from './lib/ui';
 import { Bounce, LivePill } from './components/common/UI';
@@ -18,6 +18,8 @@ import CreateQuiz from './pages/admin/CreateQuiz';
 import HostGame from './pages/admin/HostGame';
 import { apiRequest } from './api/client';
 import { syncLiveQuiz } from './lib/liveQuiz';
+import { connectSocket } from './api/socket';
+import { mascot } from './lib/constants';
 
 function Loading() {
   return <main className="loading" aria-busy="true"><h1>Loading<Bounce /></h1></main>;
@@ -26,9 +28,9 @@ function Loading() {
 /* /join/:quizId — choose a look for a quiz */
 function JoinRoute() {
   const { quizId } = useParams();
-  const location = useLocation();
-  const params = new URLSearchParams(location.search);
-  const pin = params.get('pin');
+  const [searchParams] = useSearchParams();
+  const pin = searchParams.get('pin');
+  const sessionId = searchParams.get('session');
   const [liveQuiz, setLiveQuiz] = useState(null);
   const [liveError, setLiveError] = useState('');
   useEffect(() => {
@@ -38,15 +40,21 @@ function JoinRoute() {
       .then((live) => {
         if (cancelled) return;
         if (live.quiz.id !== quizId) { setLiveError('This QR link belongs to another quiz.'); return; }
+        if (sessionId && live.sessionId !== sessionId) { setLiveError('This QR link is for a different live session.'); return; }
         setLiveQuiz(syncLiveQuiz(live));
       })
-      .catch(() => {
-        if (!cancelled) setLiveError('No live session with this PIN. Wait until the host opens the lobby.');
+      .catch((error) => {
+        if (cancelled) return;
+        setLiveError(error.status === 409
+          ? 'This game has already started.'
+          : error.status === 410
+            ? 'This game has ended.'
+            : 'No live session with this PIN. Wait until the host opens the lobby.');
       });
     return () => { cancelled = true; };
-  }, [pin, quizId]);
+  }, [pin, sessionId, quizId]);
   if (pin) {
-    if (liveError) return <Navigate to="/" replace />;
+    if (liveError) return <main className="loading" aria-busy="true"><h1>{liveError}</h1></main>;
     if (!liveQuiz) return <main className="loading" aria-busy="true"><h1>Joining live session<Bounce /></h1></main>;
     return <JoinQuiz key={quizId} quiz={liveQuiz} live />;
   }
@@ -79,6 +87,27 @@ function HostRoute() {
       }).then((session) => {
         G.backendSessionId = session.id;
         G.pin = session.pin;
+        if (G.joinTimer) clearTimeout(G.joinTimer);
+        const socket = connectSocket();
+        socket.emit('game:join', session.id, 'host', () => {});
+        socket.on('player_joined', ({ participant }) => {
+          if (!G || G.phase !== 'lobby') return;
+          if (G.players.some((player) => player.id === participant.id)) return;
+          G.players.push({
+            id: participant.id,
+            name: participant.name,
+            team: participant.team,
+            img: mascot(participant.team, 0),
+            bot: false,
+            score: 0,
+            streak: 0,
+            correct: 0,
+            last: null,
+            prevRank: 0,
+          });
+          notify();
+        });
+        notify();
       }).catch((error) => {
         toast(error.status === 400
           ? 'This quiz is not published or has no questions.'

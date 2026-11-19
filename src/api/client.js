@@ -1,4 +1,8 @@
-export const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:3000").replace(/\/$/, "");
+const configuredApiUrl = import.meta.env.VITE_API_URL;
+const browserApiUrl = typeof window !== "undefined" && window.location.hostname
+  ? `${window.location.protocol}//${window.location.hostname}:3000`
+  : "http://localhost:3000";
+export const API_URL = (configuredApiUrl || browserApiUrl).replace(/\/$/, "");
 
 export function getStoredToken() {
   return localStorage.getItem("gdgAdminToken") || "";

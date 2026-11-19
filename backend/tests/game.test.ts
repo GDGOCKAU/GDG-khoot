@@ -33,6 +33,13 @@ function setup(now = new Date("2026-01-01T00:00:00Z")) {
 }
 
 describe("live game service", () => {
+  it("does not allow PIN lookup after a session starts", async () => {
+    const { service } = setup();
+    const session = await service.createSession(quiz.id, quiz.hostId);
+    await service.start(quiz.id, quiz.hostId, session.id);
+    await expect(service.lookupByPin(session.pin)).rejects.toMatchObject({ code: "game_started" });
+  });
+
   it("runs lobby through question, reveal, leaderboard, and final", async () => {
     const { service, events } = setup();
     const session = await service.createSession(quiz.id, quiz.hostId);
