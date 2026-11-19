@@ -55,7 +55,7 @@ function HostGame() {
               <span className="code" role="img" aria-label="QR code to join this game"><QRCodeSVG value={joinUrl} size={124} level="M" /></span>
               <span style={css('font-size:14px;line-height:1.6;color:var(--muted)')}>Scan to join instantly, then pick a nickname.</span>
             </div>
-            {G.me ? <p style={css('margin:0;font-size:14px;color:var(--green-txt);font-weight:600')}>You joined as {G.me.name}.</p> : <Link className="btn btn-tonal" to="/live">Join as a player on this device</Link>}
+            {G.liveHost ? null : G.me ? <p style={css('margin:0;font-size:14px;color:var(--green-txt);font-weight:600')}>You joined as {G.me.name}.</p> : <Link className="btn btn-tonal" to="/live">Join as a player on this device</Link>}
           </div>
           <div className="card players">
             <div style={css('display:flex;justify-content:space-between;align-items:center')}><h2 style={{ margin: 0 }}>Players</h2><span className="chip chip-blue"><Ico n="users" />{cnt} joined</span></div>

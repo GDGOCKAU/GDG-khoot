@@ -9,7 +9,7 @@ import { Bounce, LivePill } from './components/common/UI';
 // Player pages
 import Home from './pages/player/Home';
 import JoinQuiz from './pages/player/JoinQuiz';
-import PlayerGame from './pages/player/PlayerGame';
+import PlayerGame, { PlayerLobby } from './pages/player/PlayerGame';
 
 // Admin pages
 import AdminLogin from './pages/admin/AdminLogin';
@@ -18,8 +18,7 @@ import CreateQuiz from './pages/admin/CreateQuiz';
 import HostGame from './pages/admin/HostGame';
 import { apiRequest } from './api/client';
 import { syncLiveQuiz } from './lib/liveQuiz';
-import { connectSocket } from './api/socket';
-import { mascot } from './lib/constants';
+import { connectLiveHost } from './lib/live';
 
 function Loading() {
   return <main className="loading" aria-busy="true"><h1>Loading<Bounce /></h1></main>;
@@ -58,9 +57,8 @@ function JoinRoute() {
     if (!liveQuiz) return <main className="loading" aria-busy="true"><h1>Joining live session<Bounce /></h1></main>;
     return <JoinQuiz key={quizId} quiz={liveQuiz} live />;
   }
-  if (UI.look?.live && UI.look.quizId === quizId) {
-    const liveQuiz = quizById(quizId);
-    if (liveQuiz) return <JoinQuiz key={quizId} quiz={liveQuiz} live />;
+  if (UI.look?.live && UI.look.quizId === quizId && UI.liveQuiz?.id === quizId) {
+    return <JoinQuiz key={quizId} quiz={UI.liveQuiz} live />;
   }
   const quiz = quizById(quizId);
   if (!quiz) return <Navigate to="/" replace />;
@@ -80,33 +78,16 @@ function HostRoute() {
   const running = hosted() && G.quiz.id === quizId;
   useEffect(() => {
     if (!(hosted() && G.quiz.id === quizId) && quiz && isAdmin()) {
-      startHost(quiz);
+      startHost(quiz, { live: true });
+      const g = G;
       apiRequest('/api/v1/sessions', {
         method: 'POST',
         body: JSON.stringify({ quizId }),
       }).then((session) => {
+        if (G !== g) return;
         G.backendSessionId = session.id;
         G.pin = session.pin;
-        if (G.joinTimer) clearTimeout(G.joinTimer);
-        const socket = connectSocket();
-        socket.emit('game:join', session.id, 'host', () => {});
-        socket.on('player_joined', ({ participant }) => {
-          if (!G || G.phase !== 'lobby') return;
-          if (G.players.some((player) => player.id === participant.id)) return;
-          G.players.push({
-            id: participant.id,
-            name: participant.name,
-            team: participant.team,
-            img: mascot(participant.team, 0),
-            bot: false,
-            score: 0,
-            streak: 0,
-            correct: 0,
-            last: null,
-            prevRank: 0,
-          });
-          notify();
-        });
+        connectLiveHost(session.id);
         notify();
       }).catch((error) => {
         toast(error.status === 400
@@ -144,7 +125,7 @@ function App() {
   /* leaving the player screen ends a practice game; every page starts at the top */
   useEffect(() => {
     const first = location.pathname.split('/').filter(Boolean)[0];
-    if (G && G.mode === 'player' && first !== 'play') stopGame();
+    if (G && G.mode === 'player' && first !== 'play' && !(G.live && first === 'lobby')) stopGame();
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
@@ -156,6 +137,7 @@ function App() {
       <Route path="/" element={<Home />} />
       <Route path="/join/:quizId" element={<JoinRoute />} />
       <Route path="/live" element={<LiveRoute />} />
+      <Route path="/lobby" element={<PlayerLobby />} />
       <Route path="/play" element={<PlayerGame />} />
 
       {/* Host + admin routes */}

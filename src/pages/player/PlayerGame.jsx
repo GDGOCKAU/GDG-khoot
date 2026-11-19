@@ -15,6 +15,8 @@ import GameClosed from './GameClosed';
 
 function PlayerGame() {
   useAppState();
+  /* live game: nothing to play until the server has sent a question */
+  if (G && G.live && G.me && G.phase === 'lobby') return <Navigate to="/lobby" replace />;
   if (G && G.me) return <PlayerView />;
   if (UI.closed) return <GameClosed />;
   return <Navigate to="/" replace />;
@@ -169,6 +171,26 @@ function PlayerView() {
     default:
       return null;
   }
+}
+
+/* /lobby — a live player waits here. It moves to /play only when the server opens a question. */
+export function PlayerLobby() {
+  useAppState();
+  const wide = useWide();
+  useAnims('lobby');
+  if (!G || !G.live || !G.me) return UI.closed ? <GameClosed /> : <Navigate to="/" replace />;
+  if (G.phase !== 'lobby') return <Navigate to="/play" replace />;
+  const me = G.me, T = TEAMS[me.team];
+  return (
+    <PShell wide={wide} center main="state" glow={wide ? T.bright : undefined}>
+      <div className="center-col">
+        <img className="avatar" src={me.img} alt="" width={wide ? 170 : 140} height={wide ? 170 : 140} style={{ '--team': T.solid, borderWidth: 7 }} />
+        <h1 style={{ fontSize: wide ? 60 : 38 }}>You&apos;re in<span style={{ color: '#34a853' }}>!</span></h1>
+        <p style={css('margin:0;color:var(--muted);font-size:18px;max-width:30rem')}>Your nickname is on the host screen. Waiting for the host to start the game<Bounce /></p>
+        <span className={`chip chip-${me.team}`}>Team {T.name}</span>
+      </div>
+    </PShell>
+  );
 }
 
 export default PlayerGame;

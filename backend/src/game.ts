@@ -45,6 +45,7 @@ export interface GameRepository {
   findAnswer(participantId: string, questionId: string): Promise<Answer | null>;
   createAnswer(answer: Omit<Answer, "id">): Promise<Answer>;
   updateParticipantScore(participantId: string, score: number, streak: number): Promise<void>;
+  countAnswers(sessionId: string, questionId: string): Promise<number>;
 }
 
 export class MemoryGameRepository implements GameRepository {
@@ -104,6 +105,9 @@ export class MemoryGameRepository implements GameRepository {
       if (participant) { participant.score = score; participant.streak = streak; return; }
     }
   }
+  async countAnswers(sessionId: string, questionId: string) {
+    return [...this.answers.values()].filter((answer) => answer.sessionId === sessionId && answer.questionId === questionId).length;
+  }
 }
 
 export type GameErrorCode =
@@ -115,7 +119,27 @@ export class GameError extends Error {
   constructor(public readonly code: GameErrorCode, message = code) { super(message); }
 }
 
-export type EventSink = (sessionId: string, event: string, payload: unknown) => void;
+/** "all" = players + host. "host" = host screen only (never reaches players). */
+export type EventAudience = "all" | "host";
+export type EventSink = (sessionId: string, event: string, payload: unknown, audience?: EventAudience) => void;
+type QuizQuestion = Quiz["questions"][number];
+
+/** The only shape a question may take when it leaves the server towards a player. No isCorrect, no word. */
+function publicQuestion(question: QuizQuestion, session: GameSession, questionCount: number) {
+  return {
+    order: question.order,
+    questionCount,
+    questionId: question.id,
+    type: question.type ?? "mc",
+    text: question.text,
+    timeLimitSecs: question.timeLimitSecs,
+    closesAt: session.closesAt,
+    code: question.type === "code" ? question.code : undefined,
+    language: question.type === "code" ? question.language : undefined,
+    pictureUrls: question.type === "pic" ? question.pictureUrls : undefined,
+    options: question.options.map(({ id, text }) => ({ id, text })),
+  };
+}
 
 export class GameService {
   constructor(
@@ -136,6 +160,8 @@ export class GameService {
     if (session.status === "FINISHED" || session.status === "CANCELLED") throw new GameError("game_closed");
     const quiz = await this.quizRepository.getQuiz(session.quizId, session.hostId);
     if (!quiz || !quiz.isPublished || quiz.questions.length === 0) throw new GameError("invalid_phase");
+    // Gate: nothing about the questions leaves the server while the session is in LOBBY.
+    // Players receive each question only through the "question" event after the host starts.
     return {
       sessionId: session.id,
       pin: session.pin,
@@ -147,21 +173,41 @@ export class GameService {
         isPublished: quiz.isPublished,
         topic: "Other",
         pin: session.pin,
-        questions: quiz.questions
-          .slice()
-          .sort((a, b) => a.order - b.order)
-          .map((question) => ({
-            id: question.id,
-            text: question.text,
-            order: question.order,
-            timeLimitSecs: question.timeLimitSecs,
-            type: question.type ?? "mc",
-            code: question.type === "code" ? question.code : undefined,
-            language: question.type === "code" ? question.language : undefined,
-            pictureUrls: question.type === "pic" ? question.pictureUrls : undefined,
-            options: question.options.map((option) => ({ id: option.id, text: option.text })),
-          })),
+        questionCount: quiz.questions.length,
       },
+    };
+  }
+
+  /** Validates a player socket and returns what that player may see right now. */
+  async participantState(sessionId: string, participantId: string) {
+    const session = await this.gameRepository.findById(sessionId);
+    if (!session) throw new GameError("session_not_found");
+    const participant = session.participants.find((item) => item.id === participantId);
+    if (!participant || participant.leftAt) throw new GameError("participant_not_found");
+    return this.stateFor(session, participant);
+  }
+
+  /** Validates the host socket (hostId comes from a verified JWT). */
+  async hostState(sessionId: string, hostId: string) {
+    const session = await this.gameRepository.findById(sessionId);
+    if (!session || session.hostId !== hostId) throw new GameError("session_not_found");
+    return this.stateFor(session, null);
+  }
+
+  private async stateFor(session: GameSession, participant: Participant | null) {
+    const quiz = await this.quizRepository.getQuiz(session.quizId, session.hostId);
+    if (!quiz) throw new GameError("quiz_not_found");
+    const current = quiz.questions.find((item) => item.order === session.currentQuestionOrder) ?? null;
+    const answered = participant && current ? !!(await this.gameRepository.findAnswer(participant.id, current.id)) : false;
+    return {
+      sessionId: session.id,
+      status: session.status,
+      questionCount: quiz.questions.length,
+      currentQuestionOrder: session.currentQuestionOrder,
+      // Only an open question is ever exposed, and only in its public shape.
+      question: session.status === "ACTIVE" && current ? publicQuestion(current, session, quiz.questions.length) : null,
+      answered,
+      participant: participant ? { id: participant.id, name: participant.name, team: participant.team, score: participant.score, streak: participant.streak } : null,
     };
   }
 
@@ -180,7 +226,7 @@ export class GameService {
     if (session.status !== "LOBBY") throw new GameError("invalid_phase");
     const participant = await this.gameRepository.join(session.id, input);
     if (participant === "duplicate") throw new GameError("duplicate_participant");
-    this.emit(session.id, "player_joined", { participant });
+    this.emit(session.id, "player_joined", { participant }, "host");
     return participant;
   }
   async start(quizId: string, hostId: string, sessionId: string) {
@@ -203,18 +249,7 @@ export class GameService {
     session.questionStartedAt = now;
     session.closesAt = new Date(now.getTime() + question.timeLimitSecs * 1000);
     await this.gameRepository.save(session);
-    const payload = {
-      order,
-      questionId: question.id,
-      type: question.type ?? "mc",
-      text: question.text,
-      timeLimitSecs: question.timeLimitSecs,
-      closesAt: session.closesAt,
-      code: question.type === "code" ? question.code : undefined,
-      language: question.type === "code" ? question.language : undefined,
-      pictureUrls: question.type === "pic" ? question.pictureUrls : undefined,
-      options: question.options.map(({ id, text }) => ({ id, text })),
-    };
+    const payload = publicQuestion(question, session, quiz.questions.length);
     this.emit(session.id, "phase", { phase: "ACTIVE", questionOrder: order });
     this.emit(session.id, "question", payload);
     return payload;
@@ -246,8 +281,9 @@ export class GameService {
     });
     await this.gameRepository.updateParticipantScore(participantId, participant.score + points, streak);
     const payload = { questionId, optionId, isCorrect: option.isCorrect, points, speedPoints, streakPoints };
-    this.emit(sessionId, "answer", payload);
-    this.emit(sessionId, "result", { participantId, ...payload });
+    // Correctness is never broadcast; the host only learns how many answers are in.
+    const count = await this.gameRepository.countAnswers(sessionId, questionId);
+    this.emit(sessionId, "answer_count", { questionId, count }, "host");
     return payload;
   }
   async reveal(quizId: string, hostId: string, sessionId: string) {

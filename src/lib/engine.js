@@ -28,7 +28,7 @@ export function addMe(me) {
   G.players.push(G.me);
   UI.showOver = false;
 }
-export function newGame(quiz, mode, me) {
+export function newGame(quiz, mode, me, opts = {}) {
   stopGame(false);
   const qs = quiz.live
     ? quiz.questions.filter((x) => (x.text || '').trim() && (x.time > 0))
@@ -39,7 +39,11 @@ export function newGame(quiz, mode, me) {
   const names = shuffle(BOT_NAMES);
   const free = () => names.filter((n) => !G.players.some((p) => p.name.toLowerCase() === n.toLowerCase()));
   if (mode === 'player') { free().slice(0, 11).forEach((n) => G.players.push(makeBot(n))); setPhase('ready', 3000); }
-  else {
+  else if (opts.live) {
+    /* live host: real players arrive from the server, never practice bots */
+    G.liveHost = true;
+    G.join = () => {};
+  } else {
     let k = 0;
     G.join = () => {
       if (!G || G.phase !== 'lobby' || G.locked || k >= 11) return;
@@ -56,6 +60,7 @@ export function newGame(quiz, mode, me) {
 export function stopGame(signal = true) {
   if (!G) return;
   clearInterval(G.timer); clearTimeout(G.joinTimer);
+  if (G.socket) G.socket.disconnect();
   G = null;
   if (signal) notify();
 }
@@ -63,7 +68,23 @@ function setPhase(phase, ms) {
   G.phase = phase; G.phaseStart = Date.now(); G.phaseEnd = ms ? Date.now() + ms : 0;
   notify();
 }
+/* live host: the server opens the question (POST /start or /next); the screen follows its closesAt */
+let liveHostOpen = null;
+export function onLiveHostOpen(f) { liveHostOpen = f; }
 function startQuestion(i) {
+  if (G.liveHost && liveHostOpen) {
+    const g = G;
+    G.phaseEnd = 0; // hold the countdown screen until the server answers
+    liveHostOpen(i).then((q) => {
+      if (G !== g) return;
+      G.qi = i; G.answers = {};
+      G.phase = 'question';
+      G.phaseEnd = Date.now() + Math.max(0, new Date(q.closesAt).getTime() - Date.now());
+      G.phaseStart = G.phaseEnd - q.timeLimitSecs * 1000;
+      notify();
+    }).catch(() => { if (G === g) notify(); });
+    return;
+  }
   G.qi = i; G.answers = {};
   const qq = curQ();
   G.players.forEach((p) => {
@@ -78,6 +99,7 @@ function startQuestion(i) {
 }
 export function answer(pid, choice) {
   if (!G || G.phase !== 'question' || G.answers[pid]) return;
+  if (G.live) { if (pid === 'me') liveAnswer(choice); return; }
   G.answers[pid] = { choice, t: Date.now() - G.phaseStart };
   if (pid === 'me') notify();
   if (Object.keys(G.answers).length >= G.players.length) setTimeout(() => { if (G && G.phase === 'question') endQuestion(); }, 600);
@@ -121,6 +143,8 @@ export function recordGame() {
 function tick() {
   if (!G) return;
   const now = Date.now();
+  /* live player: the server moves the phases; locally we only redraw timers */
+  if (G.live) { tickN += 1; tickSubs.forEach((f) => f()); return; }
   if (G.phase === 'question') {
     const el = now - G.phaseStart;
     G.players.forEach((p) => { if (p.bot && p.plan && !G.answers[p.id] && el >= p.plan.at) answer(p.id, p.plan.choice); });
@@ -144,7 +168,7 @@ function advance() {
 }
 
 /* host controls */
-export function startHost(quiz) { newGame(quiz, 'host', null); }
+export function startHost(quiz, opts = {}) { newGame(quiz, 'host', null, opts); }
 export function toggleLock() { G.locked = !G.locked; clearTimeout(G.joinTimer); if (!G.locked) G.joinTimer = setTimeout(G.join, 700); notify(); }
 export function startGame() { clearTimeout(G.joinTimer); setPhase('ready', 3000); }
 export function skip() { G.phaseEnd = Date.now(); }
@@ -188,4 +212,49 @@ export function joinGame(look, quiz) {
   if (!quiz.questions.some((x) => !qProblem(x))) return 'This quiz has no complete questions yet.';
   newGame(quiz, 'player', me);
   return '';
+}
+
+/* ---------- LIVE PLAYER (server-driven) ----------
+   The player gets no questions up front. It sits in 'lobby' until the server sends
+   the first "question" event, which only happens after the host's /start. */
+export function newLiveGame(quiz, me, { sessionId, participantId }) {
+  stopGame(false);
+  G = { quiz, qs: Array.from({ length: quiz.questionCount || 0 }, () => null), mode: 'player', live: true, pin: quiz.livePin, backendSessionId: sessionId, participantId, players: [], qi: -1, phase: 'lobby', phaseStart: Date.now(), phaseEnd: 0, answers: {}, locked: false, me: null, timer: null, joinTimer: null, recorded: false, socket: null };
+  UI.showOver = false; UI.closed = null;
+  addMe(me);
+  G.timer = setInterval(tick, 100);
+  notify();
+}
+/* a question as the server sends it: options carry ids, never correctness */
+export function liveQuestion(q) {
+  if (!G || !G.live || !q) return;
+  while (G.qs.length < (q.questionCount || 0)) G.qs.push(null);
+  G.qs[q.order] = {
+    type: q.type || 'mc', text: q.text, questionId: q.questionId,
+    answers: (q.options || []).map((o) => o.text), optionIds: (q.options || []).map((o) => o.id),
+    correct: -1, time: q.timeLimitSecs, points: 1, img: null,
+    code: q.code || '', lang: q.language || 'Dart', pics: q.pictureUrls || [], word: '',
+  };
+  if (G.qi !== q.order) G.answers = {};
+  G.qi = q.order;
+  G.phase = 'question';
+  /* the timer follows the server's closesAt */
+  const left = Math.max(0, new Date(q.closesAt).getTime() - Date.now());
+  G.phaseEnd = Date.now() + left;
+  G.phaseStart = G.phaseEnd - q.timeLimitSecs * 1000;
+  notify();
+}
+export function livePhase(phase) {
+  if (!G || !G.live) return;
+  G.phase = phase; G.phaseEnd = 0;
+  notify();
+}
+let liveAnswerHandler = null;
+export function onLiveAnswer(f) { liveAnswerHandler = f; }
+function liveAnswer(choice) {
+  const qq = curQ();
+  if (!qq) return;
+  G.answers.me = { choice, t: Date.now() - G.phaseStart };
+  notify();
+  if (liveAnswerHandler) liveAnswerHandler(qq, choice);
 }

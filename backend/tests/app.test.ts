@@ -159,10 +159,11 @@ describe("backend API foundation", () => {
       method: "GET", url: `/api/v1/sessions/by-pin/${session.json().pin}`,
     });
     expect(pinLookup.statusCode).toBe(200);
-    expect(pinLookup.json().quiz.questions).toHaveLength(1);
-    expect(pinLookup.json().quiz.questions[0].options[0]).toHaveProperty("id");
-    expect(pinLookup.json().quiz.questions[0].options[0]).not.toHaveProperty("isCorrect");
+    // Lobby gate: PIN lookup exposes only metadata; questions arrive via the socket after start.
+    expect(pinLookup.json().quiz.questions).toBeUndefined();
+    expect(pinLookup.json().quiz.questionCount).toBe(1);
     expect(JSON.stringify(pinLookup.json())).not.toContain('"isCorrect"');
+    expect(JSON.stringify(pinLookup.json())).not.toContain('"options"');
     await app.close();
   });
 });

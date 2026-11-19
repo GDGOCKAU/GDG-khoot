@@ -3,7 +3,7 @@ import { config } from "./config.js";
 import { buildApp } from "./app.js";
 import { PrismaRepository } from "./repository/prisma.js";
 import { PrismaGameRepository } from "./repository/prisma-game.js";
-import { attachRealtime } from "./realtime.js";
+import { attachRealtime, roomEmitter } from "./realtime.js";
 import { GameService } from "./game.js";
 
 const prisma = new PrismaClient();
@@ -16,8 +16,11 @@ const gameService = new GameService(
 const app = buildApp(quizRepository, config.JWT_SECRET, gameService);
 
 await app.ready();
-const io = attachRealtime(app.server);
-gameService.setEmitter((sessionId, event, payload) => io.to(`game:${sessionId}`).emit(event, payload));
+const io = attachRealtime(app.server, {
+  gameService,
+  verifyHostToken: (token) => app.jwt.verify<{ id: string }>(token).id,
+});
+gameService.setEmitter(roomEmitter(io));
 await app.listen({ port: config.PORT, host: config.HOST });
 
 const shutdown = async () => {

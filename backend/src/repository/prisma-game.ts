@@ -79,6 +79,9 @@ export class PrismaGameRepository implements GameRepository {
   async updateParticipantScore(participantId: string, score: number, streak: number) {
     await this.prisma.participant.update({ where: { id: participantId }, data: { score, streak } });
   }
+  async countAnswers(sessionId: string, questionId: string) {
+    return this.prisma.answer.count({ where: { sessionId, questionId } });
+  }
 
   private mapParticipant(participant: {
     id: string; sessionId: string; name: string; mascot: string; team: string;

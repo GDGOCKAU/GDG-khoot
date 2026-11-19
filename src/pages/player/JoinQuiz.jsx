@@ -2,14 +2,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { NICK_A, NICK_B, TEAMS, css, mascot, pick, pinFmt, rnd } from '../../lib/constants';
-import { G, UI, joinGame } from '../../lib/engine';
-import { notify } from '../../lib/store';
+import { G, UI, joinGame, newLiveGame } from '../../lib/engine';
+import { connectLivePlayer } from '../../lib/live';
 import { toast, useWide } from '../../lib/ui';
 import { Ico } from '../../components/common/UI';
 import { MascotGrid, TeamTabs } from '../../components/player/AvatarPicker';
 import { LapShell } from '../../components/layout/Shells';
 import { apiRequest } from '../../api/client';
-import { connectSocket } from '../../api/socket';
 
 function JoinQuiz({ quiz, live }) {
   const navigate = useNavigate();
@@ -46,41 +45,20 @@ function JoinQuiz({ quiz, live }) {
       localStorage.setItem('gdgParticipantId', participant.id);
       localStorage.setItem('gdgSessionId', participant.sessionId);
       UI.look = { ...look, participantId: participant.id, sessionId: participant.sessionId };
-      const socket = connectSocket();
-      socket.emit('game:join', participant.sessionId, participant.id, () => {});
-      socket.on('question', (question) => {
-        if (!G || G.mode !== 'player') return;
-        G.qi = question.order;
-        G.phase = 'question';
-        G.phaseStart = Date.now();
-        G.phaseEnd = Date.now() + question.timeLimitSecs * 1000;
-        G.answers = {};
-        notify();
-      });
-      socket.on('reveal', () => {
-        if (!G || G.mode !== 'player') return;
-        G.phase = 'reveal';
-        G.phaseEnd = 0;
-        notify();
-      });
-      socket.on('final', () => {
-        if (!G || G.mode !== 'player') return;
-        G.phase = 'final';
-        G.phaseEnd = 0;
-        notify();
-      });
-      UI.liveSocket = socket;
+      /* in: wait in the lobby. /play only opens when the server sends the first question */
+      newLiveGame(quiz, { name, team: look.team, img: mascot(look.team, look.idx) }, { sessionId: participant.sessionId, participantId: participant.id });
+      connectLivePlayer(participant.sessionId, participant.id);
     } catch (error) {
       toast(error.status === 409
         ? 'That nickname is already in this session. Choose another.'
         : error.status === 404
           ? 'This live session no longer exists.'
-          : 'Could not join the live session.');
+          : error.status === 400
+            ? 'This game has already started.'
+            : 'Could not join the live session.');
       return;
     }
-    const err = joinGame(look, quiz);
-    if (err) { toast(err); return; }
-    navigate('/play');
+    navigate('/lobby');
   };
 
   const nick = (
