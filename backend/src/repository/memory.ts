@@ -64,4 +64,29 @@ export class MemoryRepository implements Repository {
     quiz.questions.push(question);
     return question;
   }
+  async saveQuiz(input: {
+    quizId?: string;
+    hostId: string;
+    title: string;
+    description?: string;
+    isPublished: boolean;
+    questions: Array<{ text: string; order: number; timeLimitSecs: number; options: Array<{ text: string; isCorrect: boolean }> }>;
+  }) {
+    let quiz = input.quizId ? await this.getQuiz(input.quizId, input.hostId) : null;
+    if (!quiz) {
+      quiz = await this.createQuiz({ title: input.title, description: input.description, hostId: input.hostId });
+    } else {
+      Object.assign(quiz, { title: input.title, description: input.description, isPublished: input.isPublished });
+    }
+    quiz.isPublished = input.isPublished;
+    quiz.questions = input.questions.map((question) => ({
+      id: randomUUID(),
+      quizId: quiz!.id,
+      text: question.text,
+      order: question.order,
+      timeLimitSecs: question.timeLimitSecs,
+      options: question.options.map((option) => ({ id: randomUUID(), text: option.text, isCorrect: option.isCorrect })),
+    }));
+    return quiz;
+  }
 }

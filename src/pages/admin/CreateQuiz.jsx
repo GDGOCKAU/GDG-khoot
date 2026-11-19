@@ -1,6 +1,6 @@
 
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import "./CreateQuiz.css";
 import { apiRequest } from "../../api/client";
 
@@ -16,13 +16,37 @@ const createQuestion = (number = 1) => ({
 
 function CreateQuiz() {
   const navigate = useNavigate();
+  const { quizId: editQuizId } = useParams();
 
   const [quizTitle, setQuizTitle] = useState("");
+  const [quizId, setQuizId] = useState(editQuizId || null);
   const [topic, setTopic] = useState("Technology");
   const [description, setDescription] = useState("");
   const [questions, setQuestions] = useState([createQuestion()]);
   const [activeQuestion, setActiveQuestion] = useState(0);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!editQuizId) return;
+    apiRequest(`/api/v1/quizzes/${editQuizId}`)
+      .then((quiz) => {
+        setQuizId(quiz.id);
+        setQuizTitle(quiz.title || "");
+        setDescription(quiz.description || "");
+        setQuestions((quiz.questions || []).length
+          ? quiz.questions.map((question) => ({
+              id: question.id,
+              title: `Question ${question.order + 1}`,
+              text: question.text,
+              answers: question.options.map((option) => option.text),
+              correctAnswer: question.options.findIndex((option) => option.isCorrect),
+              timeLimit: question.timeLimitSecs,
+              points: 1000,
+            }))
+          : [createQuestion()]);
+      })
+      .catch(() => setMessage("Could not load this quiz for editing."));
+  }, [editQuizId]);
 
   const currentQuestion = questions[activeQuestion];
 
@@ -116,10 +140,25 @@ function CreateQuiz() {
       return;
     }
     try {
-      const quiz = await apiRequest("/api/v1/quizzes", {
+      const quiz = await apiRequest("/api/v1/quizzes/save", {
         method: "POST",
-        body: JSON.stringify({ title: quizTitle.trim(), description }),
+        body: JSON.stringify({
+          quizId: quizId || undefined,
+          title: quizTitle.trim(),
+          description,
+          isPublished: false,
+          questions: questions.filter((question) => question.text.trim()).map((question, index) => ({
+            text: question.text.trim(),
+            order: index,
+            timeLimitSecs: question.timeLimit,
+            options: question.answers.map((text, optionIndex) => ({
+              text: text.trim(),
+              isCorrect: optionIndex === question.correctAnswer,
+            })),
+          })),
+        }),
       });
+      setQuizId(quiz.id);
       setMessage("Your draft has been saved to the backend.");
       navigate("/admin", { state: { savedQuizId: quiz.id } });
     } catch (error) {
@@ -134,15 +173,14 @@ function CreateQuiz() {
       return;
     }
     try {
-      const quiz = await apiRequest("/api/v1/quizzes", {
+      const quiz = await apiRequest("/api/v1/quizzes/save", {
         method: "POST",
-        body: JSON.stringify({ title: quizTitle.trim(), description }),
-      });
-      for (let index = 0; index < questions.length; index += 1) {
-        const question = questions[index];
-        await apiRequest(`/api/v1/quizzes/${quiz.id}/questions`, {
-          method: "POST",
-          body: JSON.stringify({
+        body: JSON.stringify({
+          quizId: quizId || undefined,
+          title: quizTitle.trim(),
+          description,
+          isPublished: true,
+          questions: questions.map((question, index) => ({
             text: question.text.trim(),
             order: index,
             timeLimitSecs: question.timeLimit,
@@ -150,13 +188,10 @@ function CreateQuiz() {
               text: text.trim(),
               isCorrect: optionIndex === question.correctAnswer,
             })),
-          }),
-        });
-      }
-      await apiRequest(`/api/v1/quizzes/${quiz.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ isPublished: true }),
+          })),
+        }),
       });
+      setQuizId(quiz.id);
       setMessage("Your quiz has been published to the backend.");
       navigate("/admin", { state: { savedQuizId: quiz.id } });
     } catch (error) {

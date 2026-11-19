@@ -49,4 +49,57 @@ export class PrismaRepository implements Repository {
       include: { options: true },
     });
   }
+  async saveQuiz(input: {
+    quizId?: string;
+    hostId: string;
+    title: string;
+    description?: string;
+    isPublished: boolean;
+    questions: Array<{ text: string; order: number; timeLimitSecs: number; options: Array<{ text: string; isCorrect: boolean }> }>;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const quiz = input.quizId
+        ? await tx.quiz.findFirst({ where: { id: input.quizId, hostId: input.hostId } })
+        : null;
+      if (input.quizId && !quiz) throw new Error("quiz_not_found");
+
+      const saved = quiz
+        ? await tx.quiz.update({
+            where: { id: quiz.id },
+            data: { title: input.title, description: input.description ?? null, isPublished: input.isPublished },
+          })
+        : await tx.quiz.create({
+            data: { title: input.title, description: input.description ?? null, isPublished: input.isPublished, hostId: input.hostId },
+          });
+
+      await tx.question.deleteMany({ where: { quizId: saved.id } });
+      await tx.question.createMany({
+        data: input.questions.map((question) => ({
+          quizId: saved.id,
+          text: question.text,
+          order: question.order,
+          timeLimitSecs: question.timeLimitSecs,
+        })),
+      });
+      const savedQuestions = await tx.question.findMany({
+        where: { quizId: saved.id },
+        orderBy: { order: "asc" },
+      });
+      for (const question of savedQuestions) {
+        const source = input.questions.find((item) => item.order === question.order);
+        if (!source) continue;
+        await tx.option.createMany({
+          data: source.options.map((option) => ({
+            questionId: question.id,
+            text: option.text,
+            isCorrect: option.isCorrect,
+          })),
+        });
+      }
+      return tx.quiz.findUniqueOrThrow({
+        where: { id: saved.id },
+        include: { questions: { include: { options: true }, orderBy: { order: "asc" } } },
+      });
+    });
+  }
 }

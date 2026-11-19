@@ -15,6 +15,21 @@ const questionSchema = z.object({
   timeLimitSecs: z.number().int().positive().max(600).optional(),
   options: z.array(z.object({ text: z.string().trim().min(1).max(500), isCorrect: z.boolean() })).min(2),
 });
+const saveQuizSchema = z.object({
+  quizId: z.string().uuid().optional(),
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(2000).optional(),
+  isPublished: z.boolean(),
+  questions: z.array(z.object({
+    text: z.string().trim().max(1000),
+    order: z.number().int().nonnegative(),
+    timeLimitSecs: z.number().int().positive().max(600),
+    options: z.array(z.object({
+      text: z.string().trim().max(500),
+      isCorrect: z.boolean(),
+    })).max(4),
+  })),
+});
 
 declare module "@fastify/jwt" {
   interface FastifyJWT {
@@ -54,6 +69,28 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
   });
 
   app.get("/api/v1/quizzes", { onRequest: [app.authenticate] }, async (request) => repository.listQuizzes(request.user.id));
+  app.post("/api/v1/quizzes/save", { onRequest: [app.authenticate] }, async (request, reply) => {
+    const parsed = saveQuizSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_request", details: parsed.error.flatten() });
+    if (parsed.data.isPublished) {
+      const invalidPublish = parsed.data.questions.length === 0 || parsed.data.questions.some((question) =>
+        !question.text || question.timeLimitSecs <= 0 ||
+        question.options.length < 2 ||
+        question.options.some((option) => !option.text) ||
+        question.options.filter((option) => option.isCorrect).length !== 1
+      );
+      if (invalidPublish) return reply.code(400).send({ error: "invalid_publish_quiz" });
+    }
+    try {
+      const quiz = await repository.saveQuiz({ ...parsed.data, hostId: request.user.id });
+      return reply.code(parsed.data.quizId ? 200 : 201).send(quiz);
+    } catch (error) {
+      if (error instanceof Error && error.message === "quiz_not_found") {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      throw error;
+    }
+  });
   app.post("/api/v1/quizzes", { onRequest: [app.authenticate] }, async (request, reply) => {
     const parsed = quizSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_request", details: parsed.error.flatten() });

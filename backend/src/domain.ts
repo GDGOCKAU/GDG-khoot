@@ -31,4 +31,17 @@ export interface Repository {
     timeLimitSecs?: number;
     options: Array<{ text: string; isCorrect: boolean }>;
   }): Promise<Question | null>;
+  saveQuiz(input: {
+    quizId?: string;
+    hostId: string;
+    title: string;
+    description?: string;
+    isPublished: boolean;
+    questions: Array<{
+      text: string;
+      order: number;
+      timeLimitSecs: number;
+      options: Array<{ text: string; isCorrect: boolean }>;
+    }>;
+  }): Promise<Quiz>;
 }

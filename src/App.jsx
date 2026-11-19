@@ -38,6 +38,7 @@ function App() {
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/create" element={<CreateQuiz />} />
+        <Route path="/admin/edit/:quizId" element={<CreateQuiz />} />
         <Route
           path="/admin/host/:quizId"
           element={<AdminHostLobby />}

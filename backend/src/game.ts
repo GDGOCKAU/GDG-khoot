@@ -132,6 +132,7 @@ export class GameService {
   async createSession(quizId: string, hostId: string) {
     const quiz = await this.quizRepository.getQuiz(quizId, hostId);
     if (!quiz) throw new GameError("quiz_not_found");
+    if (!quiz.isPublished || quiz.questions.length === 0) throw new GameError("invalid_phase");
     const session = await this.gameRepository.create({ quizId, hostId });
     this.emit(session.id, "session_created", { sessionId: session.id, pin: session.pin, status: session.status });
     this.emit(session.id, "phase", { phase: "LOBBY", sessionId: session.id });
@@ -149,6 +150,7 @@ export class GameService {
   async start(quizId: string, hostId: string, sessionId: string) {
     const quiz = await this.quizRepository.getQuiz(quizId, hostId);
     if (!quiz) throw new GameError("quiz_not_found");
+    if (!quiz.isPublished || quiz.questions.length === 0) throw new GameError("invalid_phase");
     const session = await this.gameRepository.findById(sessionId);
     if (!session || session.hostId !== hostId) throw new GameError("session_not_found");
     if (session.status !== "LOBBY") throw new GameError("invalid_phase");

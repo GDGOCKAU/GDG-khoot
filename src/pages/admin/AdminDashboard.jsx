@@ -76,9 +76,7 @@ function AdminDashboard() {
   }, [quizzes, search, activeFilter]);
 
   function handleEdit(quiz) {
-    setMessage(
-      `Editing "${quiz.title}" will be available in the quiz editor.`
-    );
+    navigate(`/admin/edit/${quiz.id}`);
   }
 
   function handleHost(quiz) {
