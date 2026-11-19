@@ -9,6 +9,15 @@ export function attachRealtime(httpServer: HttpServer) {
       void socket.join(`session:${sessionId}`);
       acknowledge?.({ ok: true });
     });
+    socket.on("game:join", (sessionId: string, participantId: string, acknowledge?: (result: { ok: boolean }) => void) => {
+      if (typeof sessionId !== "string" || sessionId.length === 0 || typeof participantId !== "string") {
+        return acknowledge?.({ ok: false });
+      }
+      void socket.join(`game:${sessionId}`);
+      socket.data.sessionId = sessionId;
+      socket.data.participantId = participantId;
+      acknowledge?.({ ok: true });
+    });
   });
   return io;
 }

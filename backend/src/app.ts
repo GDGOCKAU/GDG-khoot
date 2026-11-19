@@ -4,6 +4,7 @@ import jwt from "@fastify/jwt";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import type { Repository } from "./domain.js";
+import { GameError, type GameService } from "./game.js";
 
 const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
 const quizSchema = z.object({ title: z.string().trim().min(1).max(200), description: z.string().trim().max(2000).optional() });
@@ -27,7 +28,7 @@ declare module "fastify" {
   }
 }
 
-export function buildApp(repository: Repository, jwtSecret: string): FastifyInstance {
+export function buildApp(repository: Repository, jwtSecret: string, gameService?: GameService): FastifyInstance {
   const app = Fastify({ logger: false });
   app.register(cors, { origin: true });
   app.register(jwt, { secret: jwtSecret });
@@ -80,6 +81,74 @@ export function buildApp(repository: Repository, jwtSecret: string): FastifyInst
     const question = await repository.createQuestion({ ...parsed.data, quizId: quiz.id });
     return question ? reply.code(201).send(question) : reply.code(409).send({ error: "duplicate_question_order" });
   });
+
+  if (gameService) {
+    const gameError = (reply: FastifyReply, error: unknown) => {
+      if (error instanceof z.ZodError) {
+        return reply.code(400).send({ error: "invalid_request", details: error.flatten() });
+      }
+      if (error instanceof GameError) {
+        const status = error.code === "session_not_found" || error.code === "quiz_not_found" || error.code === "participant_not_found"
+          ? 404
+          : error.code === "answer_already_submitted" || error.code === "duplicate_participant" ? 409 : 400;
+        return reply.code(status).send({ error: error.code });
+      }
+      throw error;
+    };
+
+    app.post<{ Params: { id: string } }>("/api/v1/sessions", { onRequest: [app.authenticate] }, async (request, reply) => {
+      try {
+        const body = z.object({ quizId: z.string().uuid() }).parse(request.body);
+        return reply.code(201).send(await gameService.createSession(body.quizId, request.user.id));
+      } catch (error) { return gameError(reply, error); }
+    });
+    app.post("/api/v1/sessions/join", async (request, reply) => {
+      try {
+        const body = z.object({ pin: z.string().regex(/^\d{6}$/), name: z.string().trim().min(1).max(40), mascot: z.string().trim().min(1).max(40), team: z.string().trim().min(1).max(40) }).parse(request.body);
+        return reply.code(201).send(await gameService.joinByPin(body.pin, body));
+      } catch (error) { return gameError(reply, error); }
+    });
+    app.post<{ Params: { id: string }; Body: { quizId: string } }>("/api/v1/sessions/:id/start", { onRequest: [app.authenticate] }, async (request, reply) => {
+      try {
+        const body = z.object({ quizId: z.string().uuid() }).parse(request.body);
+        return reply.send(await gameService.start(body.quizId, request.user.id, request.params.id));
+      } catch (error) { return gameError(reply, error); }
+    });
+    app.post<{ Params: { id: string }; Body: { quizId: string } }>("/api/v1/sessions/:id/reveal", { onRequest: [app.authenticate] }, async (request, reply) => {
+      try {
+        const body = z.object({ quizId: z.string().uuid() }).parse(request.body);
+        return reply.send(await gameService.reveal(body.quizId, request.user.id, request.params.id));
+      } catch (error) { return gameError(reply, error); }
+    });
+    app.post<{ Params: { id: string }; Body: { quizId: string } }>("/api/v1/sessions/:id/next", { onRequest: [app.authenticate] }, async (request, reply) => {
+      try {
+        const body = z.object({ quizId: z.string().uuid() }).parse(request.body);
+        return reply.send(await gameService.next(body.quizId, request.user.id, request.params.id));
+      } catch (error) { return gameError(reply, error); }
+    });
+    app.get<{ Params: { id: string } }>("/api/v1/sessions/:id/leaderboard", async (request, reply) => {
+      try { return reply.send(await gameService.leaderboard(request.params.id)); } catch (error) { return gameError(reply, error); }
+    });
+    app.post<{ Params: { id: string }; Body: { participantId: string; questionId: string; optionId: string } }>("/api/v1/sessions/:id/answers", async (request, reply) => {
+      try {
+        const body = z.object({ participantId: z.string().uuid(), questionId: z.string().uuid(), optionId: z.string().uuid() }).parse(request.body);
+        return reply.code(201).send(await gameService.answer(request.params.id, body.participantId, body.questionId, body.optionId));
+      } catch (error) { return gameError(reply, error); }
+    });
+    app.post<{ Params: { id: string }; Body: { participantId: string } }>("/api/v1/sessions/:id/leave", async (request, reply) => {
+      try {
+        const body = z.object({ participantId: z.string().uuid() }).parse(request.body);
+        await gameService.leave(request.params.id, body.participantId);
+        return reply.code(204).send();
+      } catch (error) { return gameError(reply, error); }
+    });
+    app.post<{ Params: { id: string }; Body: { quizId: string } }>("/api/v1/sessions/:id/cancel", { onRequest: [app.authenticate] }, async (request, reply) => {
+      try {
+        const body = z.object({ quizId: z.string().uuid() }).parse(request.body);
+        return reply.send(await gameService.cancel(body.quizId, request.user.id, request.params.id));
+      } catch (error) { return gameError(reply, error); }
+    });
+  }
 
   return app;
 }

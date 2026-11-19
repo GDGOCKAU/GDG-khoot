@@ -1,25 +1,29 @@
-import { createServer } from "node:http";
 import { PrismaClient } from "@prisma/client";
 import { config } from "./config.js";
 import { buildApp } from "./app.js";
 import { PrismaRepository } from "./repository/prisma.js";
+import { PrismaGameRepository } from "./repository/prisma-game.js";
 import { attachRealtime } from "./realtime.js";
+import { GameService } from "./game.js";
 
 const prisma = new PrismaClient();
-const app = buildApp(new PrismaRepository(prisma), config.JWT_SECRET);
-const httpServer = createServer(app.server);
-attachRealtime(httpServer);
+const quizRepository = new PrismaRepository(prisma);
+const gameRepository = new PrismaGameRepository(prisma);
+const gameService = new GameService(
+  quizRepository,
+  gameRepository,
+);
+const app = buildApp(quizRepository, config.JWT_SECRET, gameService);
 
 await app.ready();
-await new Promise<void>((resolve, reject) => {
-  httpServer.once("error", reject);
-  httpServer.listen(config.PORT, config.HOST, resolve);
-});
+const io = attachRealtime(app.server);
+gameService.setEmitter((sessionId, event, payload) => io.to(`game:${sessionId}`).emit(event, payload));
+await app.listen({ port: config.PORT, host: config.HOST });
 
 const shutdown = async () => {
+  io.close();
   await app.close();
   await prisma.$disconnect();
-  httpServer.close();
 };
 process.once("SIGINT", shutdown);
 process.once("SIGTERM", shutdown);
