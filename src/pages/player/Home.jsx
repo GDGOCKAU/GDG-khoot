@@ -5,6 +5,8 @@ import Navbar from "../../components/common/Navbar.jsx";
 import "./Home.css";
 import { Link, useNavigate } from "react-router-dom";
 
+const quizzes = [];
+
 const TOPICS = {
   Mobile: { color: "blue", icon: "📱" },
   Cloud: { color: "red", icon: "☁️" },
