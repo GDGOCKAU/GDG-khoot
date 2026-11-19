@@ -4,7 +4,7 @@
 import { apiRequest, getStoredToken } from '../api/client';
 import { connectSocket } from '../api/socket';
 import { mascot } from './constants';
-import { G, applyStandings, exitGame, livePhase, liveQuestion, onLiveAnswer, onLiveHostOpen, setLiveHooks, skip } from './engine';
+import { G, applyHostState, applyStandings, exitGame, livePhase, liveQuestion, newLiveGame, onLiveAnswer, onLiveHostOpen, setLiveHooks, skip, stopGame } from './engine';
 import { notify } from './store';
 import { toast } from './ui';
 
@@ -13,6 +13,14 @@ const mascotIdx = (m) => { const n = Number(String(m || '').split('-')[1]); retu
 /* apply what the server says this player may see right now */
 function applyPlayerState(state) {
   if (!G || !G.live || !state) return;
+  /* also restores a refreshed phone: title, count and who I am come from the server */
+  if (state.quizTitle) G.quiz.title = state.quizTitle;
+  if (state.pin) G.pin = state.pin;
+  while (G.qs.length < (state.questionCount || 0)) G.qs.push(null);
+  if (state.participant && G.me) {
+    Object.assign(G.me, { name: state.participant.name, team: state.participant.team, img: mascot(state.participant.team, mascotIdx(state.participant.mascot)), score: state.participant.score, streak: state.participant.streak });
+  }
+  G.resuming = false;
   if (state.status === 'ACTIVE' && state.question) {
     liveQuestion(state.question);
     if (state.answered && !G.answers.me) { G.answers.me = { choice: null, t: 0 }; notify(); }
@@ -28,7 +36,10 @@ export function connectLivePlayer(sessionId, participantId) {
   /* runs on first connect and on every reconnect */
   socket.on('connect', () => {
     socket.emit('game:join', sessionId, participantId, (res) => {
-      if (!res || !res.ok) { toast('You are no longer in this game.'); exitGame(); return; }
+      if (!res || !res.ok || (G && G.resuming && res.state.status === 'FINISHED')) {
+        if (G && G.resuming) { forgetPlayer(); stopGame(); return; }
+        toast('You are no longer in this game.'); exitGame(); return;
+      }
       applyPlayerState(res.state);
     });
   });
@@ -59,11 +70,32 @@ export function connectLivePlayer(sessionId, participantId) {
   return socket;
 }
 
-export function connectLiveHost(sessionId) {
+const forgetPlayer = () => { localStorage.removeItem('gdgParticipantId'); localStorage.removeItem('gdgSessionId'); };
+/* a refreshed phone on /lobby or /play picks its seat back up */
+export function resumeLivePlayer() {
+  if (G) return false;
+  const sessionId = localStorage.getItem('gdgSessionId'), participantId = localStorage.getItem('gdgParticipantId');
+  if (!sessionId || !participantId) return false;
+  newLiveGame({ id: 'live', title: '', topic: 'Other', questionCount: 0, questions: [], live: true }, { name: '', team: 'blue', img: mascot('blue', 0) }, { sessionId, participantId });
+  G.resuming = true;
+  connectLivePlayer(sessionId, participantId);
+  return true;
+}
+
+/* a live player who leaves the game page frees their seat on the server */
+export function leaveLive() {
+  if (G && G.live) forgetPlayer();
+  if (!G || !G.live || !G.participantId || G.phase === 'final') return;
+  apiRequest(`/api/v1/sessions/${G.backendSessionId}/leave`, { method: 'POST', body: JSON.stringify({ participantId: G.participantId }), keepalive: true }).catch(() => {});
+}
+
+export function connectLiveHost(sessionId, onFirstState) {
   const socket = connectSocket();
   G.socket = socket;
+  let first = true;
   socket.on('connect', () => {
     socket.emit('host:join', sessionId, getStoredToken(), (res) => {
+      if (first && onFirstState) { first = false; onFirstState(res); return; }
       if (!res || !res.ok) toast('The server rejected the host connection. Log in again.');
     });
   });
@@ -75,6 +107,11 @@ export function connectLiveHost(sessionId) {
       img: mascot(participant.team, mascotIdx(participant.mascot)),
       bot: false, score: 0, streak: 0, correct: 0, last: null, prevRank: 0,
     });
+    notify();
+  });
+  socket.on('player_left', ({ participantId }) => {
+    if (!G) return;
+    G.players = G.players.filter((player) => player.id !== participantId);
     notify();
   });
   socket.on('answer_count', ({ count }) => {
@@ -96,4 +133,33 @@ export function connectLiveHost(sessionId) {
       .catch((error) => { toast('The server did not open the question. Press Skip to retry.'); throw error; });
   });
   return socket;
+}
+
+/* a refreshed host screen re-attaches to its running session instead of opening a new one */
+const hostKey = (quizId) => `kauhoot:host:${quizId}`;
+export function rememberHostSession(quizId, sessionId) { localStorage.setItem(hostKey(quizId), sessionId); G.resumeKey = hostKey(quizId); }
+export function resumeLiveHost(quizId) {
+  const sessionId = localStorage.getItem(hostKey(quizId));
+  if (!sessionId) return Promise.resolve(false);
+  const g = G;
+  return new Promise((resolve) => {
+    let done = false;
+    const timer = setTimeout(() => { if (done) return; done = true; if (G === g && G.socket) { G.socket.disconnect(); G.socket = null; } resolve(false); }, 5000);
+    connectLiveHost(sessionId, (res) => {
+      if (done) return;
+      done = true; clearTimeout(timer);
+      if (G !== g) { resolve(true); return; }
+      if (!res || !res.ok || !['LOBBY', 'ACTIVE', 'REVEAL'].includes(res.state.status)) {
+        localStorage.removeItem(hostKey(quizId));
+        if (G.socket) G.socket.disconnect();
+        G.socket = null;
+        resolve(false);
+        return;
+      }
+      G.backendSessionId = sessionId;
+      G.resumeKey = hostKey(quizId);
+      applyHostState(res.state);
+      resolve(true);
+    });
+  });
 }

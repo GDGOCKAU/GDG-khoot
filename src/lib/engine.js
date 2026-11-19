@@ -196,9 +196,10 @@ export function startHost(quiz, opts = {}) { newGame(quiz, 'host', null, opts); 
 export function toggleLock() { G.locked = !G.locked; clearTimeout(G.joinTimer); if (!G.locked) G.joinTimer = setTimeout(G.join, 700); notify(); }
 export function startGame() { clearTimeout(G.joinTimer); setPhase('ready', 3000); }
 export function skip() { G.phaseEnd = Date.now(); }
-export function endGame() { recordGame(); if (G.me) { G.ended = true; clearInterval(G.timer); notify(); } else stopGame(); }
+export function endGame() { if (G && G.resumeKey) localStorage.removeItem(G.resumeKey); recordGame(); if (G.me) { G.ended = true; clearInterval(G.timer); notify(); } else stopGame(); }
 export function exitGame() {
   if (G && G.liveHost && liveHooks.cancel && G.phase !== 'final') liveHooks.cancel();
+  if (G && G.resumeKey) localStorage.removeItem(G.resumeKey);
   const hadMe = G && G.me ? { title: G.quiz.title, name: G.me.name } : null;
   stopGame(false); UI.closed = hadMe; notify();
   return hadMe;
@@ -312,4 +313,21 @@ export function applyStandings(r, choices) {
   });
   if (G.me && !next.includes(G.me)) next.push(G.me);
   G.players = next;
+}
+
+/* host screen re-attached after a refresh: rebuild players and pick the phase up from the server */
+export function applyHostState(st) {
+  if (!G || !st) return;
+  if (st.pin) G.pin = st.pin;
+  applyStandings({ standings: st.standings || [] });
+  if (st.status === 'ACTIVE' && st.question) {
+    G.qi = st.question.order; G.answers = {}; G.liveAnswered = 0;
+    G.phase = 'question';
+    G.phaseEnd = Date.now() + Math.max(0, new Date(st.question.closesAt).getTime() - Date.now());
+    G.phaseStart = G.phaseEnd - st.question.timeLimitSecs * 1000;
+    notify();
+  } else if (st.status === 'REVEAL') {
+    G.qi = st.currentQuestionOrder ?? 0;
+    setPhase('leaderboard', 4000);
+  } else notify();
 }

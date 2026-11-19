@@ -97,13 +97,14 @@ export function LivePill() {
   let label, btn;
   if (r === 'host') {
     label = <b>You&apos;re the host</b>;
-    btn = G.me ? <Link className="btn btn-primary btn-sm" to="/play">My player screen <Ico n="arrow" /></Link> : (G.phase === 'final' ? null : <Link className="btn btn-primary btn-sm" to="/live">Join as a player <Ico n="arrow" /></Link>);
+    /* live host: players join from their own phones; joining here would end the hosted game */
+    btn = G.me ? <Link className="btn btn-primary btn-sm" to="/play">My player screen <Ico n="arrow" /></Link> : (G.phase === 'final' || G.liveHost ? null : <Link className="btn btn-primary btn-sm" to="/live">Join as a player <Ico n="arrow" /></Link>);
   } else if (r === 'play' && G.me) {
     label = <b>Playing as {G.me.name}</b>;
     btn = <Link className="btn btn-primary btn-sm" to={`/host/${G.quiz.id}`}>Host screen <Ico n="arrow" /></Link>;
   } else {
     label = <><b>Live game</b> · PIN {pinFmt(G.pin)} · <span>{PHASE_LABEL[G.phase] || ''}</span></>;
-    btn = <><Link className="btn btn-outline btn-sm" to={`/host/${G.quiz.id}`}>Host screen</Link>{G.me ? <Link className="btn btn-primary btn-sm" to="/play">My player screen</Link> : <Link className="btn btn-primary btn-sm" to="/live">Join</Link>}</>;
+    btn = <><Link className="btn btn-outline btn-sm" to={`/host/${G.quiz.id}`}>Host screen</Link>{G.me ? <Link className="btn btn-primary btn-sm" to="/play">My player screen</Link> : G.liveHost ? null : <Link className="btn btn-primary btn-sm" to="/live">Join</Link>}</>;
   }
   return <div className="live-pill" role="region" aria-label="Live game"><span className="live-dot" aria-hidden="true" /><span>{label}</span>{btn}</div>;
 }

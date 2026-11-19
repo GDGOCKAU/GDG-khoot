@@ -219,13 +219,17 @@ export class GameService {
     const answered = participant && current ? !!(await this.gameRepository.findAnswer(participant.id, current.id)) : false;
     return {
       sessionId: session.id,
+      pin: session.pin,
+      quizTitle: quiz.title,
       status: session.status,
       questionCount: quiz.questions.length,
       currentQuestionOrder: session.currentQuestionOrder,
       // Only an open question is ever exposed, and only in its public shape.
       question: session.status === "ACTIVE" && current ? publicQuestion(current, session, quiz.questions.length) : null,
       answered,
-      participant: participant ? { id: participant.id, name: participant.name, team: participant.team, score: participant.score, streak: participant.streak } : null,
+      participant: participant ? { id: participant.id, name: participant.name, team: participant.team, mascot: participant.mascot, score: participant.score, streak: participant.streak } : null,
+      // host only: everyone in the session, so a refreshed host screen can rebuild its lobby/leaderboard
+      standings: participant ? undefined : (await this.standings(session.id, null)).standings,
     };
   }
 
@@ -390,7 +394,7 @@ export class GameService {
   }
   async leave(sessionId: string, participantId: string) {
     if (!(await this.gameRepository.leave(sessionId, participantId))) throw new GameError("participant_not_found");
-    this.emit(sessionId, "player_left", { participantId });
+    this.emit(sessionId, "player_left", { participantId }, "host");
   }
   async cancel(quizId: string, hostId: string, sessionId: string) {
     const session = await this.gameRepository.findById(sessionId);

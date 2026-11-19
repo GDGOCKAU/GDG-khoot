@@ -18,7 +18,7 @@ import CreateQuiz from './pages/admin/CreateQuiz';
 import HostGame from './pages/admin/HostGame';
 import { apiRequest } from './api/client';
 import { syncLiveQuiz } from './lib/liveQuiz';
-import { connectLiveHost } from './lib/live';
+import { connectLiveHost, leaveLive, rememberHostSession, resumeLiveHost, resumeLivePlayer } from './lib/live';
 
 function Loading() {
   return <main className="loading" aria-busy="true"><h1>Loading<Bounce /></h1></main>;
@@ -68,6 +68,7 @@ function JoinRoute() {
 function LiveRoute() {
   useAppState();
   if (!hosted()) return <Navigate to="/" replace />;
+  if (G.liveHost) return <Navigate to={`/host/${G.quiz.id}`} replace />;
   return <JoinQuiz key={'live:' + G.quiz.id} quiz={G.quiz} live />;
 }
 /* /host/:quizId — the host's big screen. Opening it starts a new game (admins only). */
@@ -80,15 +81,19 @@ function HostRoute() {
     if (!(hosted() && G.quiz.id === quizId) && quiz && isAdmin()) {
       startHost(quiz, { live: true });
       const g = G;
-      apiRequest('/api/v1/sessions', {
-        method: 'POST',
-        body: JSON.stringify({ quizId }),
-      }).then((session) => {
-        if (G !== g) return;
-        G.backendSessionId = session.id;
-        G.pin = session.pin;
-        connectLiveHost(session.id);
-        notify();
+      resumeLiveHost(quizId).then((resumed) => {
+        if (resumed || G !== g) return;
+        return apiRequest('/api/v1/sessions', {
+          method: 'POST',
+          body: JSON.stringify({ quizId }),
+        }).then((session) => {
+          if (G !== g) return;
+          G.backendSessionId = session.id;
+          G.pin = session.pin;
+          rememberHostSession(quizId, session.id);
+          connectLiveHost(session.id);
+          notify();
+        });
       }).catch((error) => {
         toast(error.status === 400
           ? 'This quiz is not published or has no questions.'
@@ -120,12 +125,17 @@ function App() {
   const [booted, setBooted] = useState(false);
 
   useEffect(() => { const t = setTimeout(() => setBooted(true), 1400); return () => clearTimeout(t); }, []);
+  /* a refreshed phone on /lobby or /play rejoins its live game */
+  useEffect(() => {
+    const first = window.location.pathname.split('/').filter(Boolean)[0];
+    if (first === 'lobby' || first === 'play') resumeLivePlayer();
+  }, []);
   useEffect(() => installSpiderDrag(), []);
 
   /* leaving the player screen ends a practice game; every page starts at the top */
   useEffect(() => {
     const first = location.pathname.split('/').filter(Boolean)[0];
-    if (G && G.mode === 'player' && first !== 'play' && !(G.live && first === 'lobby')) stopGame();
+    if (G && G.mode === 'player' && first !== 'play' && !(G.live && first === 'lobby')) { leaveLive(); stopGame(); }
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
