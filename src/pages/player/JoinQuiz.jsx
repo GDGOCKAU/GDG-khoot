@@ -6,6 +6,7 @@ import AvatarPicker from "../../components/player/AvatarPicker";
 import Devu from "../../components/common/Devu";
 import Navbar from "../../components/common/Navbar";
 import "./JoinQuiz.css";
+import { apiRequest } from "../../api/client";
 
 const randomNames = [
   "CuriousCoder",
@@ -48,7 +49,7 @@ function JoinQuiz() {
     setError("");
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
   event.preventDefault();
 
   const cleanNickname = nickname.trim();
@@ -64,6 +65,27 @@ function JoinQuiz() {
   }
 
   setError("");
+  const pin = String(gamePin || quizId || "").replace(/\D/g, "");
+  let participantId = "";
+  if (/^\d{6}$/.test(pin)) {
+    try {
+      const participant = await apiRequest("/api/v1/sessions/join", {
+        method: "POST",
+        body: JSON.stringify({
+          pin,
+          name: cleanNickname,
+          mascot: `${selectedAvatar.color}-${selectedAvatar.number}`,
+          team: selectedAvatar.color,
+        }),
+      });
+      participantId = participant.id;
+      localStorage.setItem("gdgParticipantId", participant.id);
+      localStorage.setItem("gdgSessionId", participant.sessionId);
+    } catch (requestError) {
+      setError(requestError.status === 409 ? "That nickname is already taken." : "Could not join the live session.");
+      return;
+    }
+  }
 
   // Save player information for the gameplay screen
   localStorage.setItem("gdgNickname", cleanNickname);
@@ -78,6 +100,7 @@ function JoinQuiz() {
       avatar: selectedAvatar,
       quizTitle,
       pin: gamePin,
+      participantId,
     },
   });
 }

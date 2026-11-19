@@ -1,10 +1,12 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import Devu from "../../components/common/Devu";
 import ThemeToggle from "../../components/common/ThemeToggle";
 import "./AdminHostLobby.css";
+import { apiRequest } from "../../api/client";
+import { connectSocket } from "../../api/socket";
 
 const mockPlayers = [
   { id: 1, nickname: "PixelMaster", avatar: { color: "blue", number: 3 } },
@@ -16,13 +18,38 @@ const mockPlayers = [
 function AdminHostLobby() {
   const { quizId } = useParams();
 
-  const [players] = useState(mockPlayers);
+  const [players, setPlayers] = useState([]);
+  const [session, setSession] = useState(null);
   const [copied, setCopied] = useState(false);
   const [gameStarted, setGameStarted] = useState(false);
   const [message, setMessage] = useState("");
+  const [phase, setPhase] = useState("LOBBY");
 
-  const gamePin = "482916";
+  const [gamePin, setGamePin] = useState("482916");
   const joinUrl = `http://192.168.3.29:5173/join/${quizId}`;
+
+  useEffect(() => {
+    let socket;
+    apiRequest("/api/v1/sessions", {
+      method: "POST",
+      body: JSON.stringify({ quizId }),
+    }).then((created) => {
+      setSession(created);
+      setGamePin(created.pin);
+      socket = connectSocket();
+      socket.emit("game:join", created.id, "host", () => {});
+      socket.on("player_joined", ({ participant }) => {
+        setPlayers((previous) => previous.some((player) => player.id === participant.id)
+          ? previous
+          : [...previous, { id: participant.id, nickname: participant.name, avatar: { color: participant.team.toLower?.() || participant.team, number: 1 } }]);
+      });
+      socket.on("player_left", ({ participantId }) => {
+        setPlayers((previous) => previous.filter((player) => player.id !== participantId));
+      });
+      socket.on("phase", ({ phase: nextPhase }) => setPhase(nextPhase));
+    }).catch(() => setPlayers(mockPlayers));
+    return () => socket?.disconnect();
+  }, [quizId]);
 
   async function copyText(text, label) {
     try {
@@ -35,14 +62,51 @@ function AdminHostLobby() {
     }
   }
 
-  function handleStartGame() {
+  async function handleStartGame() {
     if (players.length === 0) {
       setMessage("You need at least one player to start the game.");
       return;
     }
+    if (!session) {
+      setMessage("Demo mode: no live backend session is available.");
+      setGameStarted(true);
+      return;
+    }
+    try {
+      await apiRequest(`/api/v1/sessions/${session.id}/start`, {
+        method: "POST",
+        body: JSON.stringify({ quizId }),
+      });
+      setGameStarted(true);
+      setMessage("Live game started.");
+    } catch {
+      setGameStarted(true);
+      setMessage("Demo mode: backend session unavailable.");
+    }
+  }
 
-    setGameStarted(true);
-    setMessage("Demo mode: the live quiz screen will be connected next.");
+  async function handleReveal() {
+    if (!session) return;
+    try {
+      await apiRequest(`/api/v1/sessions/${session.id}/reveal`, {
+        method: "POST",
+        body: JSON.stringify({ quizId }),
+      });
+    } catch {
+      setMessage("Could not reveal the answer.");
+    }
+  }
+
+  async function handleNext() {
+    if (!session) return;
+    try {
+      await apiRequest(`/api/v1/sessions/${session.id}/next`, {
+        method: "POST",
+        body: JSON.stringify({ quizId }),
+      });
+    } catch {
+      setMessage("Could not advance the game.");
+    }
   }
 
   return (
@@ -190,6 +254,16 @@ function AdminHostLobby() {
             >
               {gameStarted ? "Game started ✓" : "Start game →"}
             </button>
+            {gameStarted && phase === "ACTIVE" && (
+              <button type="button" className="host-start-button" onClick={handleReveal}>
+                Reveal answer
+              </button>
+            )}
+            {gameStarted && phase === "REVEAL" && (
+              <button type="button" className="host-start-button" onClick={handleNext}>
+                Next question
+              </button>
+            )}
           </div>
         </section>
 

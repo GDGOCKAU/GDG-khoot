@@ -1,5 +1,32 @@
 # React + Vite
 
+## GDG KAUHOOT frontend and backend
+
+Frontend:
+
+```sh
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Backend:
+
+```sh
+cd backend
+cp .env.example .env
+npm install
+npm run prisma:generate
+npm run prisma:migrate
+npm run prisma:seed
+npm run dev
+```
+
+Set `VITE_API_URL` and `VITE_SOCKET_URL` to the Fastify origin (normally
+`http://localhost:3000`). Do not commit `.env`; use development-only credentials
+and a local PostgreSQL database. Seed/admin credentials are documented separately
+in `backend/README.md`.
+
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
 Currently, two official plugins are available:

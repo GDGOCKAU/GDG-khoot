@@ -1,8 +1,10 @@
 
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import "./PlayerGame.css";
 import ThemeToggle from "../../components/common/ThemeToggle";
+import { apiRequest } from "../../api/client";
+import { connectSocket } from "../../api/socket";
 
 const questions = [
   {
@@ -34,7 +36,7 @@ const answerColors = ["red", "blue", "green", "yellow"];
 const answerShapes = ["triangle", "diamond", "circle", "square"];
 
 function PlayerGame() {
-  const { gameId } = useParams();
+  const location = useLocation();
 
   const [questionIndex, setQuestionIndex] = useState(0);
   const [phase, setPhase] = useState("countdown");
@@ -43,9 +45,44 @@ function PlayerGame() {
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [score, setScore] = useState(0);
   const [pointsEarned, setPointsEarned] = useState(0);
+  const participantId = location.state?.participantId || localStorage.getItem("gdgParticipantId") || "";
+  const sessionId = localStorage.getItem("gdgSessionId") || "";
+  const [liveQuestion, setLiveQuestion] = useState(location.state?.question || null);
+  const [liveReveal, setLiveReveal] = useState(null);
 
-  const currentQuestion = questions[questionIndex];
-  const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
+  useEffect(() => {
+    if (!sessionId) return undefined;
+    const socket = connectSocket();
+    socket.emit("game:join", sessionId, participantId, () => {});
+    socket.on("question", (question) => {
+      setLiveQuestion(question);
+      setQuestionIndex(question.order);
+      setSelectedAnswer(null);
+      setPointsEarned(0);
+      setTimeLeft(question.timeLimitSecs);
+      setPhase("question");
+    });
+    socket.on("reveal", (payload) => {
+      setLiveReveal(payload);
+      setPhase("reveal");
+    });
+    socket.on("final", () => setPhase("final"));
+    return () => socket.disconnect();
+  }, [participantId, sessionId]);
+
+  const currentQuestion = liveQuestion
+    ? {
+        text: liveQuestion.text,
+        answers: liveQuestion.options.map((option) => option.text),
+        correctAnswer: liveReveal
+          ? liveQuestion.options.findIndex((option) => option.id === liveReveal.correctOptionId)
+          : 0,
+        timeLimit: liveQuestion.timeLimitSecs,
+      }
+    : questions[questionIndex];
+  const isCorrect = liveReveal
+    ? liveQuestion?.options[selectedAnswer]?.id === liveReveal.correctOptionId
+    : selectedAnswer === currentQuestion.correctAnswer;
 
   // Countdown before each question
   useEffect(() => {
@@ -92,11 +129,30 @@ function PlayerGame() {
     }
   }, [phase]);
 
-  function handleAnswer(index) {
+  async function handleAnswer(index) {
     if (phase !== "question" || selectedAnswer !== null) return;
 
     setSelectedAnswer(index);
     setPhase("waiting");
+    if (liveQuestion && sessionId && participantId) {
+      try {
+        const optionId = liveQuestion.options[index]?.id;
+        if (!optionId) throw new Error("missing_live_option");
+        const result = await apiRequest(`/api/v1/sessions/${sessionId}/answers`, {
+          method: "POST",
+          body: JSON.stringify({
+            participantId,
+            questionId: liveQuestion.questionId,
+            optionId,
+          }),
+        });
+        setPointsEarned(result.points);
+        setScore((previous) => previous + result.points);
+      } catch {
+        setPhase("question");
+        setSelectedAnswer(null);
+      }
+    }
   }
 
   function handleNextQuestion() {
@@ -116,7 +172,6 @@ function PlayerGame() {
   }
 
   const progress = (timeLeft / currentQuestion.timeLimit) * 100;
-  const gamePin = gameId || "------";
 
   return (
     <main className={`player-game-page phase-${phase}`}>

@@ -3,9 +3,7 @@ import { useState } from "react";
 import HangingDevu from "../../components/common/HangingDevu";
 import Navbar from "../../components/common/Navbar.jsx";
 import "./Home.css";
-import { Link, useNavigate } from "react-router-dom";// Temporary until the backend provides the quiz list.
-// Expected quiz fields: id, status, topic, title, desc, questions, pin.
-const quizzes = [];
+import { Link, useNavigate } from "react-router-dom";
 
 const TOPICS = {
   Mobile: { color: "blue", icon: "📱" },

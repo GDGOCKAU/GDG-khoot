@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./CreateQuiz.css";
+import { apiRequest } from "../../api/client";
 
 const createQuestion = (number = 1) => ({
   id: crypto.randomUUID(),
@@ -17,7 +18,6 @@ function CreateQuiz() {
   const navigate = useNavigate();
 
   const [quizTitle, setQuizTitle] = useState("");
-  const [quizId] = useState(() => crypto.randomUUID());
   const [topic, setTopic] = useState("Technology");
   const [description, setDescription] = useState("");
   const [questions, setQuestions] = useState([createQuestion()]);
@@ -110,64 +110,59 @@ function CreateQuiz() {
     return "";
   }
 
-  function saveDraft() {
-  const quizData = {
-    id: quizId,
-    title: quizTitle.trim() || "Untitled Quiz",
-    topic,
-    description,
-    questions,
-    status: "Draft",
-    lastHosted: "Never",
-    updatedAt: new Date().toISOString(),
-  };
-
-  const savedQuizzes = JSON.parse(
-    localStorage.getItem("gdgQuizzes") || "[]"
-  );
-
-  const updatedQuizzes = [
-    ...savedQuizzes.filter((quiz) => quiz.id !== quizId),
-    quizData,
-  ];
-
-  localStorage.setItem("gdgQuizzes", JSON.stringify(updatedQuizzes));
-
-  setMessage("Your draft has been saved successfully!");
-}
-
-  function publishQuiz() {
-  const validationError = validateQuiz();
-
-  if (validationError) {
-    setMessage(validationError);
-    return;
+  async function saveDraft() {
+    if (!quizTitle.trim()) {
+      setMessage("Please enter a quiz title.");
+      return;
+    }
+    try {
+      const quiz = await apiRequest("/api/v1/quizzes", {
+        method: "POST",
+        body: JSON.stringify({ title: quizTitle.trim(), description }),
+      });
+      setMessage("Your draft has been saved to the backend.");
+      navigate("/admin", { state: { savedQuizId: quiz.id } });
+    } catch (error) {
+      setMessage(error.status === 401 ? "Please sign in again." : "Could not save the draft to the backend.");
+    }
   }
 
-  const quizData = {
-    id: quizId,
-    title: quizTitle.trim(),
-    topic,
-    description,
-    questions,
-    status: "Ready",
-    lastHosted: "Never",
-    updatedAt: new Date().toISOString(),
-  };
-
-  const savedQuizzes = JSON.parse(
-    localStorage.getItem("gdgQuizzes") || "[]"
-  );
-
-  const updatedQuizzes = [
-    ...savedQuizzes.filter((quiz) => quiz.id !== quizId),
-    quizData,
-  ];
-
-  localStorage.setItem("gdgQuizzes", JSON.stringify(updatedQuizzes));
-
-  setMessage("Your quiz has been published successfully!");
-}
+  async function publishQuiz() {
+    const validationError = validateQuiz();
+    if (validationError) {
+      setMessage(validationError);
+      return;
+    }
+    try {
+      const quiz = await apiRequest("/api/v1/quizzes", {
+        method: "POST",
+        body: JSON.stringify({ title: quizTitle.trim(), description }),
+      });
+      for (let index = 0; index < questions.length; index += 1) {
+        const question = questions[index];
+        await apiRequest(`/api/v1/quizzes/${quiz.id}/questions`, {
+          method: "POST",
+          body: JSON.stringify({
+            text: question.text.trim(),
+            order: index,
+            timeLimitSecs: question.timeLimit,
+            options: question.answers.map((text, optionIndex) => ({
+              text: text.trim(),
+              isCorrect: optionIndex === question.correctAnswer,
+            })),
+          }),
+        });
+      }
+      await apiRequest(`/api/v1/quizzes/${quiz.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ isPublished: true }),
+      });
+      setMessage("Your quiz has been published to the backend.");
+      navigate("/admin", { state: { savedQuizId: quiz.id } });
+    } catch (error) {
+      setMessage(error.status === 401 ? "Please sign in again." : "Could not publish the quiz to the backend.");
+    }
+  }
 
   return (
     <div className="create-quiz-page">

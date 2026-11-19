@@ -1,13 +1,15 @@
 
-import { useLocation, useParams, Link } from "react-router-dom";
+import { useEffect } from "react";
+import { useLocation, Link, useNavigate } from "react-router-dom";
 
 import Devu from "../../components/common/Devu";
 import Navbar from "../../components/common/Navbar";
 import "./Lobby.css";
+import { connectSocket } from "../../api/socket";
 
 function Lobby() {
   const location = useLocation();
-  const { quizId } = useParams();
+  const navigate = useNavigate();
 
   const nickname =
     location.state?.nickname ||
@@ -28,6 +30,18 @@ function Lobby() {
   const avatar = location.state?.avatar || savedAvatar;
   const quizTitle = location.state?.quizTitle || "";
   const gamePin = location.state?.pin || "";
+  const participantId = location.state?.participantId || localStorage.getItem("gdgParticipantId") || "";
+  const sessionId = localStorage.getItem("gdgSessionId") || "";
+
+  useEffect(() => {
+    if (!participantId || !sessionId) return undefined;
+    const socket = connectSocket();
+    socket.emit("game:join", sessionId, participantId, () => {});
+    socket.on("question", (question) => {
+      navigate(`/play/${gamePin}`, { state: { participantId, question, pin: gamePin } });
+    });
+    return () => socket.disconnect();
+  }, [gamePin, navigate, participantId, sessionId]);
 
   const teamNames = {
     blue: "Blue",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GameError, GameService, MemoryGameRepository } from "../src/game.js";
+import { GameService, MemoryGameRepository } from "../src/game.js";
 import type { Quiz } from "../src/domain.js";
 
 const quiz: Quiz = {

@@ -1,7 +1,8 @@
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "./AdminDashboard.css";
+import { apiRequest } from "../../api/client";
 
 const initialQuizzes = [
   {
@@ -41,10 +42,25 @@ const initialQuizzes = [
 function AdminDashboard() {
   const navigate = useNavigate();
 
-  const [quizzes] = useState(initialQuizzes);
+  const [quizzes, setQuizzes] = useState(initialQuizzes);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState("All");
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    apiRequest("/api/v1/quizzes")
+      .then((items) => {
+        setQuizzes(items.map((quiz) => ({
+          id: quiz.id,
+          title: quiz.title,
+          topic: "Other",
+          questions: quiz.questions?.length ?? 0,
+          lastHosted: "Never",
+          status: quiz.isPublished ? "Ready" : "Draft",
+        })));
+      })
+      .catch(() => setMessage("Showing demo quizzes; backend is unavailable or sign-in expired."));
+  }, []);
 
   const filteredQuizzes = useMemo(() => {
     return quizzes.filter((quiz) => {
