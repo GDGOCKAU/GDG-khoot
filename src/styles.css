@@ -563,3 +563,8 @@ body:has(.spider-fly) { cursor: grabbing; user-select: none; }
   .gfoot-social a { width: 52px; height: 52px; }
   .gfoot-copy { font-size: 15px; align-items: flex-start; }
 }
+
+/* quiz cards: same layout whatever the text length */
+.quiz-card p { min-height: 3em; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.quiz-card h3 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quiz-card .meta { margin-top: auto; padding-top: 8px; }
