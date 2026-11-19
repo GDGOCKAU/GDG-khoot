@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { TEAMS, TOPICS, css, pinFmt } from '../../lib/constants';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { TEAMS, TOPICS, css } from '../../lib/constants';
 import { DB, ready, topicNames, useAppState } from '../../lib/store';
 import { G, UI, hosted } from '../../lib/engine';
 import { toast } from '../../lib/ui';
@@ -23,6 +23,14 @@ function Home() {
   const [active, setActive] = useState('join');
   const holdRef = useRef(0);
   const pinRef = useRef(null);
+  const location = useLocation();
+
+  /* back from a wrong-PIN page: straight to the PIN box */
+  useEffect(() => {
+    if (!location.state?.focusPin) return;
+    document.getElementById('join')?.scrollIntoView();
+    pinRef.current?.focus();
+  }, [location.state]);
 
   /* scroll spy for the nav pills */
   useEffect(() => {
@@ -105,7 +113,6 @@ function Home() {
             {pinError ? <p className="err" id="pinErr" role="alert">{pinError}</p> : <span id="pinErr" />}
             <button className="btn btn-primary btn-lg" type="submit">Enter game <Ico n="arrow" /></button>
             <ColorBar />
-            <p style={css('margin:0;text-align:center;font-size:13px;color:var(--muted)')}>Each quiz below shows its PIN, or just press Play on one.</p>
           </form>
         </div>
       </section>
@@ -125,7 +132,7 @@ function Home() {
                 <span className="ico"><TopicIcon t={x.topic} /></span>
                 <h3>{x.title}</h3>
                 <p>{x.desc || ''}</p>
-                <div className="meta"><span className="chip">{x.questions.length} questions</span><TopicChip t={x.topic} /><span className="chip" title="Game PIN">PIN {pinFmt(x.pin)}</span></div>
+                <div className="meta"><span className="chip">{x.questions.length} questions</span><TopicChip t={x.topic} /></div>
                 <Link className="btn btn-tonal btn-sm play" to={`/join/${x.id}`} onClick={() => { UI.look = null; }}>Play <Ico n="arrow" /></Link>
               </article>
             );

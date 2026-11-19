@@ -9,6 +9,7 @@ import { Bounce, LivePill } from './components/common/UI';
 // Player pages
 import Home from './pages/player/Home';
 import JoinQuiz from './pages/player/JoinQuiz';
+import JoinError from './pages/player/JoinError';
 import PlayerGame, { PlayerLobby } from './pages/player/PlayerGame';
 
 // Admin pages
@@ -38,22 +39,21 @@ function JoinRoute() {
     apiRequest(`/api/v1/sessions/by-pin/${pin}`)
       .then((live) => {
         if (cancelled) return;
-        if (live.quiz.id !== quizId) { setLiveError('This QR link belongs to another quiz.'); return; }
-        if (sessionId && live.sessionId !== sessionId) { setLiveError('This QR link is for a different live session.'); return; }
+        if (live.quiz.id !== quizId) { setLiveError('mismatch'); return; }
+        if (sessionId && live.sessionId !== sessionId) { setLiveError('mismatch'); return; }
         setLiveQuiz(syncLiveQuiz(live));
       })
       .catch((error) => {
         if (cancelled) return;
-        setLiveError(error.body?.error === 'game_locked' ? 'The host has locked this game.' : error.status === 409
-          ? 'This game has already started.'
-          : error.status === 410
-            ? 'This game has ended.'
-            : 'No live session with this PIN. Wait until the host opens the lobby.');
+        setLiveError(error.body?.error === 'game_locked' ? 'locked'
+          : error.status === 409 ? 'started'
+          : error.status === 410 ? 'ended'
+          : 'not_found');
       });
     return () => { cancelled = true; };
   }, [pin, sessionId, quizId]);
   if (pin) {
-    if (liveError) return <main className="loading" aria-busy="true"><h1>{liveError}</h1></main>;
+    if (liveError) return <JoinError kind={liveError} />;
     if (!liveQuiz) return <main className="loading" aria-busy="true"><h1>Joining live session<Bounce /></h1></main>;
     return <JoinQuiz key={quizId} quiz={liveQuiz} live />;
   }
