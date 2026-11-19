@@ -6,20 +6,21 @@ import { G } from '../../lib/engine';
 import { setAdmin } from '../../lib/store';
 import { Brand, ColorBar, ThemeButton, Hang, Ico, MePill } from '../common/UI';
 
-export function LapShell({ right, bg, center, children }) {
+export function LapShell({ right, bg, center, main = '', glow, children }) {
   return (
     <div className="lap" style={bg ? { '--pbg': bg } : undefined}>
       <div className="orb" aria-hidden="true" style={css('background:#4285f4;top:-160px;right:6%;opacity:.10')} />
       <header className="lap-head"><Link to="/" style={{ textDecoration: 'none' }}><Brand /></Link><div style={css('display:flex;align-items:center;gap:10px')}>{right}<ThemeButton /></div></header>
-      <main className={`lap-main${center ? ' lap-center' : ''}`}>{children}</main>
+      {glow && <div className="lap-glow" aria-hidden="true" style={{ '--g': glow }} />}
+      <main className={`lap-main${center ? ' lap-center' : ''}${main ? ' ' + main : ''}`}>{children}</main>
       <ColorBar />
     </div>
   );
 }
 
 /* player screen frame: laptop layout when wide, phone layout otherwise */
-export function PShell({ wide, bg, center, wideRight, phoneRight, children }) {
-  if (wide) return <LapShell right={wideRight ?? <MePill p={G.me} />} bg={bg} center={center}>{children}</LapShell>;
+export function PShell({ wide, bg, center, wideRight, phoneRight, main, glow, children }) {
+  if (wide) return <LapShell right={wideRight ?? <MePill p={G.me} />} bg={bg} center={center} main={main} glow={glow}>{children}</LapShell>;
   return (
     <div className="pl" style={bg ? { '--pbg': bg } : undefined}>
       <header className="pl-head"><div className="in"><Brand />{phoneRight ?? <span className="chip">{G.me.name}</span>}</div></header>
@@ -29,7 +30,7 @@ export function PShell({ wide, bg, center, wideRight, phoneRight, children }) {
   );
 }
 
-export function HostShell({ right, onExit, children }) {
+export function HostShell({ right, onExit, main = '', children }) {
   const done = G.phase === 'final' || G.ended;
   return (
     <div className="host">
@@ -39,10 +40,10 @@ export function HostShell({ right, onExit, children }) {
       <header className="host-top"><Brand />
         <div style={css('display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end')}>
           {right}<ThemeButton />
-          {done ? <Link className="btn btn-ghost btn-sm" to="/admin">Dashboard</Link> : <button type="button" className="btn btn-danger btn-sm" onClick={onExit}>Exit game</button>}
+          {done ? <Link className="btn btn-ghost btn-sm" to="/admin">Dashboard</Link> : <button type="button" className="btn btn-danger btn-sm" onClick={onExit}><Ico n="door" s={16} />Exit game</button>}
         </div>
       </header>
-      <main className="host-main">{children}</main>
+      <main className={`host-main${main ? ' ' + main : ''}`}>{children}</main>
       <div className="host-bottom" aria-hidden="true">{['#4285f4', '#ea4335', '#f9ab00', '#34a853'].map((c) => <span key={c} style={{ background: c }} />)}</div>
     </div>
   );
@@ -71,7 +72,14 @@ export function AdminShell({ children }) {
           <ThemeButton />
         </div>
       </aside>
+      {/* phone layout from the design: top bar + bottom tabs */}
+      <header className="adm-phead"><Link to="/admin" style={{ textDecoration: 'none' }}><Brand /></Link><span style={css('display:flex;align-items:center;gap:8px')}><ThemeButton /><span className="chip" style={css('background:var(--surface-2);border-color:transparent;color:var(--muted)')}>ADMIN</span></span></header>
       <main className="adm-main">{children}</main>
+      <nav className="adm-tabbar" aria-label="Admin">
+        <NavLink to="/admin" end className={({ isActive }) => (isActive ? 'on' : '')}><span className="ic"><Ico n="grid" /></span>Dashboard</NavLink>
+        <NavLink to="/admin/new" className={({ isActive }) => (isActive ? 'on' : '')}><span className="ic"><Ico n="plusc" /></span>Create</NavLink>
+        <button type="button" onClick={() => { setAdmin(false); navigate('/'); }}><span className="ic"><Ico n="door" s={20} /></span>Sign out</button>
+      </nav>
     </div>
   );
 }

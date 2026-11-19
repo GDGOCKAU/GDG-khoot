@@ -19,7 +19,7 @@ export const TOPICS = {
   Other:  { c: 'blue',   icon: 'star' },
 };
 /* Your Devu mascots live in public/mascots */
-export const mascot = (team, i) => `/mascots/${team}_${String(i + 1).padStart(2, '0')}.svg`;
+export const mascot = (team, i) => `/mascots/${team}_${String(i + 1).padStart(2, '0')}.png`;
 export const SPIDER = '/img/spider_mascot.png';
 export const BOT_NAMES = ['Sara', 'CodeQueen', 'Lama_dev', 'Noura', 'FlutterFan', 'Reem', 'byte.me', 'Joud', 'Al_Aseel', 'Hala', '404NotFound', 'Dana', 'NullPointer', 'DartVader', 'GitHappens', 'CloudNine'];
 export const NICK_A = ['Pixel', 'Byte', 'Cloud', 'Dart', 'Swift', 'Kotlin', 'Flutter', 'Debug', 'Neural', 'Turbo'];

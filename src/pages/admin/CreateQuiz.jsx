@@ -3,7 +3,7 @@ import { useEffect, useReducer, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LETTERS, ansCls, css, newPin, uid } from '../../lib/constants';
 import { LANGS, QTYPES, blankQ, norm, qProblem, qType, setQType } from '../../lib/questions';
-import { addTopic, deleteQuiz, topicNames, upsertQuiz } from '../../lib/store';
+import { DB, addTopic, deleteQuiz, quizById, topicNames, upsertQuiz } from '../../lib/store';
 import { UI } from '../../lib/engine';
 import { shrinkImage, toast } from '../../lib/ui';
 import { Dots, Ico, Modal } from '../../components/common/UI';
@@ -89,6 +89,11 @@ function CreateQuiz({ quiz }) {
   const textRef = useRef(null);
   const focusText = useRef(false);
   const isNew = ed.forId === 'new' && !quiz;
+  /* a published quiz is edited with Save / Discard, like the design; drafts save themselves */
+  const stored = quizById(d.id);
+  const manual = !!stored && stored.status === 'ready';
+  if (ed.dirty == null) ed.dirty = 0;
+  const lastGame = DB.games.filter((g) => g.quizId === d.id).slice(-1)[0];
 
   if (ed.cur >= d.questions.length) ed.cur = d.questions.length - 1;
   const qq = d.questions[ed.cur];
@@ -110,7 +115,23 @@ function CreateQuiz({ quiz }) {
       persistDraft();
     }, 500);
   }
-  const change = (fn) => { fn(); softSave(); rerender(); };
+  const change = (fn) => { fn(); if (manual) ed.dirty += 1; else softSave(); rerender(); };
+  function saveChanges() {
+    if (!d.title.trim()) { toast('Give the quiz a title.'); document.querySelector('[data-f="title"]')?.focus(); return; }
+    const i = d.questions.findIndex(qProblem);
+    if (i >= 0) { ed.cur = i; rerender(); toast(`Question ${i + 1} ${qProblem(d.questions[i])}.`); return; }
+    upsertQuiz(d); ed.dirty = 0; rerender(); toast('Changes saved');
+  }
+  function discard() {
+    ed.draft = JSON.parse(JSON.stringify(stored)); ed.dirty = 0; ed.cur = Math.min(ed.cur, ed.draft.questions.length - 1);
+    rerender(); toast('Changes discarded');
+  }
+  function duplicateQuiz() {
+    const copy = { ...JSON.parse(JSON.stringify(d)), id: uid(), pin: newPin(), title: `${d.title || 'Untitled quiz'} (copy)`, status: 'draft', lastHosted: null };
+    upsertQuiz(copy); E = null;
+    navigate('/admin/edit/' + copy.id);
+    toast('Quiz duplicated as a draft');
+  }
   const setQ = (k, v) => change(() => { qq[k] = v; });
 
   function doAddTopic(name) {
@@ -212,12 +233,27 @@ function CreateQuiz({ quiz }) {
   return (
     <AdminShell>
       <div className="adm-head">
-        <div><Link to="/admin" style={css('color:var(--muted);font-size:14px;text-decoration:none')}>← Back to dashboard</Link><h1 style={{ marginTop: 8 }}>{isNew ? 'Create a quiz' : 'Edit quiz'}<span style={{ color: '#ea4335' }}>.</span></h1></div>
+        <div>
+          <Link to="/admin" style={css('color:var(--muted);font-size:14px;text-decoration:none')}>← Back to dashboard</Link>
+          <h1 style={{ marginTop: 8 }}>{isNew ? 'Create a quiz' : 'Edit quiz'}<span style={{ color: '#ea4335' }}>.</span></h1>
+          {!isNew && (
+            <div className="ed-status">
+              {stored && stored.status === 'ready' ? <span className="st" style={{ color: 'var(--green-txt)' }}>Published</span> : <span className="st">Draft</span>}
+              <span>·</span>
+              <span>{d.lastHosted ? `Last hosted ${new Date(d.lastHosted).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${lastGame ? ` · ${lastGame.players} players` : ''}` : 'Never hosted'}</span>
+            </div>
+          )}
+        </div>
         <div style={css('display:flex;flex-wrap:wrap;gap:10px;align-items:center')}>
-          <span style={css('font-size:14px;color:var(--muted)')}>{saveState}</span>
-          {!isNew && <button type="button" className="btn btn-danger" onClick={() => setAskDelete(true)}><Ico n="trash" />Delete</button>}
-          <button type="button" className="btn btn-outline" onClick={preview}>Preview</button>
-          <button type="button" className="btn btn-primary" onClick={publish}>{d.status === 'ready' ? 'Save changes' : 'Publish quiz'}</button>
+          {manual ? <>
+            {ed.dirty > 0 && <span className="unsaved">{ed.dirty} unsaved change{ed.dirty > 1 ? 's' : ''}</span>}
+            <button type="button" className="btn btn-outline" onClick={discard} disabled={!ed.dirty}>Discard</button>
+            <button type="button" className="btn btn-primary" onClick={saveChanges}>Save changes</button>
+          </> : <>
+            <span style={css('font-size:14px;color:var(--muted)')}>{saveState}</span>
+            <button type="button" className="btn btn-outline" onClick={preview}>Preview</button>
+            <button type="button" className="btn btn-primary" onClick={publish}>Publish quiz</button>
+          </>}
         </div>
       </div>
       <section className="card" style={{ padding: 24 }}><div className="three">
@@ -229,9 +265,12 @@ function CreateQuiz({ quiz }) {
               <button type="button" className="btn btn-primary btn-sm" onClick={() => doAddTopic(document.getElementById('topicIn').value)}>Add</button>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAddingTopic(false)}>Cancel</button>
             </div></div>
-          : <label className="field"><span>Topic</span><select className="input" value={d.topic} onChange={(e) => { if (e.target.value === '__new') setAddingTopic(true); else change(() => { d.topic = e.target.value; }); }}>
-              {topicNames().map((t) => <option key={t}>{t}</option>)}<option value="__new">+ Add a new topic…</option>
-            </select></label>}
+          : <div className="field"><label htmlFor="topicSel">Topic</label><div style={{ display: 'flex', gap: 8 }}>
+              <select id="topicSel" className="input" style={{ flex: 1, minWidth: 0 }} value={d.topic} onChange={(e) => { if (e.target.value === '__new') setAddingTopic(true); else change(() => { d.topic = e.target.value; }); }}>
+                {topicNames().map((t) => <option key={t}>{t}</option>)}<option value="__new">+ Add a topic…</option>
+              </select>
+              <button type="button" className="topic-add" onClick={() => setAddingTopic(true)} aria-label="Add a topic" title="Add a topic"><Ico n="plus" /></button>
+            </div></div>}
         <label className="field"><span>Description</span><input className="input" value={d.desc} placeholder="One line about the quiz" maxLength={90} onChange={(e) => change(() => { d.desc = e.target.value; })} /></label>
       </div></section>
       <nav className="card qnav" aria-label="Questions">
@@ -242,14 +281,12 @@ function CreateQuiz({ quiz }) {
         <span className="info">{d.questions.length} question{d.questions.length > 1 ? 's' : ''}{bad ? <> · <span style={{ color: 'var(--red-txt)' }}>{bad} need{bad > 1 ? '' : 's'} fixing</span></> : null}</span>
       </nav>
       <section className="card" style={css('padding:28px;display:flex;flex-direction:column;gap:20px')}>
-        <div style={css('display:flex;justify-content:space-between;align-items:center;gap:10px')}><h2 style={css('margin:0;font-size:22px')}>Question {ed.cur + 1}</h2>
-          <span style={css('display:flex;gap:8px;align-items:center')}>
-            <button type="button" className="icon-btn" onClick={() => { change(() => { d.questions.splice(ed.cur + 1, 0, JSON.parse(JSON.stringify(qq))); ed.cur += 1; }); toast('Question duplicated'); }} aria-label="Duplicate question"><Ico n="copy" /></button>
-            <button type="button" className="icon-btn" style={{ color: 'var(--red-txt)' }} onClick={() => { if (d.questions.length < 2) return; change(() => { d.questions.splice(ed.cur, 1); ed.cur = Math.max(0, ed.cur - 1); }); toast('Question deleted'); }} aria-label="Delete question" disabled={d.questions.length < 2}><Ico n="trash" /></button>
+        <div style={css('display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px')}><h2 style={css('margin:0;font-size:20px;font-weight:600')}>Question {ed.cur + 1}</h2>
+          <span className="qhead-tools">
+            <span className="seg qtype" role="tablist" aria-label="Question type">{QTYPES.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={T === k} onClick={() => change(() => setQType(qq, k))}>{l}</button>)}</span>
+            <button type="button" className="icon-btn" onClick={() => { change(() => { d.questions.splice(ed.cur + 1, 0, JSON.parse(JSON.stringify(qq))); ed.cur += 1; }); toast('Question duplicated'); }} aria-label="Duplicate question"><Ico n="copy" s={16} /></button>
+            <button type="button" className="icon-btn" style={{ color: 'var(--red-txt)' }} onClick={() => { if (d.questions.length < 2) return; change(() => { d.questions.splice(ed.cur, 1); ed.cur = Math.max(0, ed.cur - 1); }); toast('Question deleted'); }} aria-label="Delete question" disabled={d.questions.length < 2}><Ico n="trash" s={16} /></button>
           </span>
-        </div>
-        <div><span className="label" style={css('display:block;margin-bottom:10px')}>Question type</span>
-          <div className="seg qtype" role="tablist" aria-label="Question type">{QTYPES.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={T === k} onClick={() => change(() => setQType(qq, k))}>{l}</button>)}</div>
         </div>
         <label className="field"><span>Question</span><textarea ref={textRef} className="input" rows={2} maxLength={160} value={qq.text} onChange={(e) => setQ('text', e.target.value)}
           placeholder={T === 'code' ? 'e.g. What does this code print?' : T === 'pic' ? 'e.g. Put the pictures together. What is the word?' : T === 'tf' ? 'Type a statement that is true or false' : 'Type your question'} /></label>
@@ -259,12 +296,21 @@ function CreateQuiz({ quiz }) {
           <label className="field"><span>Points</span><select className="input" value={qq.points} onChange={(e) => setQ('points', +e.target.value)}>{[[1, 'Standard (1,000)'], [2, 'Double (2,000)'], [0, 'No points']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
         </div>
       </section>
+      {!isNew && (
+        <section className="danger-zone">
+          <div><h2>Delete this quiz</h2><p>Removes the quiz and its questions.</p></div>
+          <div style={css('display:flex;gap:10px;flex-wrap:wrap')}>
+            <button type="button" className="btn btn-outline" onClick={duplicateQuiz}>Duplicate quiz</button>
+            <button type="button" className="btn btn-danger" style={{ fontWeight: 600 }} onClick={() => setAskDelete(true)}>Delete quiz</button>
+          </div>
+        </section>
+      )}
       {askDelete && (
         <Modal id="delT" icon="trash" title="Are you sure you want to delete the quiz?" onClose={() => setAskDelete(false)}>
           <p>&quot;{d.title || 'Untitled quiz'}&quot; and its {d.questions.length} question{d.questions.length > 1 ? 's' : ''} will be deleted. This can&apos;t be undone.</p>
           <div style={css('display:flex;gap:10px;justify-content:flex-end')}>
             <button type="button" className="btn btn-outline" onClick={() => setAskDelete(false)} autoFocus>Cancel</button>
-            <button type="button" className="btn btn-danger-solid" onClick={() => { clearTimeout(saveT.current); deleteQuiz(d.id); E = null; navigate('/admin'); toast('Quiz deleted'); }}>Delete quiz</button>
+            <button type="button" className="btn btn-danger-solid" onClick={() => { clearTimeout(saveT.current); deleteQuiz(d.id); E = null; navigate('/admin'); toast('Quiz deleted'); }}>Yes, delete quiz</button>
           </div>
         </Modal>
       )}
