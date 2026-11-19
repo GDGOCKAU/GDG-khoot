@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { MemoryRepository } from "../src/repository/memory.js";
+import { GameService, MemoryGameRepository } from "../src/game.js";
 
 describe("backend API foundation", () => {
   const repositories: MemoryRepository[] = [];
@@ -11,7 +12,9 @@ describe("backend API foundation", () => {
     const repository = new MemoryRepository();
     repository.admins.push({ id: "admin-1", email: "admin@example.com", passwordHash: bcrypt.hashSync("secret", 4) });
     repositories.push(repository);
-    return { app: buildApp(repository, "test-secret-that-is-long"), repository };
+    const gameRepository = new MemoryGameRepository();
+    const gameService = new GameService(repository, gameRepository);
+    return { app: buildApp(repository, "test-secret-that-is-long", gameService), repository };
   }
 
   it("reports health", async () => {
@@ -146,6 +149,20 @@ describe("backend API foundation", () => {
       }] },
     });
     expect(quiz.statusCode).toBe(201);
+    const session = await app.inject({
+      method: "POST", url: "/api/v1/sessions",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { quizId: quiz.json().id },
+    });
+    expect(session.statusCode).toBe(201);
+    const pinLookup = await app.inject({
+      method: "GET", url: `/api/v1/sessions/by-pin/${session.json().pin}`,
+    });
+    expect(pinLookup.statusCode).toBe(200);
+    expect(pinLookup.json().quiz.questions).toHaveLength(1);
+    expect(pinLookup.json().quiz.questions[0].options[0]).toHaveProperty("id");
+    expect(pinLookup.json().quiz.questions[0].options[0]).not.toHaveProperty("isCorrect");
+    expect(JSON.stringify(pinLookup.json())).not.toContain('"isCorrect"');
     await app.close();
   });
 });

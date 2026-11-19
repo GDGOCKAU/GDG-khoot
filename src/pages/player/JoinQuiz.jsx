@@ -20,12 +20,14 @@ function JoinQuiz({ quiz, live }) {
   });
   const setLook = (patch) => { const n = { ...look, ...patch }; UI.look = n; setLookState(n); };
   const T = TEAMS[look.team];
-  const pin = live ? G.pin : quiz.pin;
+  const pin = live ? (UI.look?.pin || G?.pin || quiz.pin) : quiz.pin;
 
   const join = async (e) => {
     if (e) e.preventDefault();
     if (!live) {
-      toast('Open this quiz from a live host session PIN.');
+      const err = joinGame(look, quiz);
+      if (err) { toast(err); if (err.startsWith('Pick')) document.getElementById('nickIn')?.focus(); return; }
+      navigate('/play');
       return;
     }
     const name = (look.name || '').trim();

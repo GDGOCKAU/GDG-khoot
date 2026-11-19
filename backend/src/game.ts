@@ -144,6 +144,18 @@ export class GameService {
         title: quiz.title,
         description: quiz.description ?? null,
         isPublished: quiz.isPublished,
+        topic: "Other",
+        pin: session.pin,
+        questions: quiz.questions
+          .slice()
+          .sort((a, b) => a.order - b.order)
+          .map((question) => ({
+            id: question.id,
+            text: question.text,
+            order: question.order,
+            timeLimitSecs: question.timeLimitSecs,
+            options: question.options.map((option) => ({ id: option.id, text: option.text })),
+          })),
       },
     };
   }

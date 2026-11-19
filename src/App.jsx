@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
-import { G, hosted, startHost, stopGame } from './lib/engine';
+import { G, UI, hosted, startHost, stopGame } from './lib/engine';
 import { isAdmin, quizById, useAppState } from './lib/store';
 import { installSpiderDrag } from './lib/ui';
 import { toast } from './lib/ui';
@@ -17,6 +17,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import CreateQuiz from './pages/admin/CreateQuiz';
 import HostGame from './pages/admin/HostGame';
 import { apiRequest } from './api/client';
+import { syncLiveQuiz } from './lib/liveQuiz';
 
 function Loading() {
   return <main className="loading" aria-busy="true"><h1>Loading<Bounce /></h1></main>;
@@ -25,6 +26,34 @@ function Loading() {
 /* /join/:quizId — choose a look for a quiz */
 function JoinRoute() {
   const { quizId } = useParams();
+  const location = useLocation();
+  const params = new URLSearchParams(location.search);
+  const pin = params.get('pin');
+  const [liveQuiz, setLiveQuiz] = useState(null);
+  const [liveError, setLiveError] = useState('');
+  useEffect(() => {
+    if (!pin) return;
+    let cancelled = false;
+    apiRequest(`/api/v1/sessions/by-pin/${pin}`)
+      .then((live) => {
+        if (cancelled) return;
+        if (live.quiz.id !== quizId) { setLiveError('This QR link belongs to another quiz.'); return; }
+        setLiveQuiz(syncLiveQuiz(live));
+      })
+      .catch(() => {
+        if (!cancelled) setLiveError('No live session with this PIN. Wait until the host opens the lobby.');
+      });
+    return () => { cancelled = true; };
+  }, [pin, quizId]);
+  if (pin) {
+    if (liveError) return <Navigate to="/" replace />;
+    if (!liveQuiz) return <main className="loading" aria-busy="true"><h1>Joining live session<Bounce /></h1></main>;
+    return <JoinQuiz key={quizId} quiz={liveQuiz} live />;
+  }
+  if (UI.look?.live && UI.look.quizId === quizId) {
+    const liveQuiz = quizById(quizId);
+    if (liveQuiz) return <JoinQuiz key={quizId} quiz={liveQuiz} live />;
+  }
   const quiz = quizById(quizId);
   if (!quiz) return <Navigate to="/" replace />;
   return <JoinQuiz key={quizId} quiz={quiz} live={false} />;

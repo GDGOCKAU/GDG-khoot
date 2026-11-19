@@ -7,6 +7,7 @@ import { toast } from '../../lib/ui';
 import { ColorBar, Hang, Ico, Logo, ThemeButton, TopicChip, TopicIcon } from '../../components/common/UI';
 import SiteFooter from '../../components/common/SiteFooter';
 import { apiRequest } from '../../api/client';
+import { syncLiveQuiz } from '../../lib/liveQuiz';
 
 const SECTIONS = ['join', 'quizzes', 'how'];
 
@@ -52,11 +53,7 @@ function Home() {
     if (p.length !== 6) { setPinError('Enter the 6-digit PIN.'); if (pinRef.current) pinRef.current.focus(); return; }
     try {
       const live = await apiRequest(`/api/v1/sessions/by-pin/${p}`);
-      const localQuiz = DB.quizzes.find((x) => x.id === live.quiz.id);
-      if (!localQuiz) {
-        setPinError('This live quiz is not loaded in this browser. Open the host dashboard again.');
-        return;
-      }
+      syncLiveQuiz(live);
       setPinError('');
       UI.look = { key: 'live:' + live.quiz.id, quizId: live.quiz.id, live: true, sessionId: live.sessionId, pin: p, name: UI.look ? UI.look.name : '', team: 'blue', idx: 0 };
       navigate('/join/' + live.quiz.id);

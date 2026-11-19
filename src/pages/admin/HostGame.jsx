@@ -31,7 +31,7 @@ function HostGame() {
   const hostName = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? window.location.hostname
     : window.location.hostname;
-  const joinUrl = `${window.location.protocol}//${hostName}:${window.location.port || '5173'}/join/${G.quiz.id}`;
+  const joinUrl = `${window.location.protocol}//${hostName}:${window.location.port || '5173'}/join/${G.quiz.id}?pin=${encodeURIComponent(G.pin)}${G.backendSessionId ? `&session=${encodeURIComponent(G.backendSessionId)}` : ''}`;
 
   const exitModal = askExit && (
     <Modal id="exitT" icon="door" title="Are you sure you want to exit the game?" onClose={() => setAskExit(false)}>
