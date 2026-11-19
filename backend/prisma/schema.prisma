@@ -39,6 +39,11 @@ model Question {
   text          String
   order         Int
   timeLimitSecs Int      @default(20)
+  type          String   @default("mc")
+  code          String?
+  language      String?
+  pictureUrls   Json?
+  word          String?
   options       Option[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

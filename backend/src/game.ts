@@ -155,6 +155,10 @@ export class GameService {
             text: question.text,
             order: question.order,
             timeLimitSecs: question.timeLimitSecs,
+            type: question.type ?? "mc",
+            code: question.type === "code" ? question.code : undefined,
+            language: question.type === "code" ? question.language : undefined,
+            pictureUrls: question.type === "pic" ? question.pictureUrls : undefined,
             options: question.options.map((option) => ({ id: option.id, text: option.text })),
           })),
       },
@@ -199,7 +203,18 @@ export class GameService {
     session.questionStartedAt = now;
     session.closesAt = new Date(now.getTime() + question.timeLimitSecs * 1000);
     await this.gameRepository.save(session);
-    const payload = { order, questionId: question.id, text: question.text, timeLimitSecs: question.timeLimitSecs, closesAt: session.closesAt, options: question.options.map(({ id, text }) => ({ id, text })) };
+    const payload = {
+      order,
+      questionId: question.id,
+      type: question.type ?? "mc",
+      text: question.text,
+      timeLimitSecs: question.timeLimitSecs,
+      closesAt: session.closesAt,
+      code: question.type === "code" ? question.code : undefined,
+      language: question.type === "code" ? question.language : undefined,
+      pictureUrls: question.type === "pic" ? question.pictureUrls : undefined,
+      options: question.options.map(({ id, text }) => ({ id, text })),
+    };
     this.emit(session.id, "phase", { phase: "ACTIVE", questionOrder: order });
     this.emit(session.id, "question", payload);
     return payload;

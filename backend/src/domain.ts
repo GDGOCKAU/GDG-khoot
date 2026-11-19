@@ -7,6 +7,11 @@ export type Question = {
   order: number;
   timeLimitSecs: number;
   options: Option[];
+  type?: string;
+  code?: string | null;
+  language?: string | null;
+  pictureUrls?: string[] | null;
+  word?: string | null;
 };
 export type Quiz = {
   id: string;
@@ -42,6 +47,11 @@ export interface Repository {
       order: number;
       timeLimitSecs: number;
       options: Array<{ text: string; isCorrect: boolean }>;
+      type?: string;
+      code?: string;
+      language?: string;
+      pictureUrls?: string[];
+      word?: string;
     }>;
   }): Promise<Quiz>;
 }

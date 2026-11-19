@@ -14,6 +14,11 @@ const questionSchema = z.object({
   order: z.number().int().nonnegative(),
   timeLimitSecs: z.number().int().positive().max(600).optional(),
   options: z.array(z.object({ text: z.string().trim().min(1).max(500), isCorrect: z.boolean() })).min(2),
+  type: z.enum(["mc", "tf", "code", "pic"]).optional(),
+  code: z.string().trim().max(10000).optional(),
+  language: z.string().trim().max(40).optional(),
+  pictureUrls: z.array(z.string()).max(20).optional(),
+  word: z.string().trim().max(100).optional(),
 });
 const saveQuizSchema = z.object({
   quizId: z.string().uuid().optional(),
@@ -28,6 +33,11 @@ const saveQuizSchema = z.object({
       text: z.string().trim().max(500),
       isCorrect: z.boolean(),
     })).max(4),
+    type: z.enum(["mc", "tf", "code", "pic"]).optional(),
+    code: z.string().trim().max(10000).optional(),
+    language: z.string().trim().max(40).optional(),
+    pictureUrls: z.array(z.string()).max(20).optional(),
+    word: z.string().trim().max(100).optional(),
   })),
 });
 
