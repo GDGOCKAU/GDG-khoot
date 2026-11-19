@@ -10,14 +10,21 @@ export function syncLiveQuiz(live) {
     status: 'ready',
     pin: live.pin,
     lastHosted: null,
+    live: true,
+    liveSessionId: live.sessionId,
+    livePin: live.pin,
     questions: (live.quiz.questions || []).map((question) => ({
-      type: 'mc',
+      type: question.type || 'mc',
       text: question.text,
       answers: (question.options || []).map((option) => option.text),
       correct: -1,
       time: question.timeLimitSecs,
       points: 1,
       img: null,
+      code: question.code || '',
+      lang: question.language || 'Dart',
+      pics: question.pictureUrls || [],
+      word: '',
     })),
   };
   upsertQuiz(quiz);

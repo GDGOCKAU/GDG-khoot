@@ -30,8 +30,10 @@ export function addMe(me) {
 }
 export function newGame(quiz, mode, me) {
   stopGame(false);
-  const qs = quiz.questions.filter((x) => !qProblem(x));
-  G = { quiz, qs, mode, pin: mode === 'host' ? newPin() : quiz.pin, players: [], qi: -1, phase: mode === 'host' ? 'lobby' : 'ready', phaseStart: Date.now(), phaseEnd: 0, answers: {}, locked: false, me: null, timer: null, joinTimer: null, recorded: false };
+  const qs = quiz.live
+    ? quiz.questions.filter((x) => (x.text || '').trim() && (x.time > 0))
+    : quiz.questions.filter((x) => !qProblem(x));
+  G = { quiz, qs, mode, pin: mode === 'host' ? newPin() : (quiz.livePin || quiz.pin), backendSessionId: quiz.liveSessionId || null, players: [], qi: -1, phase: mode === 'host' ? 'lobby' : 'ready', phaseStart: Date.now(), phaseEnd: 0, answers: {}, locked: false, me: null, timer: null, joinTimer: null, recorded: false };
   UI.showOver = false; UI.closed = null;
   if (me) addMe(me);
   const names = shuffle(BOT_NAMES);
@@ -167,6 +169,15 @@ export function joinGame(look, quiz) {
   if (!name) return 'Pick a nickname first.';
   const me = { name, team: look.team, img: mascot(look.team, look.idx) };
   UI.overTab = null;
+  if (quiz.live) {
+    if (G && G.quiz?.id === quiz.id && G.me) {
+      Object.assign(G.me, me);
+      notify();
+      return '';
+    }
+    newGame(quiz, 'player', me);
+    return '';
+  }
   if (look.live && hosted()) {
     if (G.phase === 'final') return 'This game has ended.';
     if (G.players.some((p) => p !== G.me && p.name.toLowerCase() === name.toLowerCase())) return 'That nickname is taken. Try another.';

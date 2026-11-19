@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { NICK_A, NICK_B, TEAMS, css, mascot, pick, pinFmt, rnd } from '../../lib/constants';
 import { G, UI, joinGame } from '../../lib/engine';
+import { notify } from '../../lib/store';
 import { toast, useWide } from '../../lib/ui';
 import { Ico } from '../../components/common/UI';
 import { MascotGrid, TeamTabs } from '../../components/player/AvatarPicker';
@@ -47,6 +48,27 @@ function JoinQuiz({ quiz, live }) {
       UI.look = { ...look, participantId: participant.id, sessionId: participant.sessionId };
       const socket = connectSocket();
       socket.emit('game:join', participant.sessionId, participant.id, () => {});
+      socket.on('question', (question) => {
+        if (!G || G.mode !== 'player') return;
+        G.qi = question.order;
+        G.phase = 'question';
+        G.phaseStart = Date.now();
+        G.phaseEnd = Date.now() + question.timeLimitSecs * 1000;
+        G.answers = {};
+        notify();
+      });
+      socket.on('reveal', () => {
+        if (!G || G.mode !== 'player') return;
+        G.phase = 'reveal';
+        G.phaseEnd = 0;
+        notify();
+      });
+      socket.on('final', () => {
+        if (!G || G.mode !== 'player') return;
+        G.phase = 'final';
+        G.phaseEnd = 0;
+        notify();
+      });
       UI.liveSocket = socket;
     } catch (error) {
       toast(error.status === 409
