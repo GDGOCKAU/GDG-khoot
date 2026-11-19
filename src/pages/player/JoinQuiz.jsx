@@ -1,274 +1,81 @@
+/* "Choose your look": nickname + mascot, then join. Used for /join/:quizId and /live (the hosted game). */
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { NICK_A, NICK_B, TEAMS, css, mascot, pick, pinFmt, rnd } from '../../lib/constants';
+import { G, UI, joinGame } from '../../lib/engine';
+import { toast, useWide } from '../../lib/ui';
+import { Ico } from '../../components/common/UI';
+import { MascotGrid, TeamTabs } from '../../components/player/AvatarPicker';
+import { LapShell } from '../../components/layout/Shells';
 
-import { useState } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
-
-import AvatarPicker from "../../components/player/AvatarPicker";
-import Devu from "../../components/common/Devu";
-import Navbar from "../../components/common/Navbar";
-import "./JoinQuiz.css";
-import { apiRequest } from "../../api/client";
-
-const randomNames = [
-  "CuriousCoder",
-  "PixelWizard",
-  "CodeNinja",
-  "ByteExplorer",
-  "CloudChaser",
-  "TechSpark",
-  "DebugMaster",
-  "LogicLegend",
-  "CyberFox",
-  "DigitalDreamer",
-  "QuantumCat",
-  "DevExplorer",
-];
-
-function JoinQuiz() {
-  const { quizId } = useParams();
+function JoinQuiz({ quiz, live }) {
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const [nickname, setNickname] = useState("");
-  const [selectedAvatar, setSelectedAvatar] = useState({
-    color: "blue",
-    number: 1,
+  const wide = useWide();
+  const key = (live ? 'live:' : '') + quiz.id;
+  const [look, setLookState] = useState(() => {
+    if (!UI.look || UI.look.key !== key) UI.look = { key, quizId: quiz.id, live, name: UI.look ? UI.look.name : '', team: 'blue', idx: 0 };
+    return UI.look;
   });
-  const [error, setError] = useState("");
+  const setLook = (patch) => { const n = { ...look, ...patch }; UI.look = n; setLookState(n); };
+  const T = TEAMS[look.team];
+  const pin = live ? G.pin : quiz.pin;
 
-  // Optional quiz information passed through navigation state.
-  const quizTitle = location.state?.quizTitle || "";
-  const gamePin = location.state?.pin || "";
+  const join = (e) => {
+    if (e) e.preventDefault();
+    const err = joinGame(look, quiz);
+    if (err) { toast(err); if (err.startsWith('Pick')) document.getElementById('nickIn')?.focus(); return; }
+    navigate('/play');
+  };
 
-  function generateNickname() {
-    const randomName =
-      randomNames[Math.floor(Math.random() * randomNames.length)];
-
-    const suffix = Math.floor(10 + Math.random() * 90);
-
-    setNickname(`${randomName}${suffix}`);
-    setError("");
-  }
-
-  async function handleSubmit(event) {
-  event.preventDefault();
-
-  const cleanNickname = nickname.trim();
-
-  if (!cleanNickname) {
-    setError("Please enter a nickname.");
-    return;
-  }
-
-  if (!selectedAvatar) {
-    setError("Please choose your Devu avatar.");
-    return;
-  }
-
-  setError("");
-  const pin = String(gamePin || quizId || "").replace(/\D/g, "");
-  let participantId = "";
-  if (/^\d{6}$/.test(pin)) {
-    try {
-      const participant = await apiRequest("/api/v1/sessions/join", {
-        method: "POST",
-        body: JSON.stringify({
-          pin,
-          name: cleanNickname,
-          mascot: `${selectedAvatar.color}-${selectedAvatar.number}`,
-          team: selectedAvatar.color,
-        }),
-      });
-      participantId = participant.id;
-      localStorage.setItem("gdgParticipantId", participant.id);
-      localStorage.setItem("gdgSessionId", participant.sessionId);
-    } catch (requestError) {
-      setError(requestError.status === 409 ? "That nickname is already taken." : "Could not join the live session.");
-      return;
-    }
-  }
-
-  // Save player information for the gameplay screen
-  localStorage.setItem("gdgNickname", cleanNickname);
-  localStorage.setItem(
-    "gdgAvatar",
-    JSON.stringify(selectedAvatar)
+  const nick = (
+    <label className="field"><span>Nickname</span>
+      <span style={{ display: 'flex', gap: 10 }}>
+        <input className="input" id="nickIn" maxLength={16} autoComplete="off" placeholder="Your nickname" value={look.name} onChange={(e) => setLook({ name: e.target.value })} autoFocus={!('ontouchstart' in window)} />
+        <button type="button" className="icon-btn" style={css('width:48px;height:48px;background:var(--blue-soft);border-color:transparent;color:var(--blue-txt)')} onClick={() => setLook({ name: pick(NICK_A) + pick(NICK_B) + Math.floor(rnd(1, 99)) })} aria-label="Random nickname"><Ico n="dice" /></button>
+      </span>
+    </label>
   );
+  const onTeam = (k) => setLook({ team: k });
+  const onPick = (i) => setLook({ idx: i });
 
-  navigate(`/lobby/${quizId}`, {
-    state: {
-      nickname: cleanNickname,
-      avatar: selectedAvatar,
-      quizTitle,
-      pin: gamePin,
-      participantId,
-    },
-  });
-}
-
+  if (wide) {
+    return (
+      <LapShell right={<span className="chip chip-blue">PIN {pinFmt(pin)}</span>}>
+        <div><div className="eyebrow">You&apos;re almost in</div><h1 style={{ fontSize: 44, marginTop: 6 }}>Choose your look</h1><p style={css('margin:6px 0 0;color:var(--muted)')}>{quiz.title} · Your mascot shows in the lobby, on the leaderboard and on the podium. Its color is your team.</p></div>
+        <form className="look-grid" onSubmit={join} noValidate>
+          <div className="card" style={css('padding:28px;display:flex;flex-direction:column;gap:18px;align-items:stretch')}>
+            <img className="avatar" src={mascot(look.team, look.idx)} alt="" width="180" height="180" style={{ '--team': T.solid, borderWidth: 6, alignSelf: 'center' }} />
+            <span className={`chip chip-${look.team}`} style={{ alignSelf: 'center' }}>{T.name} team</span>
+            {nick}
+            <button type="submit" className="btn btn-primary btn-lg">Join game <Ico n="arrow" /></button>
+          </div>
+          <div className="card" style={css('padding:28px;display:flex;flex-direction:column;gap:18px')}>
+            <div style={css('display:flex;justify-content:space-between;align-items:baseline')}><b style={{ fontSize: 18 }}>Pick a mascot</b><span style={{ fontSize: 13, color: 'var(--muted)' }}>48 mascots</span></div>
+            <TeamTabs team={look.team} onTeam={onTeam} style={{ maxWidth: 520 }} />
+            <MascotGrid team={look.team} idx={look.idx} onPick={onPick} six />
+          </div>
+        </form>
+      </LapShell>
+    );
+  }
   return (
-    <div className="join-page">
-      <Navbar />
-
-      <main className="join-container">
-        <div className="join-heading">
-          <span className="eyebrow">YOU'RE ALMOST IN</span>
-
-          <h1>Choose your look</h1>
-
-          <p>
-            {quizTitle
-              ? `${quizTitle} · Your mascot's color is your team.`
-              : "Choose your nickname and find your Devu. Your mascot's color is your team."}
-          </p>
-
-          {gamePin && (
-            <span className="join-pin">
-              PIN {String(gamePin).replace(/(\d{3})(\d{3})/, "$1 $2")}
-            </span>
-          )}
-        </div>
-
-        <form
-          id="player-registration"
-          className="look-grid"
-          onSubmit={handleSubmit}
-          noValidate
-        >
-          {/* Player profile */}
-          <section className="player-profile-card">
-            <div className="player-avatar-preview">
-              <Devu
-                color={selectedAvatar.color}
-                number={selectedAvatar.number}
-                size={180}
-              />
-            </div>
-
-            <span
-              className={`team-label team-${selectedAvatar.color}`}
-            >
-              {selectedAvatar.color} team
-            </span>
-
-            <div className="nickname-field">
-              <label htmlFor="nickname">Nickname</label>
-
-              <div className="nickname-input-row">
-                <input
-                  id="nickname"
-                  type="text"
-                  maxLength={16}
-                  autoComplete="off"
-                  placeholder="Your nickname"
-                  value={nickname}
-                  onChange={(event) => {
-                    setNickname(event.target.value);
-                    setError("");
-                  }}
-                />
-
-                <button
-                  type="button"
-                  className="random-name-button"
-                  onClick={generateNickname}
-                  aria-label="Generate random nickname"
-                  title="Generate random nickname"
-                >
-
-<svg
-  aria-hidden="true"
-  width="20"
-  height="20"
-  viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  strokeWidth="2"
-  strokeLinecap="round"
-  strokeLinejoin="round"
->
-  <rect x="3" y="3" width="18" height="18" rx="4" />
-  <circle cx="8.5" cy="8.5" r="1" fill="currentColor" />
-  <circle cx="15.5" cy="15.5" r="1" fill="currentColor" />
-  <circle cx="15.5" cy="8.5" r="1" fill="currentColor" />
-  <circle cx="8.5" cy="15.5" r="1" fill="currentColor" />
-</svg>
-                </button>
-              </div>
-
-              <span className="nickname-hint">
-                Choose a name your fellow players will recognize.
-              </span>
-            </div>
-
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              className="join-button desktop-join-button"
-            >
-              Join game <span aria-hidden="true">→</span>
-            </button>
-          </section>
-
-          {/* Mascot selection */}
-          <section className="mascot-selection-card">
-            <div className="mascot-section-heading">
-              <div>
-                <h2>Pick a mascot</h2>
-                <p>Your mascot represents you during the game.</p>
-              </div>
-
-              <span className="mascot-total">48 mascots</span>
-            </div>
-
-            <AvatarPicker
-              selectedAvatar={selectedAvatar}
-              onSelect={(avatar) => {
-                setSelectedAvatar(avatar);
-                setError("");
-              }}
-            />
-          </section>
+    <div className="pl">
+      <main className="pl-in">
+        <div className="pl-top"><Link className="icon-btn" to="/" aria-label="Back"><Ico n="back" /></Link><span className="chip chip-blue">PIN {pinFmt(pin)}</span></div>
+        <div><div className="eyebrow">You&apos;re almost in</div><h1 style={{ fontSize: 30, marginTop: 6 }}>Choose your look</h1><p style={css('margin:6px 0 0;color:var(--muted)')}>{quiz.title}</p></div>
+        <form onSubmit={join} style={css('display:flex;flex-direction:column;gap:18px')} noValidate>
+          {nick}
+          <div style={css('display:flex;justify-content:space-between;align-items:baseline')}><span className="label">Pick a mascot</span><span style={{ fontSize: 13, color: 'var(--muted)' }}>48 mascots</span></div>
+          <TeamTabs team={look.team} onTeam={onTeam} />
+          <p style={css('margin:-8px 0 0;font-size:13px;color:var(--muted)')}>Your mascot&apos;s color is your team on the leaderboard.</p>
+          <MascotGrid team={look.team} idx={look.idx} onPick={onPick} />
+          <button type="submit" className="sr">Join game</button>
         </form>
       </main>
-
-      {/* Mobile join footer */}
-      <footer className="mobile-join-footer">
-        <div className="mobile-selected-avatar">
-          <Devu
-            color={selectedAvatar.color}
-            number={selectedAvatar.number}
-            size={48}
-          />
-
-          <div>
-            <strong>{nickname.trim() || "Your avatar"}</strong>
-            <span>{selectedAvatar.color} team</span>
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          form="player-registration"
-          className="join-button mobile-join-button"
-        >
-          Join game →
-        </button>
-      </footer>
-
-      <footer className="join-footer">
-        <p>Play. Think. Learn. · GDG KAU</p>
-        <div className="join-footer-colorbar">
-          <span />
-          <span />
-          <span />
-          <span />
-        </div>
-      </footer>
+      <footer className="pl-foot"><div className="in">
+        <img className="avatar" src={mascot(look.team, look.idx)} alt="" width="52" height="52" style={{ '--team': T.solid }} />
+        <button type="button" className="btn btn-primary btn-lg" style={{ flex: 1 }} onClick={() => join()}>Join game</button>
+      </div></footer>
     </div>
   );
 }

@@ -1,515 +1,274 @@
+/* Create / edit a quiz: /admin/new and /admin/edit/:quizId. Saves itself as you type. */
+import { useEffect, useReducer, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { LETTERS, ansCls, css, newPin, uid } from '../../lib/constants';
+import { LANGS, QTYPES, blankQ, norm, qProblem, qType, setQType } from '../../lib/questions';
+import { addTopic, deleteQuiz, topicNames, upsertQuiz } from '../../lib/store';
+import { UI } from '../../lib/engine';
+import { shrinkImage, toast } from '../../lib/ui';
+import { Dots, Ico, Modal } from '../../components/common/UI';
+import { Boxes } from '../../components/game/Blocks';
+import { AdminShell } from '../../components/layout/Shells';
+import { apiRequest } from '../../api/client';
 
-import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import "./CreateQuiz.css";
-import { apiRequest } from "../../api/client";
-
-const createQuestion = (number = 1) => ({
-  id: crypto.randomUUID(),
-  title: `Question ${number}`,
-  text: "",
-  answers: ["", "", "", ""],
-  correctAnswer: 0,
-  timeLimit: 20,
-  points: 1000,
-});
-
-function CreateQuiz() {
-  const navigate = useNavigate();
-  const { quizId: editQuizId } = useParams();
-
-  const [quizTitle, setQuizTitle] = useState("");
-  const [quizId, setQuizId] = useState(editQuizId || null);
-  const [topic, setTopic] = useState("Technology");
-  const [description, setDescription] = useState("");
-  const [questions, setQuestions] = useState([createQuestion()]);
-  const [activeQuestion, setActiveQuestion] = useState(0);
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    if (!editQuizId) return;
-    apiRequest(`/api/v1/quizzes/${editQuizId}`)
-      .then((quiz) => {
-        setQuizId(quiz.id);
-        setQuizTitle(quiz.title || "");
-        setDescription(quiz.description || "");
-        setQuestions((quiz.questions || []).length
-          ? quiz.questions.map((question) => ({
-              id: question.id,
-              title: `Question ${question.order + 1}`,
-              text: question.text,
-              answers: question.options.map((option) => option.text),
-              correctAnswer: question.options.findIndex((option) => option.isCorrect),
-              timeLimit: question.timeLimitSecs,
-              points: 1000,
-            }))
-          : [createQuestion()]);
-      })
-      .catch(() => setMessage("Could not load this quiz for editing."));
-  }, [editQuizId]);
-
-  const currentQuestion = questions[activeQuestion];
-
-  function updateQuestion(field, value) {
-    setQuestions((previous) =>
-      previous.map((question, index) =>
-        index === activeQuestion
-          ? { ...question, [field]: value }
-          : question
-      )
-    );
+/* the open editor survives moving away and back, like the prototype */
+let E = null;
+function openEditor(quiz) {
+  const forId = quiz ? quiz.id : 'new';
+  if (!E || E.forId !== forId) {
+    E = { forId, cur: 0, saved: !!quiz, draft: quiz ? JSON.parse(JSON.stringify(quiz)) : { id: uid(), title: '', topic: 'Mobile', desc: '', status: 'draft', pin: newPin(), lastHosted: null, questions: [blankQ()] } };
   }
+  return E;
+}
 
-  function updateAnswer(answerIndex, value) {
-    setQuestions((previous) =>
-      previous.map((question, index) =>
-        index === activeQuestion
-          ? {
-              ...question,
-              answers: question.answers.map((answer, i) =>
-                i === answerIndex ? value : answer
-              ),
-            }
-          : question
-      )
-    );
-  }
-
-  function addQuestion() {
-    const newQuestion = createQuestion(questions.length + 1);
-
-    setQuestions((previous) => [...previous, newQuestion]);
-    setActiveQuestion(questions.length);
-    setMessage("");
-  }
-
-  function duplicateQuestion() {
-    const copy = {
-      ...currentQuestion,
-      id: crypto.randomUUID(),
-      title: `Question ${questions.length + 1}`,
-      answers: [...currentQuestion.answers],
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || '');
+}
+function backendQuestions(d) {
+  return d.questions.map((question, index) => {
+    const type = qType(question);
+    let options = [];
+    if (type === 'tf') {
+      options = [
+        { text: 'True', isCorrect: question.correct === 0 },
+        { text: 'False', isCorrect: question.correct === 1 },
+      ];
+    } else if (type === 'pic') {
+      options = [
+        { text: norm(question.word), isCorrect: true },
+        { text: norm(question.word) ? 'NOT_' + norm(question.word) : '', isCorrect: false },
+      ];
+    } else {
+      options = (question.answers || []).slice(0, 4).map((text, optionIndex) => ({
+        text: String(text || ''),
+        isCorrect: question.correct === optionIndex,
+      }));
+    }
+    return {
+      text: String(question.text || ''),
+      order: index,
+      timeLimitSecs: Number(question.time || 20),
+      options,
     };
+  });
+}
+async function saveBackend(d, ed, setSaveState) {
+  try {
+    const quiz = await apiRequest('/api/v1/quizzes/save', {
+      method: 'POST',
+      body: JSON.stringify({
+        quizId: isUuid(d.id) ? d.id : undefined,
+        title: d.title.trim() || 'Untitled Quiz',
+        description: d.desc || '',
+        isPublished: d.status === 'ready',
+        questions: backendQuestions(d),
+      }),
+    });
+    d.id = quiz.id;
+    if (ed.forId === 'new') ed.forId = quiz.id;
+    upsertQuiz(d);
+    ed.saved = true;
+    setSaveState?.(d.status === 'ready' ? 'All changes saved' : 'Draft saved');
+    return true;
+  } catch (error) {
+    setSaveState?.(error.status === 401 ? 'Sign in required' : 'Backend save failed');
+    toast(error.status === 401 ? 'Please sign in again.' : 'Could not save to the backend.');
+    return false;
+  }
+}
 
-    const updated = [...questions];
-    updated.splice(activeQuestion + 1, 0, copy);
+function CreateQuiz({ quiz }) {
+  const navigate = useNavigate();
+  const ed = openEditor(quiz);
+  const d = ed.draft;
+  const [, rerender] = useReducer((x) => x + 1, 0);
+  const [saveState, setSaveState] = useState(ed.saved ? (d.status === 'ready' ? 'All changes saved' : 'Draft saved') : 'Not saved yet');
+  const [addingTopic, setAddingTopic] = useState(false);
+  const [askDelete, setAskDelete] = useState(false);
+  const saveT = useRef(0);
+  const textRef = useRef(null);
+  const focusText = useRef(false);
+  const isNew = ed.forId === 'new' && !quiz;
 
-    setQuestions(updated);
-    setActiveQuestion(activeQuestion + 1);
-    setMessage("");
+  if (ed.cur >= d.questions.length) ed.cur = d.questions.length - 1;
+  const qq = d.questions[ed.cur];
+  const T = qType(qq);
+  const bad = d.questions.filter(qProblem).length;
+
+  useEffect(() => () => clearTimeout(saveT.current), []);
+  useEffect(() => { if (focusText.current && textRef.current) { focusText.current = false; textRef.current.focus(); } });
+
+  async function persistDraft() {
+    const saved = await saveBackend(d, ed, setSaveState);
+    if (saved && ed.forId !== 'new') navigate('/admin/edit/' + d.id, { replace: true });
+  }
+  function softSave() {
+    setSaveState('Saving…');
+    clearTimeout(saveT.current);
+    saveT.current = setTimeout(() => {
+      if (d.status === 'ready' && d.questions.some(qProblem)) { setSaveState('Fix the marked questions to save'); return; }
+      persistDraft();
+    }, 500);
+  }
+  const change = (fn) => { fn(); softSave(); rerender(); };
+  const setQ = (k, v) => change(() => { qq[k] = v; });
+
+  function doAddTopic(name) {
+    const n = name.trim().replace(/\s+/g, ' ');
+    if (!n) { toast('Type a topic name.'); document.getElementById('topicIn')?.focus(); return; }
+    const r = addTopic(n);
+    if (r.added) toast(`Topic “${r.name}” added`);
+    setAddingTopic(false);
+    change(() => { d.topic = r.name; });
+  }
+  async function publish() {
+    if (!d.title.trim()) { toast('Give the quiz a title.'); document.querySelector('[data-f="title"]')?.focus(); return; }
+    const i = d.questions.findIndex(qProblem);
+    if (i >= 0) { ed.cur = i; rerender(); toast(`Question ${i + 1} ${qProblem(d.questions[i])}.`); return; }
+    const wasReady = d.status === 'ready';
+    clearTimeout(saveT.current);
+    d.status = 'ready';
+    const saved = await saveBackend(d, ed, setSaveState);
+    if (!saved) { d.status = wasReady ? 'ready' : 'draft'; return; }
+    E = null;
+    navigate('/admin');
+    toast(wasReady ? 'Changes saved' : 'Quiz published. It now shows on the home page.');
+  }
+  function preview() {
+    if (!d.questions.some((x) => !qProblem(x))) { toast('Add at least one complete question to preview.'); return; }
+    clearTimeout(saveT.current);
+    upsertQuiz(d); ed.saved = true; if (ed.forId === 'new') ed.forId = d.id;
+    UI.look = null; navigate('/join/' + d.id);
+  }
+  async function pickImage(e, max, apply) {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    const data = await shrinkImage(f, max);
+    if (!data) { toast('That image could not be read.'); return; }
+    change(() => apply(data));
   }
 
-  function deleteQuestion() {
-    if (questions.length === 1) {
-      setMessage("A quiz must have at least one question.");
-      return;
-    }
+  const answers = qq.answers.map((a, i) => (
+    <label key={i} className={`ans ${ansCls(i)}${qq.correct === i ? ' right' : ''}`}>
+      <span className="L">{LETTERS[i]}</span>
+      <input type="text" value={a} placeholder={`${T === 'code' ? 'Output' : 'Answer'} ${i + 1}${i > 1 ? ' (optional)' : ''}`} maxLength={80} onChange={(e) => change(() => { qq.answers[i] = e.target.value; })} />
+      <input type="radio" name="correct" checked={qq.correct === i} onChange={() => setQ('correct', i)} aria-label={`Mark ${LETTERS[i]} as correct`} />
+    </label>
+  ));
+  const imgDrop = (
+    <label className="img-drop">
+      {qq.img
+        ? <><img src={qq.img} alt="Question image" /><button type="button" className="btn btn-outline btn-sm" style={css('position:absolute;top:10px;right:10px')} onClick={(e) => { e.preventDefault(); setQ('img', null); }}>Remove</button></>
+        : <><Ico n="image" />Add an image (optional)</>}
+      <input type="file" accept="image/*" className="sr" onChange={(e) => pickImage(e, 800, (data) => { qq.img = data; })} />
+    </label>
+  );
 
-    const updated = questions.filter(
-      (_, index) => index !== activeQuestion
-    );
-
-    setQuestions(updated);
-    setActiveQuestion(Math.max(0, activeQuestion - 1));
-    setMessage("");
-  }
-
-  function validateQuiz() {
-    if (!quizTitle.trim()) {
-      return "Please enter a quiz title.";
-    }
-
-    for (let i = 0; i < questions.length; i++) {
-      const question = questions[i];
-
-      if (!question.text.trim()) {
-        return `Please write the question for Question ${i + 1}.`;
-      }
-
-      if (question.answers.some((answer) => !answer.trim())) {
-        return `Please complete all four answers in Question ${i + 1}.`;
-      }
-    }
-
-    return "";
-  }
-
-  async function saveDraft() {
-    if (!quizTitle.trim()) {
-      setMessage("Please enter a quiz title.");
-      return;
-    }
-    try {
-      const quiz = await apiRequest("/api/v1/quizzes/save", {
-        method: "POST",
-        body: JSON.stringify({
-          quizId: quizId || undefined,
-          title: quizTitle.trim(),
-          description,
-          isPublished: false,
-          questions: questions.filter((question) => question.text.trim()).map((question, index) => ({
-            text: question.text.trim(),
-            order: index,
-            timeLimitSecs: question.timeLimit,
-            options: question.answers.map((text, optionIndex) => ({
-              text: text.trim(),
-              isCorrect: optionIndex === question.correctAnswer,
-            })),
-          })),
-        }),
-      });
-      setQuizId(quiz.id);
-      setMessage("Your draft has been saved to the backend.");
-      navigate("/admin", { state: { savedQuizId: quiz.id } });
-    } catch (error) {
-      setMessage(error.status === 401 ? "Please sign in again." : "Could not save the draft to the backend.");
-    }
-  }
-
-  async function publishQuiz() {
-    const validationError = validateQuiz();
-    if (validationError) {
-      setMessage(validationError);
-      return;
-    }
-    try {
-      const quiz = await apiRequest("/api/v1/quizzes/save", {
-        method: "POST",
-        body: JSON.stringify({
-          quizId: quizId || undefined,
-          title: quizTitle.trim(),
-          description,
-          isPublished: true,
-          questions: questions.map((question, index) => ({
-            text: question.text.trim(),
-            order: index,
-            timeLimitSecs: question.timeLimit,
-            options: question.answers.map((text, optionIndex) => ({
-              text: text.trim(),
-              isCorrect: optionIndex === question.correctAnswer,
-            })),
-          })),
-        }),
-      });
-      setQuizId(quiz.id);
-      setMessage("Your quiz has been published to the backend.");
-      navigate("/admin", { state: { savedQuizId: quiz.id } });
-    } catch (error) {
-      setMessage(error.status === 401 ? "Please sign in again." : "Could not publish the quiz to the backend.");
-    }
+  let body;
+  if (T === 'mc') body = <>{imgDrop}<div><span className="label" style={css('display:block;margin-bottom:10px')}>Answers · select the correct one</span><div className="ans-grid">{answers}</div></div></>;
+  else if (T === 'tf') body = <>{imgDrop}<div>
+    <span className="label" style={css('display:block;margin-bottom:10px')}>Answer · pick the correct one</span>
+    <div className="ans-grid">{[0, 1].map((i) => (
+      <label key={i} className={`ans ${ansCls(i)}${qq.correct === i ? ' right' : ''}`} style={{ padding: 14 }}>
+        <span className="L"><Ico n={i ? 'x' : 'check'} s={22} /></span><span style={css('flex:1;font-size:18px;font-weight:600')}>{i ? 'False' : 'True'}</span>
+        <input type="radio" name="correct" checked={qq.correct === i} onChange={() => setQ('correct', i)} aria-label={`${i ? 'False' : 'True'} is correct`} />
+      </label>
+    ))}</div>
+    <p style={css('margin:8px 0 0;font-size:13px;color:var(--muted)')}>Players only see these two buttons.</p>
+  </div></>;
+  else if (T === 'code') {
+    const code = qq.code || '', n = code.split('\n').length;
+    body = <>
+      <div className="field"><span style={css('display:flex;justify-content:space-between;gap:8px')}><span>Code</span><span style={css('font-size:12px;color:var(--muted);font-weight:400')}>Shown on the host screen · players can open it</span></span>
+        <div className="codebox codeedit" style={{ '--fs': '15px' }}>
+          <div className="codebar"><Dots /><select value={qq.lang || 'Dart'} onChange={(e) => setQ('lang', e.target.value)} aria-label="Code language">{LANGS.map((l) => <option key={l}>{l}</option>)}</select></div>
+          <div className="codebody"><pre className="ln" aria-hidden="true">{Array.from({ length: n }, (_, i) => i + 1).join('\n')}</pre>
+            <textarea spellCheck="false" aria-label="Code" rows={Math.max(6, n + 1)} value={code} onChange={(e) => setQ('code', e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Tab') { e.preventDefault(); const el = e.target, a = el.selectionStart; el.setRangeText('  ', a, el.selectionEnd, 'end'); setQ('code', el.value); } }} />
+          </div>
+        </div>
+      </div>
+      <div><span className="label" style={css('display:block;margin-bottom:10px')}>Answers · select the correct output</span><div className="ans-grid mono">{answers}</div></div>
+    </>;
+  } else {
+    const pics = qq.pics || [];
+    body = <>
+      <div className="field"><span>Pictures · players put them together into one word</span>
+        <div className="picrow">
+          {pics.map((src, i) => [
+            i ? <span key={'p' + i} className="pplus" aria-hidden="true"><Ico n="plus" /></span> : null,
+            <div key={'t' + i} className="pthumb"><img src={src} alt={`Picture ${i + 1}`} /><span className="pn">{i + 1}</span><button type="button" className="px" onClick={() => change(() => { qq.pics.splice(i, 1); })} aria-label={`Remove picture ${i + 1}`}>×</button></div>,
+          ])}
+          <label className="padd"><Ico n="plus" /><span>Add picture</span><input type="file" accept="image/*" className="sr" onChange={(e) => pickImage(e, 400, (data) => { (qq.pics = qq.pics || []).push(data); })} /></label>
+        </div>
+        <span style={css('font-size:12px;color:var(--muted);font-weight:400')}>New pictures go on the right. Players read them from left to right.</span>
+      </div>
+      <label className="field"><span>Answer · the word players type</span><input className="input" value={qq.word || ''} placeholder="e.g. DOORMAN" maxLength={20} autoComplete="off" style={css('font-weight:700;letter-spacing:.12em')} onChange={(e) => setQ('word', e.target.value.toUpperCase().replace(/[^A-Z0-9 ]/g, ''))} /></label>
+      <div><div className="boxes" style={{ justifyContent: 'flex-start' }}><Boxes word={qq.word || ''} mode="reveal" /></div><p style={css('margin:8px 0 0;font-size:12px;color:var(--muted)')}>{norm(qq.word).length} letters · players see empty boxes and type the word in</p></div>
+    </>;
   }
 
   return (
-    <div className="create-quiz-page">
-      <header className="editor-header">
-        <Link to="/admin" className="editor-brand">
-          <span className="editor-brand-mark">
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
-          <span>GDG KAU <strong>Quiz</strong></span>
-        </Link>
-
-        <div className="editor-header-actions">
-          <span className="draft-indicator">
-            <span />
-            Unsaved changes
-          </span>
-
-          <button className="save-draft-button" onClick={saveDraft}>
-            Save draft
-          </button>
-
-          <button className="publish-button" onClick={publishQuiz}>
-            Publish quiz →
-          </button>
+    <AdminShell>
+      <div className="adm-head">
+        <div><Link to="/admin" style={css('color:var(--muted);font-size:14px;text-decoration:none')}>← Back to dashboard</Link><h1 style={{ marginTop: 8 }}>{isNew ? 'Create a quiz' : 'Edit quiz'}<span style={{ color: '#ea4335' }}>.</span></h1></div>
+        <div style={css('display:flex;flex-wrap:wrap;gap:10px;align-items:center')}>
+          <span style={css('font-size:14px;color:var(--muted)')}>{saveState}</span>
+          {!isNew && <button type="button" className="btn btn-danger" onClick={() => setAskDelete(true)}><Ico n="trash" />Delete</button>}
+          <button type="button" className="btn btn-outline" onClick={preview}>Preview</button>
+          <button type="button" className="btn btn-primary" onClick={publish}>{d.status === 'ready' ? 'Save changes' : 'Publish quiz'}</button>
         </div>
-      </header>
-
-      <main className="editor-layout">
-        <aside className="question-sidebar">
-          <Link to="/admin" className="editor-back-link">
-            ← Back to dashboard
-          </Link>
-
-          <div className="question-sidebar-heading">
-            <div>
-              <h2>Questions</h2>
-              <p>{questions.length} questions</p>
-            </div>
-            <span className="question-count">{questions.length}</span>
+      </div>
+      <section className="card" style={{ padding: 24 }}><div className="three">
+        <label className="field"><span>Quiz title</span><input className="input" data-f="title" value={d.title} placeholder="e.g. Flutter Basics" maxLength={60} autoFocus={isNew} onChange={(e) => change(() => { d.title = e.target.value; })} /></label>
+        {addingTopic
+          ? <div className="field"><label htmlFor="topicIn">New topic</label><div style={{ display: 'flex', gap: 8 }}>
+              <input className="input" id="topicIn" maxLength={20} placeholder="e.g. Cybersecurity" autoComplete="off" style={{ flex: 1, minWidth: 0 }} autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); doAddTopic(e.target.value); } if (e.key === 'Escape') setAddingTopic(false); }} />
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => doAddTopic(document.getElementById('topicIn').value)}>Add</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAddingTopic(false)}>Cancel</button>
+            </div></div>
+          : <label className="field"><span>Topic</span><select className="input" value={d.topic} onChange={(e) => { if (e.target.value === '__new') setAddingTopic(true); else change(() => { d.topic = e.target.value; }); }}>
+              {topicNames().map((t) => <option key={t}>{t}</option>)}<option value="__new">+ Add a new topic…</option>
+            </select></label>}
+        <label className="field"><span>Description</span><input className="input" value={d.desc} placeholder="One line about the quiz" maxLength={90} onChange={(e) => change(() => { d.desc = e.target.value; })} /></label>
+      </div></section>
+      <nav className="card qnav" aria-label="Questions">
+        {d.questions.map((x, i) => (
+          <button key={i} type="button" className={`qn${i === ed.cur ? ' on' : ''}${qProblem(x) ? ' bad' : ''}`} onClick={() => { ed.cur = i; rerender(); }} aria-label={`Question ${i + 1}${qProblem(x) ? ', ' + qProblem(x) : ''}`} aria-current={i === ed.cur}>{i + 1}</button>
+        ))}
+        <button type="button" className="add" onClick={() => { focusText.current = true; change(() => { d.questions.push(blankQ()); ed.cur = d.questions.length - 1; }); }} aria-label="Add question">+</button>
+        <span className="info">{d.questions.length} question{d.questions.length > 1 ? 's' : ''}{bad ? <> · <span style={{ color: 'var(--red-txt)' }}>{bad} need{bad > 1 ? '' : 's'} fixing</span></> : null}</span>
+      </nav>
+      <section className="card" style={css('padding:28px;display:flex;flex-direction:column;gap:20px')}>
+        <div style={css('display:flex;justify-content:space-between;align-items:center;gap:10px')}><h2 style={css('margin:0;font-size:22px')}>Question {ed.cur + 1}</h2>
+          <span style={css('display:flex;gap:8px;align-items:center')}>
+            <button type="button" className="icon-btn" onClick={() => { change(() => { d.questions.splice(ed.cur + 1, 0, JSON.parse(JSON.stringify(qq))); ed.cur += 1; }); toast('Question duplicated'); }} aria-label="Duplicate question"><Ico n="copy" /></button>
+            <button type="button" className="icon-btn" style={{ color: 'var(--red-txt)' }} onClick={() => { if (d.questions.length < 2) return; change(() => { d.questions.splice(ed.cur, 1); ed.cur = Math.max(0, ed.cur - 1); }); toast('Question deleted'); }} aria-label="Delete question" disabled={d.questions.length < 2}><Ico n="trash" /></button>
+          </span>
+        </div>
+        <div><span className="label" style={css('display:block;margin-bottom:10px')}>Question type</span>
+          <div className="seg qtype" role="tablist" aria-label="Question type">{QTYPES.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={T === k} onClick={() => change(() => setQType(qq, k))}>{l}</button>)}</div>
+        </div>
+        <label className="field"><span>Question</span><textarea ref={textRef} className="input" rows={2} maxLength={160} value={qq.text} onChange={(e) => setQ('text', e.target.value)}
+          placeholder={T === 'code' ? 'e.g. What does this code print?' : T === 'pic' ? 'e.g. Put the pictures together. What is the word?' : T === 'tf' ? 'Type a statement that is true or false' : 'Type your question'} /></label>
+        {body}
+        <div className="three" style={css('border-top:1px solid var(--border);padding-top:20px')}>
+          <label className="field"><span>Time limit</span><select className="input" value={qq.time} onChange={(e) => setQ('time', +e.target.value)}>{[5, 10, 15, 20, 30, 60].map((s) => <option key={s} value={s}>{s} seconds</option>)}</select></label>
+          <label className="field"><span>Points</span><select className="input" value={qq.points} onChange={(e) => setQ('points', +e.target.value)}>{[[1, 'Standard (1,000)'], [2, 'Double (2,000)'], [0, 'No points']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+        </div>
+      </section>
+      {askDelete && (
+        <Modal id="delT" icon="trash" title="Are you sure you want to delete the quiz?" onClose={() => setAskDelete(false)}>
+          <p>&quot;{d.title || 'Untitled quiz'}&quot; and its {d.questions.length} question{d.questions.length > 1 ? 's' : ''} will be deleted. This can&apos;t be undone.</p>
+          <div style={css('display:flex;gap:10px;justify-content:flex-end')}>
+            <button type="button" className="btn btn-outline" onClick={() => setAskDelete(false)} autoFocus>Cancel</button>
+            <button type="button" className="btn btn-danger-solid" onClick={() => { clearTimeout(saveT.current); deleteQuiz(d.id); E = null; navigate('/admin'); toast('Quiz deleted'); }}>Delete quiz</button>
           </div>
-
-          <div className="question-list">
-            {questions.map((question, index) => (
-              <button
-                key={question.id}
-                className={`question-list-item ${
-                  activeQuestion === index ? "active" : ""
-                }`}
-                onClick={() => {
-                  setActiveQuestion(index);
-                  setMessage("");
-                }}
-              >
-                <span className="question-number">{index + 1}</span>
-                <span className="question-list-text">
-                  {question.text.trim()
-                    ? question.text
-                    : `Question ${index + 1}`}
-                </span>
-                <span className="question-menu-dot">···</span>
-              </button>
-            ))}
-          </div>
-
-          <button className="add-question-button" onClick={addQuestion}>
-            + Add question
-          </button>
-
-          <div className="sidebar-bottom">
-            <span>QUIZ OVERVIEW</span>
-            <p>{questions.length} questions added</p>
-          </div>
-        </aside>
-
-        <section className="editor-main">
-          <div className="editor-page-heading">
-            <div>
-              <span className="editor-eyebrow">QUIZ BUILDER</span>
-              <h1>Create your quiz.</h1>
-              <p>Build your questions and get ready to challenge your players.</p>
-            </div>
-
-            <span className="editor-step-label">
-              Question {activeQuestion + 1} of {questions.length}
-            </span>
-          </div>
-
-          <section className="quiz-details-card">
-            <div className="section-heading">
-              <div>
-                <h2>Quiz details</h2>
-                <p>Give your quiz a name and a little context.</p>
-              </div>
-              <span className="section-icon">✦</span>
-            </div>
-
-            <div className="quiz-details-fields">
-              <div className="editor-field">
-                <label htmlFor="quiz-title">Quiz title</label>
-                <input
-                  id="quiz-title"
-                  type="text"
-                  placeholder="e.g. Introduction to AI"
-                  value={quizTitle}
-                  onChange={(event) => setQuizTitle(event.target.value)}
-                  maxLength={60}
-                />
-              </div>
-
-              <div className="editor-field">
-                <label htmlFor="quiz-topic">Topic</label>
-                <select
-                  id="quiz-topic"
-                  value={topic}
-                  onChange={(event) => setTopic(event.target.value)}
-                >
-                  <option>Technology</option>
-                  <option>Programming</option>
-                  <option>Artificial Intelligence</option>
-                  <option>Cloud Computing</option>
-                  <option>Cybersecurity</option>
-                  <option>General Knowledge</option>
-                  <option>Other</option>
-                </select>
-              </div>
-
-              <div className="editor-field full-width">
-                <label htmlFor="quiz-description">Description</label>
-                <textarea
-                  id="quiz-description"
-                  placeholder="What is this quiz about?"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  rows={2}
-                  maxLength={180}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="question-editor-card">
-            <div className="section-heading question-editor-heading">
-              <div>
-                <span className="editor-eyebrow">QUESTION {activeQuestion + 1}</span>
-                <h2>Edit question</h2>
-                <p>Write your question and configure the answer choices.</p>
-              </div>
-
-              <div className="question-tools">
-                <button
-                  className="icon-action"
-                  onClick={duplicateQuestion}
-                  title="Duplicate question"
-                >
-                  Duplicate
-                </button>
-                <button
-                  className="icon-action delete-action"
-                  onClick={deleteQuestion}
-                  title="Delete question"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-
-            <div className="editor-field">
-              <label htmlFor="question-text">Question text</label>
-              <textarea
-                id="question-text"
-                className="question-text-input"
-                placeholder="Type your question here..."
-                value={currentQuestion.text}
-                onChange={(event) =>
-                  updateQuestion("text", event.target.value)
-                }
-                rows={3}
-                maxLength={250}
-              />
-            </div>
-
-            <div className="answers-heading">
-              <div>
-                <h3>Answer choices</h3>
-                <p>Select the correct answer by clicking its circle.</p>
-              </div>
-              <span>4 OPTIONS</span>
-            </div>
-
-            <div className="answer-grid">
-              {currentQuestion.answers.map((answer, index) => (
-                <div
-                  key={index}
-                  className={`answer-option answer-option-${index + 1} ${
-                    currentQuestion.correctAnswer === index ? "correct" : ""
-                  }`}
-                >
-                  <button
-                    type="button"
-                    className="correct-selector"
-                    onClick={() => updateQuestion("correctAnswer", index)}
-                    aria-label={`Mark answer ${index + 1} as correct`}
-                    title="Mark as correct answer"
-                  >
-                    {currentQuestion.correctAnswer === index ? "✓" : ""}
-                  </button>
-
-                  <span className="answer-letter">
-                    {String.fromCharCode(65 + index)}
-                  </span>
-
-                  <input
-                    type="text"
-                    placeholder={`Answer option ${index + 1}`}
-                    value={answer}
-                    onChange={(event) =>
-                      updateAnswer(index, event.target.value)
-                    }
-                    aria-label={`Answer option ${index + 1}`}
-                    maxLength={100}
-                  />
-
-                  {currentQuestion.correctAnswer === index && (
-                    <span className="correct-label">Correct</span>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="question-settings">
-              <div className="answers-heading">
-                <div>
-                  <h3>Question settings</h3>
-                  <p>Adjust the time and points for this question.</p>
-                </div>
-              </div>
-
-              <div className="settings-grid">
-                <div className="editor-field">
-                  <label htmlFor="time-limit">Time limit</label>
-                  <select
-                    id="time-limit"
-                    value={currentQuestion.timeLimit}
-                    onChange={(event) =>
-                      updateQuestion("timeLimit", Number(event.target.value))
-                    }
-                  >
-                    <option value={5}>5 seconds</option>
-                    <option value={10}>10 seconds</option>
-                    <option value={15}>15 seconds</option>
-                    <option value={20}>20 seconds</option>
-                    <option value={30}>30 seconds</option>
-                    <option value={60}>60 seconds</option>
-                    <option value={90}>90 seconds</option>
-                    <option value={120}>120 seconds</option>
-                  </select>
-                </div>
-
-                <div className="editor-field">
-                  <label htmlFor="points">Points</label>
-                  <select
-                    id="points"
-                    value={currentQuestion.points}
-                    onChange={(event) =>
-                      updateQuestion("points", Number(event.target.value))
-                    }
-                  >
-                    <option value={500}>500 points</option>
-                    <option value={1000}>1000 points</option>
-                    <option value={1500}>1500 points</option>
-                    <option value={2000}>2000 points</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {message && (
-            <div className="editor-message" role="status">
-              {message}
-              <button onClick={() => setMessage("")}>×</button>
-            </div>
-          )}
-
-          <div className="editor-bottom-actions">
-            <button
-              className="previous-question-button"
-              onClick={() => setActiveQuestion(Math.max(0, activeQuestion - 1))}
-              disabled={activeQuestion === 0}
-            >
-              ← Previous
-            </button>
-
-            <button className="next-question-button" onClick={() => {
-              if (activeQuestion < questions.length - 1) {
-                setActiveQuestion(activeQuestion + 1);
-                setMessage("");
-              } else {
-                addQuestion();
-              }
-            }}>
-              {activeQuestion === questions.length - 1
-                ? "Add next question +"
-                : "Next question →"}
-            </button>
-          </div>
-        </section>
-      </main>
-    </div>
+        </Modal>
+      )}
+    </AdminShell>
   );
 }
 

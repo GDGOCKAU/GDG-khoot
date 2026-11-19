@@ -1,327 +1,132 @@
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { TEAMS, TOPICS, css, pinFmt } from '../../lib/constants';
+import { DB, ready, topicNames, useAppState } from '../../lib/store';
+import { G, UI, hosted } from '../../lib/engine';
+import { toast } from '../../lib/ui';
+import { ColorBar, Hang, Ico, Logo, ThemeButton, TopicChip, TopicIcon } from '../../components/common/UI';
+import SiteFooter from '../../components/common/SiteFooter';
 
-import { useState } from "react";
-import HangingDevu from "../../components/common/HangingDevu";
-import Navbar from "../../components/common/Navbar.jsx";
-import "./Home.css";
-import { Link, useNavigate } from "react-router-dom";
-
-const quizzes = [];
-
-const TOPICS = {
-  Mobile: { color: "blue", icon: "📱" },
-  Cloud: { color: "red", icon: "☁️" },
-  AI: { color: "yellow", icon: "✨" },
-  Web: { color: "green", icon: "💻" },
-  Other: { color: "blue", icon: "⭐" },
-};
-
-function formatPin(pin) {
-  const digits = String(pin ?? "").replace(/\D/g, "");
-  return digits.length === 6
-    ? `${digits.slice(0, 3)} ${digits.slice(3)}`
-    : digits;
-}
+const SECTIONS = ['join', 'quizzes', 'how'];
 
 function Home() {
+  useAppState();
   const navigate = useNavigate();
+  const [filter, setFilter] = useState(UI.homeFilter);
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [active, setActive] = useState('join');
+  const holdRef = useRef(0);
+  const pinRef = useRef(null);
 
-  const [gamePin, setGamePin] = useState("");
-  const [pinError, setPinError] = useState("");
-  const [activeFilter, setActiveFilter] = useState("All");
+  /* scroll spy for the nav pills */
+  useEffect(() => {
+    let raf = 0;
+    const calc = () => {
+      if (Date.now() < holdRef.current) return;
+      const secs = SECTIONS.map((id) => document.getElementById(id)).filter(Boolean);
+      if (secs.length < 3) return;
+      if (innerHeight + scrollY >= document.documentElement.scrollHeight - 8) { setActive('how'); return; }
+      let cur = 'join';
+      secs.forEach((el) => { if (el.getBoundingClientRect().top <= innerHeight * 0.4) cur = el.id; });
+      setActive(cur);
+    };
+    const on = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; calc(); }); };
+    calc();
+    window.addEventListener('scroll', on, { passive: true });
+    return () => { window.removeEventListener('scroll', on); cancelAnimationFrame(raf); };
+  }, []);
 
-  function handleJoinGame(event) {
-    event.preventDefault();
+  const scrollTo = (e, id) => {
+    e.preventDefault();
+    setActive(id); holdRef.current = Date.now() + 900;
+    const t = document.getElementById(id); if (t) t.scrollIntoView({ behavior: 'smooth' });
+  };
+  const pickFilter = (f) => { UI.homeFilter = f; setFilter(f); document.getElementById('quizzes').scrollIntoView(); };
 
-    const pin = gamePin.replace(/\D/g, "");
+  const onPin = (e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 6); setPin(d.length > 3 ? d.slice(0, 3) + ' ' + d.slice(3) : d); };
+  const submitPin = (e) => {
+    e.preventDefault();
+    const p = pin.replace(/\D/g, '');
+    const qz = DB.quizzes.find((x) => x.pin === p && ready(x));
+    if (hosted() && p === G.pin) { setPinError(''); UI.look = null; navigate('/live'); return; }
+    if (p.length !== 6) setPinError('Enter the 6-digit PIN.');
+    else if (!qz) setPinError('No game with that PIN. Press Play on a quiz below to try one.');
+    else { setPinError(''); UI.look = null; navigate('/join/' + qz.id); return; }
+    if (pinRef.current) pinRef.current.focus();
+  };
 
-    if (pin.length !== 6) {
-      setPinError("Please enter a valid 6-digit game PIN.");
-      return;
-    }
+  const filters = ['All', ...topicNames()];
+  const list = DB.quizzes.filter(ready).filter((x) => filter === 'All' || x.topic === filter);
 
-    setPinError("");
-    navigate(`/join/${pin}`);
-  }
-
-  const readyQuizzes = quizzes.filter(
-    (quiz) => quiz.status === "ready"
-  );
-
-  const topics = [
-    "All",
-    ...Object.keys(TOPICS),
-  ];
-
-  const filteredQuizzes =
-    activeFilter === "All"
-      ? readyQuizzes
-      : readyQuizzes.filter(
-          (quiz) => quiz.topic === activeFilter
-        );
-
-  return (
-    <>
-      <Navbar />
-
-      <main>
-        <section className="home-hero hero" id="join">
-          <HangingDevu />
-
-          <div className="hero-grid" aria-hidden="true" />
-          <div className="hero-orb hero-orb-blue" aria-hidden="true" />
-          <div className="hero-orb hero-orb-green" aria-hidden="true" />
-
-          <div className="hero-content">
-            <div className="hero-copy">
-              <span className="hero-label">
-                <span className="hero-label-dot" />
-                GOOGLE DEVELOPER GROUPS · KAU
-              </span>
-
-              <h1>
-                Play<span className="blue-period">.</span>{" "}
-                Think<span className="red-period">.</span>
-                <br />
-                Learn<span className="yellow-period">.</span>
-              </h1>
-
-              <p className="hero-description">
-                Got what it takes? Jump into a live GDG KAU quiz,
-                race your friends, and learn something new.
-              </p>
-
-              <div className="hero-benefits">
-                <span className="benefit blue-benefit">
-                  No account needed
-                </span>
-                <span className="benefit red-benefit">
-                  Works on any phone
-                </span>
-                <span className="benefit green-benefit">
-                  Free for everyone
-                </span>
-              </div>
-            </div>
-
-            <form
-              className="join-game-card"
-              onSubmit={handleJoinGame}
-              noValidate
-            >
-              <div>
-                <h2>Join a game</h2>
-                <p className="join-card-description">
-                  Enter the PIN shown on the big screen.
-                </p>
-              </div>
-
-              <label className="pin-field">
-                <span>Game PIN</span>
-                
-<input
-  type="text"
-  inputMode="numeric"
-  autoComplete="off"
-  maxLength={7}
-  placeholder="000 000"
-  value={
-    gamePin.length > 3
-      ? `${gamePin.slice(0, 3)} ${gamePin.slice(3)}`
-      : gamePin
-  }
-  aria-describedby="pin-error"
-  onChange={(event) => {
-    const value = event.target.value
-      .replace(/\D/g, "")
-      .slice(0, 6);
-
-    setGamePin(value);
-    setPinError("");
-  }}
-/>
-
-              </label>
-
-              {pinError && (
-                <p
-                  className="pin-error"
-                  id="pin-error"
-                  role="alert"
-                >
-                  {pinError}
-                </p>
-              )}
-
-              <button
-                type="submit"
-                className="join-submit-button"
-              >
-                Enter game <span aria-hidden="true">→</span>
-              </button>
-
-              <div className="home-color-bar" />
-
-              <p className="join-card-hint">
-                Each quiz below shows its PIN, or just press Play on one.
-              </p>
-            </form>
+  return <>
+    <header className="site-head"><nav className="site-nav" aria-label="Main">
+      <Link to="/" className="brand" style={{ textDecoration: 'none' }}><Logo /><span>GDG KAU<b>HOOT</b></span></Link>
+      <div className="links">
+        {[['join', 'Join'], ['quizzes', 'Quizzes'], ['how', 'How it works']].map(([id, label]) => (
+          <a key={id} className={`pill${active === id ? ' on' : ''}`} href={`#${id}`} aria-current={active === id ? 'true' : undefined} onClick={(e) => scrollTo(e, id)}>{label}</a>
+        ))}
+        <ThemeButton />
+        <button type="button" className="btn btn-outline btn-sm" lang="ar" onClick={() => toast('Arabic version is coming soon.')}>عربي</button>
+      </div>
+    </nav></header>
+    <main>
+      <section className="hero" id="join">
+        <Hang width={120} style="top:0;left:-3px;width:120px;height:360px" />
+        <div className="grid-bg" aria-hidden="true" />
+        <div className="orb" aria-hidden="true" style={css('background:#4285f4;top:-60px;left:-120px')} />
+        <div className="orb" aria-hidden="true" style={css('background:#34a853;bottom:-120px;right:-100px')} />
+        <div className="hero-in">
+          <div className="hero-text">
+            <span className="chip" style={css('align-self:flex-start;letter-spacing:.06em;color:var(--muted)')}><i style={css('width:8px;height:8px;border-radius:50%;background:#34a853;box-shadow:0 0 0 3px var(--green-soft)')} />GOOGLE DEVELOPER GROUPS · KAU</span>
+            <h1>Play<span style={{ color: '#4285f4' }}>.</span> Think<span style={{ color: '#ea4335' }}>.</span><br />Learn<span style={{ color: '#f9ab00' }}>.</span></h1>
+            <p className="lead">Got what it takes? Jump into a live GDG KAU quiz, race your friends, and learn something new.</p>
+            <div className="ticks"><span style={{ '--c': '#4285f4' }}>No account needed</span><span style={{ '--c': '#ea4335' }}>Works on any phone</span><span style={{ '--c': '#34a853' }}>Free for everyone</span></div>
           </div>
-        </section>
-
-        {/* Explore quizzes */}
-        <section
-          className="home-section quizzes-section"
-          id="quizzes"
-        >
-          <div className="section-inner">
-            <div className="section-heading quizzes-heading">
-              <div>
-                <span className="section-label quizzes-label">
-                  LEARN SOMETHING NEW
-                </span>
-                <h2>Explore quizzes</h2>
-              </div>
-
-              <div
-                className="quiz-filters"
-                role="tablist"
-                aria-label="Filter quizzes by topic"
-              >
-                {topics.map((topic) => (
-                  <button
-                    key={topic}
-                    type="button"
-                    role="tab"
-                    aria-selected={activeFilter === topic}
-                    className={
-                      activeFilter === topic
-                        ? "quiz-filter active"
-                        : "quiz-filter"
-                    }
-                    onClick={() => setActiveFilter(topic)}
-                  >
-                    {topic}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {filteredQuizzes.length > 0 ? (
-              <div className="quiz-grid">
-                {filteredQuizzes.map((quiz) => {
-                  const topicInfo =
-                    TOPICS[quiz.topic] || TOPICS.Other;
-
-                  return (
-                    <article
-                      className={`quiz-card quiz-card-${topicInfo.color}`}
-                      key={quiz.id}
-                    >
-                      <div
-                        className="quiz-card-glow"
-                        aria-hidden="true"
-                      />
-
-                      <span className="quiz-card-icon">
-                        {topicInfo.icon}
-                      </span>
-
-                      <h3>{quiz.title}</h3>
-
-                      <p className="quiz-card-description">
-                        {quiz.desc || ""}
-                      </p>
-
-                      <div className="quiz-card-meta">
-                        <span className="quiz-chip">
-                          {quiz.questions?.length ?? 0} questions
-                        </span>
-
-                        <span
-                          className={`quiz-chip quiz-topic-${topicInfo.color}`}
-                        >
-                          {quiz.topic || "Other"}
-                        </span>
-
-                        <span
-                          className="quiz-chip"
-                          title="Game PIN"
-                        >
-                          PIN {formatPin(quiz.pin)}
-                        </span>
-                      </div>
-
-                      <Link
-                        to={`/join/${quiz.id}`}
-                        className="quiz-play-button"
-                      >
-                        Play <span aria-hidden="true">→</span>
-                      </Link>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="quiz-empty">
-                No quizzes in this topic yet.
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* How it works */}
-        <section className="home-section how-section" id="how">
-          <div className="section-inner">
-            <div className="section-heading">
-              <div>
-                <span className="section-label how-label">
-                  HOW IT WORKS
-                </span>
-                <h2>Three steps to play</h2>
-              </div>
-            </div>
-
-            <div className="steps-grid">
-              <article className="step-card step-blue">
-                <span className="step-number">1</span>
-                <h3>Get the PIN</h3>
-                <p>
-                  The host shows it on the big screen at the event.
-                </p>
-              </article>
-
-              <article className="step-card step-red">
-                <span className="step-number">2</span>
-                <h3>Pick a nickname</h3>
-                <p>
-                  Keep it fun, it shows on the leaderboard.
-                </p>
-              </article>
-
-              <article className="step-card step-yellow">
-                <span className="step-number">3</span>
-                <h3>Answer fast</h3>
-                <p>
-                  Right and quick answers earn the most points.
-                </p>
-              </article>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      <footer className="home-footer">
-        <div className="footer-inner">
-          <span>
-            GDG on Campus · King Abdulaziz University
-          </span>
-          <Link to="/admin/login">Admin sign in</Link>
+          <form className="join-card" onSubmit={submitPin} noValidate>
+            <div><h2>Join a game</h2><p style={css('margin:6px 0 0;color:var(--muted);font-size:14px')}>Enter the PIN shown on the big screen.</p></div>
+            <label className="field"><span>Game PIN</span><input ref={pinRef} className="input pin num" id="pinIn" inputMode="numeric" autoComplete="off" maxLength={7} placeholder="000 000" aria-describedby="pinErr" value={pin} onChange={onPin} /></label>
+            {pinError ? <p className="err" id="pinErr" role="alert">{pinError}</p> : <span id="pinErr" />}
+            <button className="btn btn-primary btn-lg" type="submit">Enter game <Ico n="arrow" /></button>
+            <ColorBar />
+            <p style={css('margin:0;text-align:center;font-size:13px;color:var(--muted)')}>Each quiz below shows its PIN, or just press Play on one.</p>
+          </form>
         </div>
-
-        <div className="home-color-bar footer-color-bar" />
-      </footer>
-    </>
-  );
+      </section>
+      <section style={{ background: 'var(--canvas)' }} id="quizzes"><div className="section">
+        <div className="sec-head">
+          <div><span className="sec-tag" style={{ '--c': '#ea4335' }}>LEARN SOMETHING NEW</span><h2>Explore quizzes</h2></div>
+          <div className="seg filters" role="tablist" aria-label="Filter by topic">
+            {filters.map((f) => <button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => pickFilter(f)}>{f}</button>)}
+          </div>
+        </div>
+        <div className="quiz-grid">
+          {list.length ? list.map((x) => {
+            const T = TEAMS[(TOPICS[x.topic] || TOPICS.Other).c];
+            return (
+              <article key={x.id} className="quiz-card" style={{ '--acc': T.bright, '--acc-soft': T.soft, '--acc-txt': T.txt }}>
+                <div className="glow" aria-hidden="true" />
+                <span className="ico"><TopicIcon t={x.topic} /></span>
+                <h3>{x.title}</h3>
+                <p>{x.desc || ''}</p>
+                <div className="meta"><span className="chip">{x.questions.length} questions</span><TopicChip t={x.topic} /><span className="chip" title="Game PIN">PIN {pinFmt(x.pin)}</span></div>
+                <Link className="btn btn-tonal btn-sm play" to={`/join/${x.id}`} onClick={() => { UI.look = null; }}>Play <Ico n="arrow" /></Link>
+              </article>
+            );
+          }) : <div className="empty">No quizzes in this topic yet.</div>}
+        </div>
+      </div></section>
+      <section id="how" style={{ background: 'var(--bg)' }}><div className="section">
+        <div className="sec-head"><div><span className="sec-tag" style={{ '--c': '#34a853' }}>HOW IT WORKS</span><h2>Three steps to play</h2></div></div>
+        <div className="steps">
+          <div className="step" style={{ '--soft': 'var(--blue-soft)', '--txt': 'var(--blue-txt)' }}><b>1</b><h3>Get the PIN</h3><p>The host shows it on the big screen at the event.</p></div>
+          <div className="step" style={{ '--soft': 'var(--red-soft)', '--txt': 'var(--red-txt)' }}><b>2</b><h3>Pick a nickname</h3><p>Keep it fun, it shows on the leaderboard.</p></div>
+          <div className="step" style={{ '--soft': 'var(--yellow-soft)', '--txt': 'var(--yellow-txt)' }}><b>3</b><h3>Answer fast</h3><p>Right and quick answers earn the most points.</p></div>
+        </div>
+      </div></section>
+    </main>
+    <SiteFooter />
+  </>;
 }
 
 export default Home;

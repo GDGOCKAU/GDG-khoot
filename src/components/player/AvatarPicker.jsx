@@ -1,78 +1,24 @@
+/* Team colour tabs + the 12 Devu mascots of that colour */
+import { TEAMS, TEAM_KEYS, mascot } from '../../lib/constants';
 
-import { useState } from "react";
-import Devu from "../common/Devu";
-import "./AvatarPicker.css";
-
-const colors = ["Blue", "Red", "Yellow", "Green"];
-
-const mascots = ["blue", "red", "yellow", "green"].flatMap((color) =>
-  Array.from({ length: 12 }, (_, index) => ({
-    color,
-    number: index + 1,
-  }))
-);
-
-function AvatarPicker({ selectedAvatar, onSelect }) {
-  const [activeColor, setActiveColor] = useState("Blue");
-
-  const filteredMascots = mascots.filter(
-    (mascot) => mascot.color === activeColor.toLowerCase()
-  );
-
+export function TeamTabs({ team, onTeam, style }) {
   return (
-    <div className="avatar-picker">
-      <div className="avatar-filters">
-        {colors.map((color) => (
-          <button
-            key={color}
-            type="button"
-            className={`avatar-filter ${
-              activeColor === color ? "active" : ""
-            }`}
-            onClick={() => setActiveColor(color)}
-            aria-pressed={activeColor === color}
-          >
-            {color}
-          </button>
-        ))}
-      </div>
-
-      <div className="avatar-grid">
-        {filteredMascots.map((mascot) => {
-          const isSelected =
-            selectedAvatar?.color === mascot.color &&
-            selectedAvatar?.number === mascot.number;
-
-          return (
-            <button
-              key={`${mascot.color}-${mascot.number}`}
-              type="button"
-              className={`avatar-option ${
-                isSelected ? "selected" : ""
-              }`}
-              onClick={() => onSelect(mascot)}
-              aria-label={`Select ${mascot.color} Devu ${mascot.number}`}
-              aria-pressed={isSelected}
-            >
-              <Devu
-                color={mascot.color}
-                number={mascot.number}
-                size={85}
-              />
-
-              {isSelected && (
-                <span className="avatar-check">✓</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      <p className="avatar-count">
-        Showing {filteredMascots.length} mascots
-      </p>
+    <div className="team-tabs" role="tablist" aria-label="Mascot color" style={style}>
+      {TEAM_KEYS.map((k) => (
+        <button key={k} type="button" role="tab" className={`t-${k}`} style={{ '--c': TEAMS[k].solid }} aria-selected={team === k} onClick={() => onTeam(k)}><i />{TEAMS[k].name}</button>
+      ))}
     </div>
   );
 }
 
-export default AvatarPicker;
+export function MascotGrid({ team, idx, onPick, six }) {
+  return (
+    <div className={`m-grid${six ? ' six' : ''}`}>
+      {Array.from({ length: 12 }, (_, i) => (
+        <button key={i} type="button" className={`c-${team}`} aria-pressed={idx === i} aria-label={`${TEAMS[team].name} mascot ${i + 1}`} onClick={() => onPick(i)}>
+          <img src={mascot(team, i)} alt="" />
+        </button>
+      ))}
+    </div>
+  );
+}

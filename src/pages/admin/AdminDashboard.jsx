@@ -1,330 +1,94 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { DB, upsertQuiz, useAppState } from '../../lib/store';
+import { Ico, TopicChip } from '../../components/common/UI';
+import { AdminShell } from '../../components/layout/Shells';
+import { apiRequest } from '../../api/client';
 
-import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import "./AdminDashboard.css";
-import { apiRequest } from "../../api/client";
-
-const initialQuizzes = [
-  {
-    id: 1,
-    title: "Flutter Basics",
-    topic: "Mobile",
-    questions: 10,
-    lastHosted: "Nov 12",
-    status: "Ready",
-  },
-  {
-    id: 2,
-    title: "Cloud 101",
-    topic: "Cloud",
-    questions: 12,
-    lastHosted: "Nov 5",
-    status: "Ready",
-  },
-  {
-    id: 3,
-    title: "AI & Machine Learning",
-    topic: "AI",
-    questions: 8,
-    lastHosted: "Never",
-    status: "Draft",
-  },
-  {
-    id: 4,
-    title: "Web Dev Essentials",
-    topic: "Web",
-    questions: 15,
-    lastHosted: "Oct 29",
-    status: "Ready",
-  },
-];
+let lastFilter = 'All', lastSearch = '';
 
 function AdminDashboard() {
-  const navigate = useNavigate();
-
-  const [quizzes, setQuizzes] = useState(initialQuizzes);
-  const [search, setSearch] = useState("");
-  const [activeFilter, setActiveFilter] = useState("All");
-  const [message, setMessage] = useState("");
+  useAppState();
+  const [filter, setFilterS] = useState(lastFilter);
+  const [search, setSearchS] = useState(lastSearch);
+  const setFilter = (v) => { lastFilter = v; setFilterS(v); };
+  const setSearch = (v) => { lastSearch = v; setSearchS(v); };
 
   useEffect(() => {
-    apiRequest("/api/v1/quizzes")
+    apiRequest('/api/v1/quizzes')
       .then((items) => {
-        setQuizzes(items.map((quiz) => ({
+        items.forEach((quiz) => upsertQuiz({
           id: quiz.id,
           title: quiz.title,
-          topic: "Other",
-          questions: quiz.questions?.length ?? 0,
-          lastHosted: "Never",
-          status: quiz.isPublished ? "Ready" : "Draft",
-        })));
+          topic: 'Other',
+          desc: quiz.description || '',
+          status: quiz.isPublished ? 'ready' : 'draft',
+          pin: String(100000 + Math.floor(Math.random() * 900000)),
+          lastHosted: null,
+          questions: (quiz.questions || []).map((question) => ({
+            type: 'mc',
+            text: question.text,
+            answers: (question.options || []).map((option) => option.text),
+            correct: (question.options || []).findIndex((option) => option.isCorrect),
+            time: question.timeLimitSecs,
+            points: 1,
+            img: null,
+          })),
+        }));
       })
-      .catch(() => setMessage("Showing demo quizzes; backend is unavailable or sign-in expired."));
+      .catch(() => {});
   }, []);
 
-  const filteredQuizzes = useMemo(() => {
-    return quizzes.filter((quiz) => {
-      const matchesSearch =
-        quiz.title.toLowerCase().includes(search.toLowerCase()) ||
-        quiz.topic.toLowerCase().includes(search.toLowerCase());
-
-      const matchesFilter =
-        activeFilter === "All" || quiz.status === activeFilter;
-
-      return matchesSearch && matchesFilter;
-    });
-  }, [quizzes, search, activeFilter]);
-
-  function handleEdit(quiz) {
-    navigate(`/admin/edit/${quiz.id}`);
-  }
-
-  function handleHost(quiz) {
-    navigate(`/admin/host/${quiz.id}`);
-  }
+  const games = DB.games.filter((g) => g.mode === 'host');
+  const acc = DB.games.length ? Math.round(100 * DB.games.reduce((s, g) => s + g.accuracy, 0) / DB.games.length) + '%' : '—';
+  const players = DB.games.reduce((s, g) => s + g.players, 0);
+  const term = search.trim().toLowerCase();
+  const list = DB.quizzes.filter((x) => (filter === 'All' || (filter === 'Ready' ? x.status === 'ready' : x.status === 'draft')) && (!term || x.title.toLowerCase().includes(term)));
 
   return (
-    <div className="admin-dashboard">
-      <aside className="admin-sidebar">
-        <Link to="/" className="admin-brand">
-          <span className="admin-brand-mark">
-            <i className="brand-blue" />
-            <i className="brand-red" />
-            <i className="brand-yellow" />
-            <i className="brand-green" />
-          </span>
-
-          <span>
-            <strong>
-              GDG KAU <span>Quiz</span>
-            </strong>
-            <small>ADMIN</small>
-          </span>
-        </Link>
-
-        <nav className="admin-navigation">
-          <Link to="/admin" className="admin-nav-link active">
-            <span>▦</span>
-            Dashboard
-          </Link>
-
-          <Link to="/admin/create" className="admin-nav-link">
-            <span>⊕</span>
-            Create quiz
-          </Link>
-
-          <Link to="/admin/results" className="admin-nav-link">
-            <span>▥</span>
-            Results
-          </Link>
-        </nav>
-
-        <div className="admin-session">
-          <div className="session-icon">♙</div>
-          <div>
-            <strong>Admin session</strong>
-            <Link to="/">Back to player home</Link>
+    <AdminShell>
+      <div className="adm-head">
+        <div><h1>Dashboard<span style={{ color: '#ea4335' }}>.</span></h1><p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>Create quizzes and host live games for GDG KAU events.</p></div>
+        <Link className="btn btn-primary" to="/admin/new"><Ico n="plus" />Create quiz</Link>
+      </div>
+      <div className="stats">
+        <div className="card stat" style={{ '--c': '#4285f4' }}><b className="num">{DB.quizzes.length}</b><span>Quizzes</span></div>
+        <div className="card stat" style={{ '--c': '#ea4335' }}><b className="num">{games.length}</b><span>Games hosted</span></div>
+        <div className="card stat" style={{ '--c': '#f9ab00' }}><b className="num">{players}</b><span>Players so far</span></div>
+        <div className="card stat" style={{ '--c': '#34a853' }}><b className="num">{acc}</b><span>Average accuracy</span></div>
+      </div>
+      <section className="card tbl-wrap">
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <h2 style={{ margin: 0, fontSize: 22 }}>Your quizzes</h2>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+            <label className="sr" htmlFor="dashSearch">Search quizzes</label>
+            <input className="input" id="dashSearch" placeholder="Search quizzes" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 220, minHeight: 42, fontSize: 14 }} />
+            <div className="seg" role="tablist" aria-label="Filter quizzes">
+              {['All', 'Ready', 'Drafts'].map((f) => <button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}>{f}</button>)}
+            </div>
           </div>
         </div>
-      </aside>
-
-      <main className="admin-main">
-        <header className="dashboard-header">
-          <div>
-            <h1>Dashboard.</h1>
-            <p>
-              Create quizzes and host live games for GDG KAU events.
-            </p>
-          </div>
-
-          <Link to="/admin/create" className="create-quiz-button">
-            <span>＋</span> Create quiz
-          </Link>
-        </header>
-
-        <section className="dashboard-stats">
-          <article className="stat-card stat-blue">
-            <strong>12</strong>
-            <span>Quizzes</span>
-          </article>
-
-          <article className="stat-card stat-red">
-            <strong>8</strong>
-            <span>Games hosted</span>
-          </article>
-
-          <article className="stat-card stat-yellow">
-            <strong>24</strong>
-            <span>Players this month</span>
-          </article>
-
-          <article className="stat-card stat-green">
-            <strong>92%</strong>
-            <span>Average accuracy</span>
-          </article>
-        </section>
-
-        <section className="quiz-management">
-          <div className="quiz-management-header">
-            <h2>Your quizzes</h2>
-
-            <div className="quiz-tools">
-              <input
-                type="search"
-                placeholder="Search quizzes..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                aria-label="Search quizzes"
-              />
-
-              <div className="quiz-filters">
-                {["All", "Ready", "Draft"].map((filter) => (
-                  <button
-                    key={filter}
-                    className={
-                      activeFilter === filter ? "selected" : ""
-                    }
-                    onClick={() => setActiveFilter(filter)}
-                  >
-                    {filter}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {message && (
-            <div className="dashboard-message" role="status">
-              {message}
-              <button onClick={() => setMessage("")}>×</button>
-            </div>
-          )}
-
-          <div className="quiz-table-wrapper">
-            <table className="quiz-table">
-              <thead>
-                <tr>
-                  <th>Quiz</th>
-                  <th>Topic</th>
-                  <th>Questions</th>
-                  <th>Last hosted</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredQuizzes.map((quiz) => (
-                  <tr key={quiz.id}>
-                    <td className="quiz-title-cell">
-                      {quiz.title}
-                    </td>
-
-                    <td>
-                      <span
-                        className={`topic-tag topic-${quiz.topic.toLowerCase()}`}
-                      >
-                        {quiz.topic}
-                      </span>
-                    </td>
-
-                    <td>{quiz.questions}</td>
-                    <td>{quiz.lastHosted}</td>
-
-                    <td>
-                      <span
-                        className={`status-tag ${quiz.status.toLowerCase()}`}
-                      >
-                        <span />
-                        {quiz.status}
-                      </span>
-                    </td>
-
-                    <td>
-                      <div className="quiz-actions">
-                        <button
-                          className="edit-button"
-                          onClick={() => handleEdit(quiz)}
-                        >
-                          Edit
-                        </button>
-
-                        {quiz.status === "Ready" ? (
-                          <button
-                            className="host-button"
-                            onClick={() => handleHost(quiz)}
-                          >
-                            Host live
-                          </button>
-                        ) : (
-                          <button
-                            className="continue-button"
-                            onClick={() => handleEdit(quiz)}
-                          >
-                            Continue editing
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-
-                {filteredQuizzes.length === 0 && (
-                  <tr>
-                    <td colSpan="6" className="empty-table">
-                      No quizzes found. Try another search or filter.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mobile-quiz-list">
-            {filteredQuizzes.map((quiz) => (
-              <article className="mobile-quiz-card" key={quiz.id}>
-                <div className="mobile-quiz-top">
-                  <strong>{quiz.title}</strong>
-
-                  <span
-                    className={`status-tag ${quiz.status.toLowerCase()}`}
-                  >
-                    <span />
-                    {quiz.status}
-                  </span>
-                </div>
-
-                <p>
-                  {quiz.topic} · {quiz.questions} questions
-                </p>
-
-                <div className="mobile-quiz-actions">
-                  <button
-                    className="edit-button"
-                    onClick={() => handleEdit(quiz)}
-                  >
-                    Edit
-                  </button>
-
-                  {quiz.status === "Ready" && (
-                    <button
-                      className="host-button"
-                      onClick={() => handleHost(quiz)}
-                    >
-                      Host live
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <p className="dashboard-footer">
-          GDG KAU Quiz · Admin workspace
-        </p>
-      </main>
-    </div>
+        <div className="tbl-scroll"><table>
+          <thead><tr><th>Quiz</th><th>Topic</th><th>Questions</th><th>Last hosted</th><th>Status</th><th style={{ textAlign: 'right' }}>Actions</th></tr></thead>
+          <tbody>
+            {list.length ? list.map((x) => (
+              <tr key={x.id}>
+                <td><b>{x.title || 'Untitled quiz'}</b></td>
+                <td><TopicChip t={x.topic} /></td>
+                <td className="num">{x.questions.length}</td>
+                <td style={{ color: 'var(--muted)' }}>{x.lastHosted ? new Date(x.lastHosted).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Never'}</td>
+                <td>{x.status === 'ready' ? <span className="status" style={{ color: 'var(--green-txt)' }}>Ready</span> : <span className="status" style={{ color: 'var(--muted)' }}>Draft</span>}</td>
+                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  {x.status === 'ready'
+                    ? <><Link className="btn btn-outline btn-sm" to={`/admin/edit/${x.id}`}>Edit</Link> <Link className="btn btn-primary btn-sm" to={`/host/${x.id}`}>Host live</Link></>
+                    : <Link className="btn btn-outline btn-sm" to={`/admin/edit/${x.id}`}>Continue editing</Link>}
+                </td>
+              </tr>
+            )) : <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)', padding: 32 }}>No quizzes match.</td></tr>}
+          </tbody>
+        </table></div>
+      </section>
+    </AdminShell>
   );
 }
 
