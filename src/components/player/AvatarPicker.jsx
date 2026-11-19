@@ -1,11 +1,11 @@
 /* Team colour tabs + the 12 Devu mascots of that colour */
 import { TEAMS, TEAM_KEYS, mascot } from '../../lib/constants';
 
-export function TeamTabs({ team, onTeam, style }) {
+export function TeamTabs({ team, onTeam, style, pills }) {
   return (
-    <div className="team-tabs" role="tablist" aria-label="Mascot color" style={style}>
+    <div className={`team-tabs${pills ? ' pills' : ''}`} role="tablist" aria-label="Mascot color" style={style}>
       {TEAM_KEYS.map((k) => (
-        <button key={k} type="button" role="tab" className={`t-${k}`} style={{ '--c': TEAMS[k].solid }} aria-selected={team === k} onClick={() => onTeam(k)}><i />{TEAMS[k].name}</button>
+        <button key={k} type="button" role="tab" className={`t-${k}`} style={{ '--c': TEAMS[k].solid }} aria-selected={team === k} onClick={() => onTeam(k)}><i />{TEAMS[k].name}{pills && team === k ? ' · 12' : ''}</button>
       ))}
     </div>
   );

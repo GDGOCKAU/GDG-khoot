@@ -40,18 +40,18 @@ function JoinQuiz({ quiz, live }) {
 
   if (wide) {
     return (
-      <LapShell right={<span className="chip chip-blue">PIN {pinFmt(pin)}</span>}>
-        <div><div className="eyebrow">You&apos;re almost in</div><h1 style={{ fontSize: 44, marginTop: 6 }}>Choose your look</h1><p style={css('margin:6px 0 0;color:var(--muted)')}>{quiz.title} · Your mascot shows in the lobby, on the leaderboard and on the podium. Its color is your team.</p></div>
+      <LapShell right={<span className="chip chip-blue" style={{ fontSize: 13, padding: '6px 14px' }}>PIN {pinFmt(pin)}</span>} main="look">
+        <div><div className="eyebrow">You&apos;re almost in</div><h1 style={{ fontSize: 44, marginTop: 6 }}>Choose your look</h1><p style={css('margin:8px 0 0;color:var(--muted);font-size:16px')}>{quiz.title} · Your mascot shows in the lobby, on the leaderboard and on the podium. Its color is your color.</p></div>
         <form className="look-grid" onSubmit={join} noValidate>
           <div className="card" style={css('padding:28px;display:flex;flex-direction:column;gap:18px;align-items:stretch')}>
-            <img className="avatar" src={mascot(look.team, look.idx)} alt="" width="180" height="180" style={{ '--team': T.solid, borderWidth: 6, alignSelf: 'center' }} />
-            <span className={`chip chip-${look.team}`} style={{ alignSelf: 'center' }}>{T.name} team</span>
-            {nick}
-            <button type="submit" className="btn btn-primary btn-lg">Join game <Ico n="arrow" /></button>
+            <img className="avatar look-prev" src={mascot(look.team, look.idx)} alt="Your mascot preview" width="180" height="180" style={{ '--team': T.solid, borderWidth: 7, alignSelf: 'center' }} />
+            <span className={`chip chip-${look.team}`} style={{ alignSelf: 'center', fontSize: 13 }}>{T.name} player</span>
+            <div style={{ width: '100%' }}>{nick}</div>
+            <button type="submit" className="btn btn-primary btn-lg" style={{ width: '100%', minHeight: 54, fontSize: 16 }}>Join game <Ico n="arrow" /></button>
           </div>
           <div className="card" style={css('padding:28px;display:flex;flex-direction:column;gap:18px')}>
-            <div style={css('display:flex;justify-content:space-between;align-items:baseline')}><b style={{ fontSize: 18 }}>Pick a mascot</b><span style={{ fontSize: 13, color: 'var(--muted)' }}>48 mascots</span></div>
-            <TeamTabs team={look.team} onTeam={onTeam} style={{ maxWidth: 520 }} />
+            <div style={css('display:flex;justify-content:space-between;align-items:center')}><h2 style={css('margin:0;font-size:20px;font-weight:600')}>Pick a mascot</h2><span style={{ fontSize: 13, color: 'var(--muted)' }}>48 mascots</span></div>
+            <TeamTabs team={look.team} onTeam={onTeam} pills />
             <MascotGrid team={look.team} idx={look.idx} onPick={onPick} six />
           </div>
         </form>

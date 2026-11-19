@@ -13,7 +13,10 @@ function Home() {
   useAppState();
   const navigate = useNavigate();
   const [filter, setFilter] = useState(UI.homeFilter);
-  const [pin, setPin] = useState('');
+  const [pin, setPin] = useState(() => {
+    const d = (new URLSearchParams(window.location.search).get('pin') || '').replace(/\D/g, '').slice(0, 6);
+    return d.length > 3 ? d.slice(0, 3) + ' ' + d.slice(3) : d;
+  });
   const [pinError, setPinError] = useState('');
   const [active, setActive] = useState('join');
   const holdRef = useRef(0);

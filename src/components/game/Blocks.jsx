@@ -3,10 +3,10 @@ import { TEAMS, TEAM_KEYS, LETTERS, ansCls, mascot, fmt, ord, css } from '../../
 import { qType, norm, isCorrect, correctLabel, highlight } from '../../lib/questions';
 import { G, curQ, ranked, rankOf, teamStats, hosted } from '../../lib/engine';
 import { isWide } from '../../lib/ui';
-import { Ico, Logo, Dots, Bounce, TopicChip, Avatar, You, Secs } from '../common/UI';
+import { Ico, Logo, Dots, TopicChip, Avatar, You, Secs } from '../common/UI';
 
 const tfIco = (i, s) => <Ico n={i === 0 ? 'check' : 'x'} s={s} />;
-const CROWN = <svg aria-hidden="true" width="44" height="36" viewBox="0 0 24 20"><path d="M2 6l5 4 5-7 5 7 5-4-2 12H4z" fill="#f9ab00" stroke="#1f2328" strokeWidth="1.4" strokeLinejoin="round" /></svg>;
+const CROWN = <svg aria-hidden="true" width="48" height="34" viewBox="0 0 56 40" fill="#f9ab00" stroke="#1f2328" strokeWidth="2.5" strokeLinejoin="round"><path d="M4 12l12 10L28 4l12 18 12-10-4 24H8z" /></svg>;
 
 /* a count-up number, animated by runAnims() */
 function Num({ to, from = 0, delay, dur, className, style }) {
@@ -49,10 +49,10 @@ export function PicsRow({ qq, size }) {
     </div>
   );
 }
-export function ChosenPill({ qq, choice }) {
+export function ChosenPill({ qq, choice, big }) {
   const t = qType(qq);
-  if (t === 'pic') return <span className="chosen c-blue" style={{ letterSpacing: '.12em' }}>{String(choice).toUpperCase()}</span>;
-  return <span className={`chosen ${ansCls(choice)}${t === 'code' ? ' mono' : ''}`}><span className="L">{t === 'tf' ? tfIco(choice, 20) : LETTERS[choice]}</span><span>{qq.answers[choice]}</span></span>;
+  if (t === 'pic') return <span className={`chosen c-blue${big ? ' big' : ''}`} style={{ letterSpacing: '.12em' }}>{String(choice).toUpperCase()}</span>;
+  return <span className={`chosen ${ansCls(choice)}${t === 'code' ? ' mono' : ''}${big ? ' big' : ''}`}><span className="L">{t === 'tf' ? tfIco(choice, 20) : LETTERS[choice]}</span><span>{qq.answers[choice]}</span></span>;
 }
 
 export function PlayerAnswerArea({ qq, wide, typed, onType, onSubmitPic, onAnswer, showCode, onToggleCode }) {
@@ -111,7 +111,7 @@ export function HostAnswerArea({ qq }) {
 
 /* ---------- answer results ---------- */
 function QHead({ qq }) {
-  return <div className="card qcard" style={{ padding: '22px 28px' }}><TopicChip t={G.quiz.topic} /><h1 style={{ fontSize: 'clamp(24px,2.6vw,36px)' }}>{qq.text}</h1></div>;
+  return <div className="card qcard res"><TopicChip t={G.quiz.topic} /><h1>{qq.text}</h1></div>;
 }
 function PicAnswersBlock() {
   const qq = curQ(), total = G.players.length, vals = Object.values(G.answers);
@@ -122,8 +122,8 @@ function PicAnswersBlock() {
     <QHead qq={qq} />
     <div style={css('display:flex;flex-direction:column;align-items:center;gap:14px')}><PicsRow qq={qq} size={isWide() ? 110 : 76} /><div className="boxes reveal"><Boxes word={qq.word} mode="reveal" /></div></div>
     <div style={css('display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px')}>
-      <span className="chip chip-green" style={{ fontSize: 15, padding: '10px 16px' }}><b data-count={right} data-start="0" data-delay="1500" data-dur="600">0</b>&nbsp;of {total} guessed it</span>
-      <span style={{ color: 'var(--muted)', fontSize: 14 }}>Leaderboard in <Secs />s</span>
+      <span className="chip chip-green res-chip"><b data-count={right} data-start="0" data-delay="1500" data-dur="600">0</b>&nbsp;of {total} guessed it</span>
+      <span style={{ color: 'var(--muted)', fontSize: 15 }}>Time&apos;s up · Leaderboard in <Secs />s</span>
     </div>
     <div className="achart" style={{ '--n': 3, minHeight: 220 }}>
       {cols.map(([ci, label, n, ok, ic], k) => (
@@ -146,8 +146,8 @@ export function AnswersBlock() {
   return <>
     <QHead qq={qq} />
     <div style={css('display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px')}>
-      <span className="chip chip-green" style={{ fontSize: 15, padding: '10px 16px' }}><b data-count={right} data-start="0" data-delay="1500" data-dur="600">0</b>&nbsp;of {total} got it right</span>
-      <span style={{ color: 'var(--muted)', fontSize: 14 }}>Leaderboard in <Secs />s</span>
+      <span className="chip chip-green res-chip"><b data-count={right} data-start="0" data-delay="1500" data-dur="600">0</b>&nbsp;of {total} got it right</span>
+      <span style={{ color: 'var(--muted)', fontSize: 15 }}>Time&apos;s up · Leaderboard in <Secs />s</span>
     </div>
     <div className="achart" style={{ '--n': qq.answers.filter((a) => a.trim()).length }}>
       {qq.answers.map((a, i) => (a.trim() ? (
@@ -166,7 +166,7 @@ function LbRow({ p, i, extra, fl }) {
   const t = TEAMS[p.team];
   const attrs = fl ? { 'data-idx': fl.idx, 'data-from': fl.from, ...(fl.off ? { 'data-off': '1' } : {}) } : {};
   return (
-    <div className={`lb-row${p.id === 'me' ? ' me' : ''}`} style={{ '--c': t.solid, '--txt': t.txt }} {...attrs}>
+    <div className={`lb-row${p.id === 'me' ? ' me' : ''}${i < 3 ? ' top3' : ''}`} style={{ '--c': t.solid, '--txt': t.txt }} {...attrs}>
       {fl ? <span className="rk" data-rankfrom={fl.fromRank} data-rankto={i + 1}>{i + 1}</span> : <span className="rk">{i + 1}</span>}
       <Avatar p={p} size={44} />
       <span className="nm">{p.name}{p.id === 'me' && <You />}</span>
@@ -212,7 +212,7 @@ export function LbBlock({ forPlayer }) {
   return <>
     <div style={{ textAlign: 'center' }}>
       <div className="eyebrow">Correct answer · {correctLabel(qq)}</div>
-      <h1 style={{ fontSize: 'clamp(32px,4vw,56px)', marginTop: 6 }}>Leaderboard</h1>
+      <h1 className="lb-title" style={{ marginTop: 6 }}>Leaderboard</h1>
       <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 14 }}>After question {G.qi + 1} of {G.qs.length} · {last ? 'Team results' : 'Next question'} in <Secs />s</p>
     </div>
     <div className="lb">
@@ -232,41 +232,45 @@ export function LbBlock({ forPlayer }) {
 export function TeamsBlock() {
   const ts = teamStats(), win = ts[0];
   const shown = TEAM_KEYS.map((k) => ts.find((t) => t.key === k)).filter(Boolean);
-  const H = [300, 240, 190, 150];
+  const max = Math.max(1, ...ts.map((t) => t.avg));
   const step = 650, last = (ts.length - 1) * step;
   return <>
-    <div style={{ textAlign: 'center' }}><div className="eyebrow">Team results</div><h1 style={{ fontSize: 'clamp(36px,5vw,64px)', marginTop: 6 }}>Team <span style={{ color: TEAMS[win.key].solid }}>{TEAMS[win.key].name}</span> wins<span style={{ color: '#ea4335' }}>!</span></h1></div>
-    <div className="podium">
+    <div style={{ textAlign: 'center' }}><div className="eyebrow" style={{ letterSpacing: '.08em' }}>Team results</div><h1 className="big-title" style={{ marginTop: 6 }}>Team <span style={{ color: TEAMS[win.key].solid }}>{TEAMS[win.key].name}</span> wins<span style={{ color: '#34a853' }}>!</span></h1></div>
+    <div className="tgrid" style={{ '--n': shown.length }}>
       {shown.map((t) => {
         const r = ts.indexOf(t), T = TEAMS[t.key], d = (ts.length - 1 - r) * step;
+        const h = Math.max(120, Math.round(280 * t.avg / max));
         return (
-          <div key={t.key} className={`pod${t.key === 'yellow' ? ' yel' : ''}${r === 0 ? ' win' : ''}`} style={{ '--c': T.solid, '--d': `${d}ms`, '--cd': `${last + 1100}ms` }}>
-            {r === 0 && <span className="crown">{CROWN}</span>}
-            <Avatar p={{ team: t.key, img: mascot(t.key, 0) }} size={r ? 80 : 100} bw={4} />
-            <span className="nm">Team {T.name}</span><span className="pt">{t.count} player{t.count > 1 ? 's' : ''}</span>
-            <div className="blk" style={{ '--h': `${H[r]}px` }}><b>{r + 1}</b><span className="num"><Num to={Math.round(t.avg)} delay={d} dur={1200} /> avg</span></div>
+          <div key={t.key} className={`tcol${t.key === 'yellow' ? ' yel' : ''}${r === 0 ? ' win' : ''}`} style={{ '--c': T.solid, '--d': `${d}ms`, '--cd': `${last + 1100}ms` }}>
+            {r === 0 ? <span className="crown">{CROWN}</span> : <span className="spacer" />}
+            <Avatar p={{ team: t.key, img: mascot(t.key, 0) }} size={r ? 96 : 120} bw={6} />
+            <span className="nm">Team {T.name}</span>
+            <span className="pt">{t.count} player{t.count > 1 ? 's' : ''}</span>
+            <div className="tblk" style={{ '--h': `${h}px` }}><b>{r + 1}</b><span className="avg num"><Num to={Math.round(t.avg)} delay={d} dur={1200} /> avg</span></div>
           </div>
         );
       })}
     </div>
-    <p style={{ margin: 0, color: 'var(--muted)', fontSize: 14, textAlign: 'center' }}>Ranked by average points per player, so team size doesn&apos;t matter. Top 3 players next.</p>
+    <p style={{ margin: 0, color: 'var(--muted)', fontSize: 15, textAlign: 'center' }}>Ranked by average points per player, so team size doesn&apos;t matter. Top 3 players next.</p>
   </>;
 }
 export function PodiumBlock() {
-  const top = ranked().slice(0, 3), order = [1, 0, 2].filter((i) => top[i]), H = [320, 240, 180];
-  const D = [1500, 750, 0];
+  const top = ranked().slice(0, 3), order = [1, 0, 2].filter((i) => top[i]);
+  const H = [270, 200, 150], SZ = [168, 132, 120], BW = [7, 6, 6], D = [1500, 750, 0];
   return <>
-    <div style={{ textAlign: 'center' }}><div className="eyebrow">Final results</div><h1 style={{ fontSize: 'clamp(36px,5vw,64px)', marginTop: 6 }}>And the winners are<Bounce /></h1></div>
-    <div className="podium">
+    <div style={{ textAlign: 'center' }}><div className="eyebrow" style={{ letterSpacing: '.08em' }}>Final results</div><h1 className="big-title" style={{ marginTop: 6 }}>And the winners are<span style={{ color: '#34a853' }}>…</span></h1></div>
+    <div className="tgrid pgrid">
       {order.map((i) => {
         const p = top[i], T = TEAMS[p.team];
         return (
-          <div key={p.id} className={`pod${p.team === 'yellow' ? ' yel' : ''}${i === 0 ? ' win' : ''}`} style={{ '--c': T.solid, '--d': `${D[i]}ms`, '--cd': '2700ms' }}>
+          <div key={p.id} className={`tcol${p.team === 'yellow' ? ' yel' : ''}${i === 0 ? ' win' : ''}${i === 2 ? ' third' : ''}`} style={{ '--c': T.solid, '--d': `${D[i]}ms`, '--cd': '2700ms' }}>
             {i === 0 && <span className="crown">{CROWN}</span>}
-            <Avatar p={p} size={i ? 110 : 150} bw={5} />
-            <span className="nm">{p.name}{p.id === 'me' && <You />}</span>
-            <span className="pt num"><Num to={p.score} delay={D[i]} dur={1200} /> pts</span>
-            <div className="blk" style={{ '--h': `${H[i]}px` }}><b>{i + 1}</b><span>{ord(i + 1)}</span></div>
+            <Avatar p={p} size={SZ[i]} bw={BW[i]} />
+            <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 0, maxWidth: '100%' }}>
+              <span className="nm" style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}{p.id === 'me' && <You />}</span>
+              <span className="pt num"><Num to={p.score} delay={D[i]} dur={1200} /> pts</span>
+            </span>
+            <div className="tblk" style={{ '--h': `${H[i]}px` }}><b>{i + 1}</b><span className="lbl">{ord(i + 1)}</span></div>
           </div>
         );
       })}
@@ -278,7 +282,7 @@ export function FinalBlock({ action }) {
   const n = G.qs.length, all = ranked();
   return <>
     <div style={css('display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px')}>
-      <div><div className="eyebrow">Final results · {G.quiz.title}</div><h1 style={{ fontSize: 'clamp(32px,4vw,56px)', marginTop: 6 }}>Final leaderboard<span style={{ color: '#f9ab00' }}>.</span></h1></div>
+      <div><div className="eyebrow">Final results · {G.quiz.title}</div><h1 className="lb-title" style={{ marginTop: 6 }}>Final leaderboard<span style={{ color: '#f9ab00' }}>.</span></h1></div>
       {action}
     </div>
     <div className="final-grid" style={{ '--rows': Math.ceil(all.length / 2) }}>
@@ -298,49 +302,84 @@ export function FinalBlock({ action }) {
   </>;
 }
 
-/* ---------- 9:16 story card preview ---------- */
-export function Story({ kind }) {
-  const me = G.me, top = ranked().slice(0, 3), T = TEAMS[me.team], win = teamStats()[0];
-  const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  const head = <div className="sb"><Logo /><span>GDG KAU<b style={{ color: '#1a73e8' }}>HOOT</b><small>Google Developer Group · KAU</small></span></div>;
-  const foot = <>
-    <div className="foot"><span>@gdgteam_ · @gdgockau</span><b style={{ color: '#1f2328' }}>gdgkau.com</b></div>
-    <div className="stripe">{['#4285f4', '#ea4335', '#f9ab00', '#34a853'].map((c) => <span key={c} style={{ background: c }} />)}</div>
+/* ---------- 9:16 story card preview (designed at 540×960, scaled with cqw) ---------- */
+const u = (n) => `${(n / 5.4).toFixed(3)}cqw`;
+const SOFT = { blue: '#e8f0fe', red: '#fce8e6', yellow: '#fef7e0', green: '#e6f4ea' };
+function StoryHead() {
+  return <header style={{ position: 'relative', padding: `${u(40)} ${u(36)} 0`, display: 'flex', alignItems: 'center', gap: u(12) }}>
+    <span style={{ display: 'flex', width: u(64), height: u(36), flexShrink: 0 }}><Logo /></span>
+    <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.15 }}><b style={{ fontSize: u(22) }}>GDG KAU<span style={{ color: '#1a73e8' }}>HOOT</span></b><span style={{ fontSize: u(13), color: '#5f6570' }}>Google Developer Group · KAU</span></span>
+  </header>;
+}
+function StoryFoot({ pad = 24 }) {
+  return <>
+    <footer style={{ position: 'relative', padding: `${u(pad)} ${u(36)} ${u(24)}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: u(13), color: '#5f6570' }}><span>@gdgteam_ · @gdgockau</span><b style={{ color: '#1f2328', fontWeight: 600 }}>gdgkau.com</b></footer>
+    <div aria-hidden="true" style={{ display: 'flex', height: u(8) }}>{['#4285f4', '#ea4335', '#f9ab00', '#34a853'].map((c) => <span key={c} style={{ flex: 1, background: c }} />)}</div>
   </>;
+}
+const blob = (size, bg, pos) => <span aria-hidden="true" style={{ position: 'absolute', width: u(size), height: u(size), borderRadius: '50%', background: bg, ...Object.fromEntries(Object.entries(pos).map(([k, v]) => [k, u(v)])) }} />;
+const tag = (text) => <span style={{ alignSelf: 'flex-start', padding: `${u(6)} ${u(14)}`, borderRadius: 100, background: '#fff', border: '1px solid #e3e6eb', fontSize: u(13), fontWeight: 600 }}>{text}</span>;
+
+export function Story({ kind }) {
+  const me = G.me, all = ranked(), top = all.slice(0, 3), T = TEAMS[me.team], ts = teamStats(), win = ts[0];
+  const date = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const base = { position: 'relative', overflow: 'hidden', width: '100%', aspectRatio: '9 / 16', background: '#f8f9fe', color: '#1f2328', display: 'flex', flexDirection: 'column', borderRadius: '1.25rem', border: '1px solid #e3e6eb', boxShadow: '0 24px 48px -12px rgb(16 24 40 / .25)', fontFamily: "'Google Sans', 'Plus Jakarta Sans', system-ui, sans-serif" };
   if (kind === 'me') {
+    const teamRank = ts.findIndex((t) => t.key === me.team) + 1;
+    const stat = (big, small, extra = {}) => <div style={{ background: '#fff', border: '1px solid #e3e6eb', borderRadius: u(16), padding: `${u(12)} ${u(6)}`, display: 'flex', flexDirection: 'column', gap: u(2), ...extra }}><b style={{ fontSize: u(22), ...(extra.color ? { color: extra.color } : {}) }}>{big}</b><span style={{ fontSize: u(12), color: '#5f6570' }}>{small}</span></div>;
     return (
-      <div className="story"><span className="blob" style={{ width: 200, height: 200, background: T.softHex, top: -60, right: -70 }} />{head}
-        <span className="stag">{G.quiz.title} · {date}</span>
-        <div style={css('flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center')}>
-          <img src={me.img} alt="" className="s-av" style={{ borderColor: T.solid }} />
-          <b className="s-name">{me.name}</b>
-          <b className="s-rank" style={{ color: T.txtHex }}>{ord(rankOf(me))}</b>
-          <span className="s-sub">{fmt(me.score)} points · {me.correct}/{G.qs.length} correct</span>
-          <span className="s-team" style={{ background: T.softHex, color: T.txtHex }}>Team {T.name}</span>
-        </div>{foot}
+      <div style={base}>
+        {blob(380, SOFT[me.team], { top: 160, left: 80 })}{blob(300, '#e2ebfa', { top: -120, right: -120 })}{blob(260, '#e8f3ed', { bottom: 80, left: -140 })}
+        <StoryHead />
+        <main style={{ position: 'relative', flex: 1, padding: `${u(28)} ${u(36)} 0`, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: u(14), textAlign: 'center' }}>
+          <span style={{ alignSelf: 'center', padding: `${u(6)} ${u(14)}`, borderRadius: 100, background: '#fff', border: '1px solid #e3e6eb', fontSize: u(13), fontWeight: 600 }}>{G.quiz.title} · {date}</span>
+          <img src={me.img} alt="" style={{ width: u(200), height: u(200), borderRadius: '50%', objectFit: 'cover', background: '#fff', border: `${u(8)} solid ${T.solid}`, marginTop: u(10) }} />
+          <b style={{ fontSize: u(32), letterSpacing: '-.02em' }}>{me.name}</b>
+          <span style={{ display: 'flex', alignItems: 'baseline', gap: u(8) }}><b style={{ fontSize: u(88), letterSpacing: '-.05em', lineHeight: 1 }}>{ord(rankOf(me))}</b><span style={{ fontSize: u(20), color: '#5f6570' }}>of {all.length}</span></span>
+          <div style={{ width: '100%', display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: u(10), marginTop: u(6) }}>
+            {stat(fmt(me.score), 'points')}{stat(`${me.correct}/${G.qs.length}`, 'correct')}{stat(T.name, `team · ${ord(teamRank)}`, { background: SOFT[me.team], border: 0, color: T.txtHex })}
+          </div>
+        </main>
+        <div style={{ position: 'relative', margin: `${u(20)} ${u(28)} 0`, background: '#fff', border: '1px solid #e3e6eb', borderRadius: u(20), padding: `${u(14)} ${u(16)}`, display: 'flex', flexDirection: 'column', gap: u(10) }}>
+          <span style={{ fontSize: u(12), fontWeight: 600, color: '#5f6570', letterSpacing: '.06em' }}>TOP 3{win ? ` · TEAM ${TEAMS[win.key].name.toUpperCase()} WON` : ''}</span>
+          <div style={{ display: 'flex', gap: u(10) }}>{top.map((p, i) => (
+            <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: u(8), flex: '1 1 0', minWidth: 0 }}><b style={{ fontSize: u(14), color: TEAMS[p.team].txtHex }}>{i + 1}</b><img src={p.img} alt="" style={{ width: u(32), height: u(32), flexShrink: 0, borderRadius: '50%', objectFit: 'cover', background: '#fff', border: `${u(2)} solid ${TEAMS[p.team].solid}` }} /><span style={{ fontSize: u(13), fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span></div>
+          ))}</div>
+        </div>
+        <StoryFoot pad={20} />
       </div>
     );
   }
   const order = [1, 0, 2].filter((i) => top[i]);
-  const hts = [36, 26, 20];
+  const AV = [118, 96, 88], NM = [20, 17, 17], HT = [240, 170, 120], NUM = [52, 40, 40];
   return (
-    <div className="story"><span className="blob" style={{ width: 200, height: 200, background: '#e2ebfa', top: -60, right: -70 }} />{head}
-      <span className="stag">{G.quiz.title} · {date}</span>
-      <b className="s-title">Top 3<span style={{ color: '#ea4335' }}>.</span></b>
-      <div style={css('flex:1;display:flex;align-items:flex-end;justify-content:center;gap:6px')}>
+    <div style={base}>
+      {blob(360, '#e2ebfa', { top: -120, right: -120 })}{blob(300, '#e8f3ed', { top: 300, left: -170 })}{blob(260, '#f8e8e9', { top: 420, right: -150 })}{blob(280, '#fcf0d6', { bottom: 60, left: -120 })}
+      <StoryHead />
+      <div style={{ position: 'relative', padding: `${u(36)} ${u(36)} 0`, display: 'flex', flexDirection: 'column', gap: u(10) }}>
+        {tag(`${G.quiz.title} · ${date}`)}
+        <b style={{ fontSize: u(58), letterSpacing: '-.045em', lineHeight: 1 }}>Top 3<span style={{ color: '#ea4335' }}>.</span></b>
+        <div aria-hidden="true" style={{ display: 'flex', gap: u(6), width: u(120), height: u(5) }}>{['#4285f4', '#ea4335', '#f9ab00', '#34a853'].map((c) => <span key={c} style={{ flex: 1, background: c, borderRadius: 4 }} />)}</div>
+      </div>
+      <div style={{ position: 'relative', flex: 1, padding: `0 ${u(28)}`, display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: u(12), alignItems: 'end' }}>
         {order.map((i) => {
           const p = top[i], t = TEAMS[p.team];
           return (
-            <div key={p.id} style={css('flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:3px')}>
-              <img src={p.img} alt="" className={i ? 's-pav' : 's-pav first'} style={{ borderColor: t.solid }} />
-              <b className="s-pn">{p.name}</b><span className="s-ps">{fmt(p.score)}</span>
-              <div className="s-blk" style={{ height: `${hts[i]}cqw`, background: t.solid, color: p.team === 'yellow' ? '#1f2328' : '#fff' }}>{i + 1}</div>
+            <div key={p.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: u(8), minWidth: 0 }}>
+              {i === 0 && <svg aria-hidden="true" style={{ width: u(40), height: u(28) }} viewBox="0 0 56 40" fill="#f9ab00" stroke="#1f2328" strokeWidth="2.5" strokeLinejoin="round"><path d="M4 12l12 10L28 4l12 18 12-10-4 24H8z" /></svg>}
+              <img src={p.img} alt="" style={{ width: u(AV[i]), height: u(AV[i]), borderRadius: '50%', objectFit: 'cover', background: '#fff', border: `${u(5)} solid ${t.solid}` }} />
+              <b style={{ fontSize: u(NM[i]), maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</b>
+              <span style={{ fontSize: u(14), fontWeight: 600, color: '#5f6570' }}>{fmt(p.score)}</span>
+              <div style={{ width: '100%', height: u(HT[i]), borderRadius: `${u(20)} ${u(20)} 0 0`, background: t.solid, color: p.team === 'yellow' ? '#1f2328' : '#fff', display: 'flex', justifyContent: 'center', paddingTop: u(14), boxSizing: 'border-box', fontSize: u(NUM[i]), fontWeight: 700 }}>{i + 1}</div>
             </div>
           );
         })}
       </div>
-      {win && <div className="s-win"><b>Team <span style={{ color: TEAMS[win.key].solid }}>{TEAMS[win.key].name}</span> wins!</b><br /><span>{G.players.length} players · {G.qs.length} questions</span></div>}
-      {foot}
+      <div style={{ position: 'relative', margin: `0 ${u(28)}`, background: '#fff', borderRadius: `0 0 ${u(20)} ${u(20)}`, border: '1px solid #e3e6eb', borderTop: 0, padding: `${u(16)} ${u(18)}`, display: 'flex', alignItems: 'center', gap: u(12) }}>
+        {win && <img src={mascot(win.key, 1)} alt="" style={{ width: u(44), height: u(44), flexShrink: 0, borderRadius: '50%', objectFit: 'cover', background: '#fff', border: `${u(3)} solid ${TEAMS[win.key].solid}` }} />}
+        <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.3 }}>{win && <b style={{ fontSize: u(16) }}>Team <span style={{ color: TEAMS[win.key].solid }}>{TEAMS[win.key].name}</span> wins!</b>}<span style={{ fontSize: u(13), color: '#5f6570' }}>{G.players.length} players · {G.qs.length} questions</span></span>
+      </div>
+      <StoryFoot />
     </div>
   );
 }

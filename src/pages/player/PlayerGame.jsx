@@ -6,7 +6,7 @@ import { qType, norm } from '../../lib/questions';
 import { G, UI, answer, curQ, hosted, rankOf } from '../../lib/engine';
 import { notify, useAppState } from '../../lib/store';
 import { toast, useAnims, useWide } from '../../lib/ui';
-import { Bounce, Brand, Ico, LiveBar, LiveRing, MePill, Secs, Count, Answered } from '../../components/common/UI';
+import { Bounce, Ico, LiveBar, LiveRing, MePill, Secs, Count, Answered } from '../../components/common/UI';
 import { AnswersBlock, Boxes, ChosenPill, FinalBlock, LbBlock, PlayerAnswerArea, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
 import { LapShell, PShell } from '../../components/layout/Shells';
 import GameOver from './GameOver';
@@ -64,29 +64,31 @@ function PlayerView() {
   const me = G.me, qq = curQ(), n = G.qs.length;
   const qLabel = qq ? `Question ${G.qi + 1} of ${n}` : '';
   const T = TEAMS[me.team];
-  const av = (size, extra) => <span style={{ position: 'relative', display: 'inline-flex' }}><img className="avatar" src={me.img} alt="" width={size} height={size} style={{ '--team': T.solid, borderWidth: size > 100 ? 6 : 4 }} />{extra}</span>;
-  const ringCount = <LiveRing size={wide ? 170 : 140} stroke={12} color="#1a73e8"><span style={{ fontSize: wide ? 72 : 60, color: '#1a73e8' }}><Count /></span></LiveRing>;
+  const av = (size, extra) => <span style={{ position: 'relative', display: 'inline-flex' }}><img className="avatar" src={me.img} alt="" width={size} height={size} style={{ '--team': T.solid, borderWidth: size > 100 ? 7 : 4 }} />{extra}</span>;
+  const ringCount = <LiveRing size={wide ? 150 : 140} stroke={12} color="#1a73e8"><span style={{ fontSize: wide ? 72 : 60, color: '#1a73e8' }}><Count /></span></LiveRing>;
   const shell = (children, opts = {}) => <PShell wide={wide} {...opts}>{children}</PShell>;
+  /* centred state screens on a laptop: narrow column with a soft glow behind the mascot */
+  const stateOpts = (glow, extra = {}) => ({ center: true, main: 'state', glow: wide ? glow : undefined, ...extra });
 
   switch (G.phase) {
     case 'lobby':
       return shell(
         <div className="center-col">
           {av(wide ? 170 : 140)}
-          <h1 style={{ fontSize: wide ? 52 : 38 }}>You&apos;re in<span style={{ color: '#34a853' }}>!</span></h1>
+          <h1 style={{ fontSize: wide ? 60 : 38 }}>You&apos;re in<span style={{ color: '#34a853' }}>!</span></h1>
           <p style={css('margin:0;color:var(--muted);font-size:18px;max-width:30rem')}>Your nickname is on the host screen. Waiting for the host to start the game<Bounce /></p>
           <span className={`chip chip-${me.team}`}>Team {T.name}</span>
           <Link className="btn btn-outline" to={`/host/${G.quiz.id}`}>Open the host screen to start</Link>
-        </div>, { center: true });
+        </div>, stateOpts(TEAMS[me.team].bright));
     case 'ready':
       return shell(
         <div className="center-col">
           <span className="chip">Question 1 of {n}</span>
-          {av(wide ? 150 : 110)}
+          {av(wide ? 170 : 110)}
           <h1 style={{ fontSize: wide ? 64 : 40 }}>Get ready<span style={{ color: '#ea4335' }}>!</span></h1>
           <div>{ringCount}</div>
-          <p style={css('margin:0;color:var(--muted)')}>Your answer buttons appear here in a moment.{wide ? ' Keys 1–4 work too.' : ''}</p>
-        </div>, { bg: 'var(--bg)', center: true });
+          <p style={css('margin:0;color:var(--muted)')} className={wide ? 'lead18' : ''}>{wide ? 'Look at the big screen. Your answer buttons appear here in a moment. Keys 1–4 work too.' : 'Your answer buttons appear here in a moment.'}</p>
+        </div>, stateOpts('#4285f4'));
     case 'question': {
       if (!G.answers.me) {
         const T2 = qType(qq), qimg = qq.img && (T2 === 'mc' || T2 === 'tf');
@@ -94,25 +96,23 @@ function PlayerView() {
         const area = <PlayerAnswerArea qq={qq} wide={wide} typed={typed} onType={setTyped} onSubmitPic={submitPic} onAnswer={(i) => answer('me', i)} showCode={showCode ?? !hosted()} onToggleCode={() => setShowCode(!(showCode ?? !hosted()))} />;
         if (wide) {
           return (
-            <LapShell right={<MePill p={me} />}>
-              <div style={css('display:flex;justify-content:space-between;align-items:center;gap:16px')}><span className="chip">{qLabel}</span><span style={css('display:flex;align-items:center;gap:12px;width:260px')}><span className="bar"><LiveBar /></span><b className="num" style={{ fontSize: 22 }}><Secs />s</b></span></div>
-              <div className="card" style={css('padding:28px 32px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px')}><h1 style={{ fontSize: 'clamp(28px,3vw,40px)' }}>{qq.text}</h1>{qimg && <img src={qq.img} alt="" style={css('max-height:180px;max-width:100%;border-radius:1rem')} />}</div>
+            <LapShell right={<MePill p={me} />} main="q">
+              <div style={css('display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:16px')}><span className="chip" style={css('font-size:14px;padding:8px 16px')}>{qLabel}</span><span style={css('display:flex;align-items:center;gap:12px')}><span className="tbar"><LiveBar /></span><b className="num" style={{ fontSize: 22 }}><Secs />s</b></span></div>
+              <div className="card lap-q" style={css('text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px')}><h1>{qq.text}</h1>{qimg && <img src={qq.img} alt="" style={css('max-height:180px;max-width:100%;border-radius:1rem')} />}</div>
               {area}
-              <div style={css('display:flex;justify-content:space-between;color:var(--muted);font-size:14px')}><span>{tip}</span><b className="num" style={{ color: 'var(--ink)' }}>{fmt(me.score)} pts</b></div>
+              <div style={css('display:flex;justify-content:space-between;color:var(--muted);font-size:14px')}><span>{tip}</span><b className="num" style={{ color: 'var(--ink)', fontWeight: 600 }}>{fmt(me.score)} pts</b></div>
             </LapShell>
           );
         }
         return (
-          <div className="pl">
-            <header className="pl-head"><div className="in"><Brand /><span className="chip">Q{G.qi + 1} of {n}</span></div></header>
-            <main className="pl-in">
-              <div className="pl-top" style={{ minHeight: 0 }}><span style={{ fontSize: 14, color: 'var(--muted)' }}>{T2 === 'pic' ? 'Guess the word' : T2 === 'tf' ? 'True or false?' : 'Pick an answer'}</span><span className="chip chip-blue"><Ico n="clock" /><span><Secs />s</span></span></div>
-              <h1 style={css('font-size:22px;line-height:1.35;font-weight:600')}>{qq.text}</h1>
+          <div className="pq">
+            <div className="pq-top"><span className="chip" style={css('font-size:13px;padding:6px 14px')}>Q{G.qi + 1} of {n}</span><span className="chip chip-blue" style={css('font-size:13px;padding:6px 14px')}><Ico n="clock" s={14} /><span><Secs />s</span></span></div>
+            <p className="pq-text">{qq.text}</p>
+            <main className="pq-main">
               {qimg && <img src={qq.img} alt="" style={css('max-height:160px;max-width:100%;border-radius:1rem;align-self:center')} />}
-              <div className="bar" style={{ height: 6 }}><LiveBar /></div>
               {area}
             </main>
-            <footer className="pl-foot"><div className="in"><span>{me.name}</span><span className="num">{fmt(me.score)} pts</span></div></footer>
+            <footer className="pq-foot"><span>{me.name}</span><span className="num" style={{ fontWeight: 700 }}>{fmt(me.score)} pts</span></footer>
           </div>
         );
       }
@@ -120,31 +120,31 @@ function PlayerView() {
       return shell(
         <div className="center-col">
           <span className="chip">{qLabel}</span>
-          {av(wide ? 150 : 130)}
-          <h1 style={{ fontSize: wide ? 56 : 40, display: 'flex', alignItems: 'baseline' }}>Waiting<Bounce /></h1>
-          <ChosenPill qq={qq} choice={a.choice} />
-          <p style={css('margin:0;color:var(--muted)')}>Waiting for the others… <b style={{ color: 'var(--ink)' }}><Answered /></b> / {G.players.length} answered</p>
-          <div style={css('display:flex;align-items:center;gap:12px;width:220px')}><div className="bar"><LiveBar /></div><span className="num" style={css('color:var(--muted);font-size:14px')}><Secs />s</span></div>
-          <p style={css('margin:0;font-size:13px;color:var(--muted)')}>The answer shows when time is up.</p>
-        </div>, { center: true });
+          {av(wide ? 170 : 130)}
+          <h1 style={{ fontSize: wide ? 60 : 40, display: 'flex', alignItems: 'baseline' }}>Waiting<Bounce /></h1>
+          <ChosenPill qq={qq} choice={a.choice} big={wide} />
+          <p style={css('margin:0;color:var(--muted)')} className={wide ? 'lead18' : ''}>Waiting for the others… <b style={{ color: 'var(--ink)' }}><Answered /></b> / {G.players.length} answered</p>
+          <div style={css('display:flex;align-items:center;gap:12px')}><div className="tbar"><LiveBar /></div><span className="num" style={css('color:var(--muted);font-size:16px;font-weight:600')}><Secs />s</span></div>
+          <p style={css('margin:0;font-size:15px;color:var(--muted)')}>{wide ? 'Look at the big screen. The answer shows when time is up.' : 'The answer shows when time is up.'}</p>
+        </div>, stateOpts(TEAMS[me.team].bright));
     }
     case 'reveal': {
       const L = me.last || { ok: false, choice: null, pts: 0 }, ok = L.ok, timeUp = !ok && L.choice === null;
       const col = ok ? '#188038' : timeUp ? '#f9ab00' : '#d93025';
-      const s = wide ? 52 : 44;
-      const badge = <span style={{ position: 'absolute', right: -6, bottom: -6, width: s, height: s, borderRadius: '50%', background: col, color: timeUp ? '#1f2328' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '4px solid var(--bg)' }}><Ico n={ok ? 'check' : timeUp ? 'hourglass' : 'x'} s={wide ? 26 : 22} /></span>;
+      const s = wide ? 60 : 44;
+      const badge = <span className="state-badge" style={{ width: s, height: s, background: col, color: timeUp ? '#1f2328' : '#fff', bottom: wide ? 6 : -6 }}><Ico n={ok ? 'check' : timeUp ? 'hourglass' : 'x'} s={wide ? 30 : 22} /></span>;
       return shell(
         <div className="center-col">
           <span className="chip">{qLabel}</span>
-          {av(wide ? 150 : 130, badge)}
+          {av(wide ? 180 : 130, badge)}
           <h1 style={{ fontSize: wide ? 64 : 42, color: ok ? 'var(--green-txt)' : timeUp ? 'var(--yellow-txt)' : 'var(--red-txt)' }}>{ok ? 'Correct!' : timeUp ? "Time's up!" : 'Not quite!'}</h1>
           {timeUp && <p style={css('margin:-8px 0 0;color:var(--muted)')}>No answer this time. Be quicker on the next one!</p>}
           {ok
             ? <div style={css('display:flex;flex-wrap:wrap;gap:10px;justify-content:center')}><span className="pts-pill num">+{fmt(L.pts)} points</span>{me.streak > 1 && <span className="pts-pill" style={css('font-size:16px;display:flex;align-items:center;gap:6px;color:var(--green-txt)')}><Ico n="flame" />Streak: {me.streak}</span>}</div>
             : <><span style={{ color: 'var(--muted)' }}>The answer was</span>{qType(qq) === 'pic' ? <div className="boxes reveal"><Boxes word={qq.word} mode="reveal" /></div> : <ChosenPill qq={qq} choice={qq.correct} />}</>}
-          <div className="stat-card" style={{ width: 'min(380px,100%)' }}><div style={{ textAlign: 'left' }}><small>Your rank</small><strong>{ord(rankOf(me))} place</strong></div><div style={{ textAlign: 'right' }}><small>Total</small><strong className="num">{fmt(me.score)}</strong></div></div>
-          <p style={css('margin:0;font-size:13px;color:var(--muted)')}>{hosted() ? 'Answers on the host screen · leaderboard' : 'Answer results'} in <Secs />s</p>
-        </div>, { bg: ok ? 'var(--green-soft)' : timeUp ? 'var(--yellow-soft)' : 'var(--red-soft)', center: true });
+          <div className={`stat-card${wide ? ' big' : ''}`} style={{ width: 'min(380px,100%)', ...(wide ? { width: '100%' } : {}) }}><div style={{ textAlign: 'left' }}><small>Your rank</small><strong>{ord(rankOf(me))} place</strong></div><div style={{ textAlign: 'right' }}><small>Total</small><strong className="num">{fmt(me.score)}</strong></div></div>
+          <p style={css('margin:0;font-size:13px;color:var(--muted)')}>{wide ? 'Look at the big screen for the leaderboard.' : <>{hosted() ? 'Answers on the host screen · leaderboard' : 'Answer results'} in <Secs />s</>}</p>
+        </div>, stateOpts(ok ? '#34a853' : timeUp ? '#f9ab00' : '#ea4335', { bg: ok ? 'var(--green-soft)' : timeUp ? 'var(--yellow-soft)' : 'var(--red-soft)' }));
     }
     case 'answers':
       return shell(<AnswersBlock />, { phoneRight: <span className="chip">Q{G.qi + 1} of {n}</span> });
@@ -152,11 +152,11 @@ function PlayerView() {
       return shell(
         <div className="center-col">
           <span className="chip">Question {G.qi + 2} of {n}</span>
-          {av(wide ? 130 : 100)}
+          {av(wide ? 170 : 100)}
           <h1 style={{ fontSize: wide ? 64 : 40 }}>Next question<span style={{ color: '#ea4335' }}>!</span></h1>
           <div>{ringCount}</div>
           <p style={css('margin:0;color:var(--muted)')}>You&apos;re {ord(rankOf(me))} with {fmt(me.score)} points. Get ready!</p>
-        </div>, { bg: 'var(--bg)', center: true });
+        </div>, stateOpts('#4285f4'));
     case 'leaderboard':
       return shell(<LbBlock forPlayer />, { phoneRight: <span className="chip">After Q{G.qi + 1} of {n}</span> });
     case 'teams':

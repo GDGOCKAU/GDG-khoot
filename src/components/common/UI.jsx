@@ -19,8 +19,8 @@ export function Brand({ sub }) {
   return <span className="brand"><Logo /><span>GDG KAU<b>HOOT</b>{sub ? <small>{sub}</small> : null}</span></span>;
 }
 const G4 = ['#4285f4', '#ea4335', '#f9ab00', '#34a853'];
-export function ColorBar({ h = 4 }) {
-  return <div className="colorbar" style={{ height: h }}>{G4.map((c) => <span key={c} style={{ background: c }} />)}</div>;
+export function ColorBar({ h = 4, gaps }) {
+  return <div className={`colorbar${gaps ? ' gaps' : ''}`} style={{ height: h }}>{G4.map((c) => <span key={c} style={{ background: c }} />)}</div>;
 }
 export function Dots() { return <span className="dots-g" aria-hidden="true">{G4.map((c) => <i key={c} style={{ background: c }} />)}</span>; }
 export function Bounce() { return <span className="bounce" aria-hidden="true">{G4.map((c) => <i key={c} style={{ background: c }} />)}</span>; }

@@ -23,7 +23,7 @@ function AdminDashboard() {
     <AdminShell>
       <div className="adm-head">
         <div><h1>Dashboard<span style={{ color: '#ea4335' }}>.</span></h1><p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>Create quizzes and host live games for GDG KAU events.</p></div>
-        <Link className="btn btn-primary" to="/admin/new"><Ico n="plus" />Create quiz</Link>
+        <Link className="btn btn-primary dash-new" to="/admin/new"><Ico n="plus" /><span className="full">Create quiz</span><span className="short">New quiz</span></Link>
       </div>
       <div className="stats">
         <div className="card stat" style={{ '--c': '#4285f4' }}><b className="num">{DB.quizzes.length}</b><span>Quizzes</span></div>
@@ -61,6 +61,19 @@ function AdminDashboard() {
             )) : <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)', padding: 32 }}>No quizzes match.</td></tr>}
           </tbody>
         </table></div>
+        <div className="qcards">
+          {list.length ? list.map((x) => (
+            <article key={x.id} className="qcard-m">
+              <div className="r1"><h3>{x.title || 'Untitled quiz'}</h3>{x.status === 'ready' ? <span className="status" style={{ color: 'var(--green-txt)' }}>Ready</span> : <span className="status" style={{ color: 'var(--muted)' }}>Draft</span>}</div>
+              <div className="r2"><TopicChip t={x.topic} />{x.questions.length} questions · Last hosted {x.lastHosted ? new Date(x.lastHosted).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Never'}</div>
+              <div className="r3">
+                {x.status === 'ready'
+                  ? <><Link className="btn btn-outline btn-sm" to={`/admin/edit/${x.id}`}>Edit</Link><Link className="btn btn-primary btn-sm" to={`/host/${x.id}`}>Host live</Link></>
+                  : <Link className="btn btn-outline btn-sm" to={`/admin/edit/${x.id}`}>Continue editing</Link>}
+              </div>
+            </article>
+          )) : <p style={{ margin: 0, textAlign: 'center', color: 'var(--muted)', padding: 24 }}>No quizzes match.</p>}
+        </div>
       </section>
     </AdminShell>
   );
