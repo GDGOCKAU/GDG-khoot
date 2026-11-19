@@ -1,8 +1,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import Devu from "../../components/common/Devu";
 import "./PlayerGame.css";
+import ThemeToggle from "../../components/common/ThemeToggle";
 
 const questions = [
   {
@@ -30,23 +30,11 @@ const questions = [
   },
 ];
 
-const answerColors = ["blue", "red", "yellow", "green"];
+const answerColors = ["red", "blue", "green", "yellow"];
+const answerShapes = ["triangle", "diamond", "circle", "square"];
 
 function PlayerGame() {
   const { gameId } = useParams();
-
-  const nickname = localStorage.getItem("gdgNickname") || "Guest Player";
-
-  let savedAvatar = { color: "blue", number: 1 };
-
-  try {
-    savedAvatar = JSON.parse(
-      localStorage.getItem("gdgAvatar") ||
-        '{"color":"blue","number":1}'
-    );
-  } catch {
-    savedAvatar = { color: "blue", number: 1 };
-  }
 
   const [questionIndex, setQuestionIndex] = useState(0);
   const [phase, setPhase] = useState("countdown");
@@ -57,11 +45,9 @@ function PlayerGame() {
   const [pointsEarned, setPointsEarned] = useState(0);
 
   const currentQuestion = questions[questionIndex];
+  const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
 
-  const isCorrect =
-    selectedAnswer === currentQuestion.correctAnswer;
-
-  // Countdown before the question
+  // Countdown before each question
   useEffect(() => {
     if (phase !== "countdown") return;
 
@@ -77,7 +63,7 @@ function PlayerGame() {
     return () => clearTimeout(timer);
   }, [phase, countdown]);
 
-  // Question timer
+  // Question timer continues while the player waits
   useEffect(() => {
     if (phase !== "question" && phase !== "waiting") return;
 
@@ -93,13 +79,12 @@ function PlayerGame() {
     return () => clearTimeout(timer);
   }, [phase, timeLeft]);
 
-  // Calculate points when the answer is revealed
+  // Calculate the player's points when the answer is revealed
   useEffect(() => {
     if (phase !== "reveal") return;
 
     if (selectedAnswer === currentQuestion.correctAnswer) {
       const earned = Math.max(100, timeLeft * 50);
-
       setPointsEarned(earned);
       setScore((previous) => previous + earned);
     } else {
@@ -130,66 +115,58 @@ function PlayerGame() {
     setPhase("countdown");
   }
 
-  const progress =
-    (timeLeft / currentQuestion.timeLimit) * 100;
+  const progress = (timeLeft / currentQuestion.timeLimit) * 100;
+  const gamePin = gameId || "------";
 
   return (
     <main className={`player-game-page phase-${phase}`}>
       <header className="player-game-header">
-        <div className="player-game-brand">
-          GDG KAU <strong>Quiz</strong>
-        </div>
+  <div className="player-game-brand">
+    <span className="brand-mark" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+      <i />
+    </span>
+    <span>
+      GDG KAU<span className="brand-blue">HOOT</span>
+    </span>
+  </div>
 
-        <div className="player-profile">
-          <Devu
-            color={savedAvatar.color}
-            number={savedAvatar.number}
-            size={42}
-          />
-          <span>{nickname}</span>
-        </div>
-      </header>
+  <div className="player-game-header-actions">
+    <div className="player-game-meta">
+      {/* Keep your existing PIN, question count, and timer JSX here */}
+    </div>
+
+    <ThemeToggle />
+  </div>
+</header>
 
       <section className="player-game-content">
-
-        {/* Countdown */}
         {phase === "countdown" && (
           <div className="player-countdown-screen">
-            <span className="player-question-label">
-              Question {questionIndex + 1} of {questions.length}
+            <span className="player-eyebrow">
+              QUESTION {questionIndex + 1} OF {questions.length}
             </span>
 
-            <Devu
-              color={savedAvatar.color}
-              number={savedAvatar.number}
-              size={150}
-            />
-
             <h1>Get ready!</h1>
+            <p>Look at the screen and get ready to answer.</p>
 
             <div className="countdown-circle">
               {countdown > 0 ? countdown : "GO!"}
             </div>
 
-            <p>Your answer buttons will appear in a moment.</p>
+            <div className="countdown-dots" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+              <i />
+            </div>
           </div>
         )}
 
-        {/* Question and waiting screen */}
         {(phase === "question" || phase === "waiting") && (
           <div className="player-question-screen">
-
-            <div className="player-question-top">
-              <span className="player-question-label">
-                Question {questionIndex + 1} of {questions.length}
-              </span>
-
-              <div className="player-timer">
-                <span>{timeLeft}</span>
-                <small>SEC</small>
-              </div>
-            </div>
-
             <div className="player-progress-track">
               <div
                 className="player-progress-fill"
@@ -197,11 +174,14 @@ function PlayerGame() {
               />
             </div>
 
-            <div className="player-question-card">
-              <span className="player-question-type">
-                MULTIPLE CHOICE
+            <div className="player-question-heading">
+              <span className="player-eyebrow">YOUR QUESTION</span>
+              <span className="player-question-number">
+                QUESTION {questionIndex + 1}
               </span>
+            </div>
 
+            <div className="player-question-card">
               <h1>{currentQuestion.text}</h1>
             </div>
 
@@ -210,43 +190,55 @@ function PlayerGame() {
                 <div className="player-answer-grid">
                   {currentQuestion.answers.map((answer, index) => (
                     <button
-                      key={index}
+                      key={`${questionIndex}-${index}`}
+                      type="button"
                       className={`player-answer-button ${answerColors[index]}`}
                       onClick={() => handleAnswer(index)}
                     >
-                      <span className="answer-letter">
-                        {String.fromCharCode(65 + index)}
-                      </span>
-
-                      <span>{answer}</span>
+                      <span
+                        className={`answer-shape ${answerShapes[index]}`}
+                        aria-hidden="true"
+                      />
+                      <span className="answer-text">{answer}</span>
                     </button>
                   ))}
                 </div>
 
                 <p className="player-game-tip">
-                  Choose your answer before time runs out!
+                  Choose your answer before the timer runs out.
                 </p>
               </>
             ) : (
               <div className="player-waiting-screen">
-                <div className="waiting-spinner" />
+                <div className="waiting-animation" aria-hidden="true">
+  <div className="orbit-ring">
+    <span className="orbit-shape triangle" />
+    <span className="orbit-shape diamond" />
+    <span className="orbit-shape circle" />
+    <span className="orbit-shape square" />
+  </div>
+
+  <div className="orbit-center">?</div>
+</div>
 
                 <h2>Answer submitted!</h2>
-
-                <p>Waiting for the time to run out...</p>
+                <p>Your answer has been locked in.</p>
 
                 <div className="player-selected-answer">
-                  Your answer:{" "}
+                  <span>YOUR ANSWER</span>
                   <strong>
                     {currentQuestion.answers[selectedAnswer]}
                   </strong>
                 </div>
+
+                <p className="waiting-note">
+                  Waiting for the question to finish...
+                </p>
               </div>
             )}
           </div>
         )}
 
-        {/* Answer reveal */}
         {phase === "reveal" && (
           <div
             className={`player-feedback-screen ${
@@ -257,100 +249,79 @@ function PlayerGame() {
                   : "incorrect"
             }`}
           >
-            <Devu
-              color={savedAvatar.color}
-              number={savedAvatar.number}
-              size={130}
-            />
+            <span className="player-eyebrow">QUESTION {questionIndex + 1}</span>
 
-            {selectedAnswer === null ? (
-              <>
-                <span className="feedback-icon">⏰</span>
+            <div className="feedback-icon">
+              {selectedAnswer === null ? "⌛" : isCorrect ? "✓" : "✕"}
+            </div>
 
-                <h1>Time's up!</h1>
+            <h1>
+              {selectedAnswer === null
+                ? "Time's up!"
+                : isCorrect
+                  ? "Correct!"
+                  : "Not quite!"}
+            </h1>
 
-                <p>You didn't submit an answer.</p>
-              </>
-            ) : isCorrect ? (
-              <>
-                <span className="feedback-icon">✓</span>
-
-                <h1>Correct!</h1>
-
-                <p>Great job! You got the right answer.</p>
-
-                <div className="points-earned">
-                  +{pointsEarned} points
-                </div>
-              </>
-            ) : (
-              <>
-                <span className="feedback-icon">✕</span>
-
-                <h1>Not quite!</h1>
-
-                <p>Better luck on the next question.</p>
-              </>
-            )}
+            <p>
+              {selectedAnswer === null
+                ? "You didn't submit an answer."
+                : isCorrect
+                  ? "Great job! You got the right answer."
+                  : "Keep going. There's another question ahead!"}
+            </p>
 
             <div className="correct-answer-card">
-              <span>THE CORRECT ANSWER</span>
-
+              <span>CORRECT ANSWER</span>
               <strong>
                 {currentQuestion.answers[currentQuestion.correctAnswer]}
               </strong>
             </div>
 
-            <div className="player-score-card">
-              <span>Your total score</span>
+            {selectedAnswer !== null && isCorrect && (
+              <div className="points-earned">+{pointsEarned} points</div>
+            )}
 
+            <div className="player-score-card">
+              <span>YOUR TOTAL SCORE</span>
               <strong>{score.toLocaleString()} pts</strong>
             </div>
 
             <button
+              type="button"
               className="player-next-button"
               onClick={handleNextQuestion}
             >
               {questionIndex === questions.length - 1
                 ? "View my results"
                 : "Next question"}
+              <span aria-hidden="true">→</span>
             </button>
           </div>
         )}
 
-        {/* Final results */}
         {phase === "final" && (
           <div className="player-final-screen">
-            <Devu
-              color={savedAvatar.color}
-              number={savedAvatar.number}
-              size={160}
-            />
+            <div className="final-trophy" aria-hidden="true">★</div>
 
-            <span className="player-question-label">
-              QUIZ COMPLETED
-            </span>
-
+            <span className="player-eyebrow">QUIZ COMPLETED</span>
             <h1>Well played!</h1>
-
-            <p>You have completed all the questions.</p>
+            <p>You've completed all the questions.</p>
 
             <div className="player-final-score">
-              <span>Your final score</span>
-
+              <span>YOUR FINAL SCORE</span>
               <strong>{score.toLocaleString()}</strong>
-
               <small>POINTS</small>
             </div>
 
             <p className="player-final-message">
-              Thanks for playing!
+              Thanks for playing GDG KAUHOOT!
             </p>
           </div>
         )}
       </section>
 
-      <footer className="player-game-footer">
+      <footer className="player-game-footer" aria-hidden="true">
         <span />
         <span />
         <span />

@@ -482,22 +482,22 @@
    DARK MODE
 ======================================== */
 
-html.dark .team-blue {
+[data-theme="dark"] .team-blue {
   background: #1a365d;
   color: #8ab4f8;
 }
 
-html.dark .team-red {
+[data-theme="dark"] .team-red {
   background: #5f2120;
   color: #f28b82;
 }
 
-html.dark .team-yellow {
+[data-theme="dark"] .team-yellow {
   background: #594719;
   color: #fdd663;
 }
 
-html.dark .team-green {
+[data-theme="dark"] .team-green {
   background: #174b2b;
   color: #81c995;
 }

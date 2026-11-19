@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
 import Devu from "../../components/common/Devu";
+import ThemeToggle from "../../components/common/ThemeToggle";
 import "./AdminHostLobby.css";
 
 const mockPlayers = [
@@ -22,6 +23,7 @@ function AdminHostLobby() {
 
   const gamePin = "482916";
   const joinUrl = `http://192.168.3.29:5173/join/${quizId}`;
+
   async function copyText(text, label) {
     try {
       await navigator.clipboard.writeText(text);
@@ -47,13 +49,15 @@ function AdminHostLobby() {
     <div className="host-lobby-page">
       <header className="host-header">
         <Link to="/admin" className="host-brand">
-          <span className="host-brand-mark">
+          <span className="host-brand-mark" aria-hidden="true">
             <i />
             <i />
             <i />
             <i />
           </span>
-          <span>GDG KAU <strong>Quiz</strong></span>
+          <span>
+            GDG KAU <strong>Quiz</strong>
+          </span>
         </Link>
 
         <div className="host-header-right">
@@ -61,9 +65,12 @@ function AdminHostLobby() {
             <span />
             {gameStarted ? "Game started" : "Lobby open"}
           </span>
+
           <Link to="/admin" className="host-exit-link">
             Exit lobby
           </Link>
+
+          <ThemeToggle />
         </div>
       </header>
 
@@ -71,7 +78,9 @@ function AdminHostLobby() {
         <div className="host-page-heading">
           <div>
             <span className="host-eyebrow">HOST CONTROL CENTER</span>
-            <h1>{gameStarted ? "Game is starting!" : "Your lobby is ready."}</h1>
+            <h1>
+              {gameStarted ? "Game is starting!" : "Your lobby is ready."}
+            </h1>
             <p>
               {gameStarted
                 ? "The live quiz screen will be available in the next stage."
@@ -89,6 +98,7 @@ function AdminHostLobby() {
             <p>Players can enter this PIN to join your quiz.</p>
 
             <button
+              type="button"
               className="host-copy-pin"
               onClick={() => copyText(gamePin, "Game PIN")}
             >
@@ -108,8 +118,11 @@ function AdminHostLobby() {
 
             <div className="host-qr-text">
               <h2>Scan to join</h2>
-              <p>Players can scan this QR code with their phone camera.</p>
+              <p>
+                Players can scan this QR code with their phone camera.
+              </p>
               <button
+                type="button"
                 className="host-copy-link"
                 onClick={() => copyText(joinUrl, "Join link")}
               >
@@ -157,7 +170,9 @@ function AdminHostLobby() {
             <div className="host-empty-players">
               <span>♙</span>
               <h3>Waiting for players</h3>
-              <p>Share your PIN or QR code to invite people into the lobby.</p>
+              <p>
+                Share your PIN or QR code to invite people into the lobby.
+              </p>
             </div>
           )}
 
@@ -168,6 +183,7 @@ function AdminHostLobby() {
             </div>
 
             <button
+              type="button"
               className="host-start-button"
               onClick={handleStartGame}
               disabled={gameStarted || players.length === 0}
@@ -180,7 +196,13 @@ function AdminHostLobby() {
         {message && (
           <div className="host-message" role="status">
             {message}
-            <button onClick={() => setMessage("")}>×</button>
+            <button
+              type="button"
+              onClick={() => setMessage("")}
+              aria-label="Dismiss message"
+            >
+              ×
+            </button>
           </div>
         )}
 

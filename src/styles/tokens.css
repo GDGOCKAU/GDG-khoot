@@ -1,0 +1,44 @@
+
+:root {
+  /* GDG brand colors */
+  --gdg-blue: #4285f4;
+  --gdg-red: #ea4335;
+  --gdg-yellow: #fbbc04;
+  --gdg-green: #34a853;
+
+  /* Typography */
+  --font-family: Inter, "Segoe UI", Arial, sans-serif;
+
+  --font-xs: 0.75rem;
+  --font-sm: 0.875rem;
+  --font-base: 1rem;
+  --font-lg: 1.125rem;
+  --font-xl: 1.25rem;
+  --font-2xl: 1.5rem;
+  --font-3xl: 2rem;
+
+  /* Layout */
+  --page-width: 1200px;
+  --page-padding: 24px;
+
+  /* Rounded corners */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* Shadows */
+  --shadow-card: 0 4px 18px rgba(0, 0, 0, 0.07);
+  --shadow-hover: 0 8px 26px rgba(0, 0, 0, 0.12);
+
+  /* Motion */
+  --transition-fast: 150ms ease;
+  --transition-normal: 220ms ease;
+
+  /* Shared answer colors */
+  --answer-red: #ea4335;
+  --answer-blue: #4285f4;
+  --answer-yellow: #fbbc04;
+  --answer-green: #34a853;
+}

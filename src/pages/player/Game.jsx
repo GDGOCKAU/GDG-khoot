@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import Devu from "../../components/common/Devu";
 import "./Game.css";
+import ThemeToggle from "../../components/common/ThemeToggle";
 
 const questions = [
   {
@@ -93,6 +94,13 @@ const teamNames = {
   green: "Green",
 };
 
+const teamHexColors = {
+  blue: "#4285f4",
+  red: "#ea4335",
+  yellow: "#f9ab00",
+  green: "#188038",
+};
+
 const phaseDurations = {
   ready: 3000,
   reveal: 7000,
@@ -110,9 +118,10 @@ function Game() {
   const [timeLeft, setTimeLeft] = useState(questions[0].timeLimit);
   const [phaseTime, setPhaseTime] = useState(3);
 
+  const [players] = useState(initialPlayers);
+
   const currentQuestion = questions[questionIndex];
   const totalQuestions = questions.length;
-  const [players] = useState(initialPlayers);
 
   const rankedPlayers = useMemo(
     () => [...players].sort((a, b) => b.score - a.score),
@@ -173,6 +182,7 @@ function Game() {
         }
       } else if (phase === "next") {
         const nextIndex = questionIndex + 1;
+
         setQuestionIndex(nextIndex);
         setTimeLeft(questions[nextIndex].timeLimit);
         setPhase("question");
@@ -189,7 +199,7 @@ function Game() {
     };
   }, [phase, questionIndex, totalQuestions]);
 
-  // Question timer.
+  // Question countdown.
   useEffect(() => {
     if (phase !== "question") return;
 
@@ -214,7 +224,11 @@ function Game() {
   }
 
   function getPhaseLabel() {
-    if (phase === "ready" || phase === "question" || phase === "reveal") {
+    if (
+      phase === "ready" ||
+      phase === "question" ||
+      phase === "reveal"
+    ) {
       return `QUESTION ${questionIndex + 1} OF ${totalQuestions}`;
     }
 
@@ -229,26 +243,26 @@ function Game() {
     return "GAME RESULTS";
   }
 
-  const progress = (timeLeft / currentQuestion.timeLimit) * 100;
+  const progress =
+    (timeLeft / currentQuestion.timeLimit) * 100;
 
   return (
-    <main className="game-host-page">
+    <div className="game-host-page">
       <header className="host-header">
-        <Link to={`/admin/host/${gameId}`} className="host-brand">
-          <span className="host-brand-dots" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
+  <Link to={`/admin/host/${gameId}`} className="host-brand">
+    <span className="host-brand-text">
+      GDG KAU<span>HOOT</span>
+    </span>
+  </Link>
 
-          <span>
-            GDG KAU <strong>Quiz</strong>
-          </span>
-        </Link>
+  <div className="host-header-actions">
+    <span className="host-phase-label">
+      {getPhaseLabel()}
+    </span>
 
-        <span className="host-phase-label">{getPhaseLabel()}</span>
-      </header>
+    <ThemeToggle />
+  </div>
+</header>
 
       <main className="host-main">
         {/* READY */}
@@ -271,8 +285,8 @@ function Game() {
             </div>
 
             <p>
-              Phones out, fingers ready. The first question starts in a
-              moment.
+              Phones out, fingers ready. The first question starts
+              in a moment.
             </p>
 
             <div className="host-answer-legend">
@@ -365,7 +379,7 @@ function Game() {
           </section>
         )}
 
-        {/* KAHOOT-STYLE ANSWER ANALYTICS */}
+        {/* ANSWER REVEAL */}
         {phase === "reveal" && (
           <section className="host-reveal-screen">
             <div className="host-reveal-question">
@@ -410,7 +424,9 @@ function Game() {
                     className={`host-analytics-column ${
                       isCorrect ? "is-correct" : "is-wrong"
                     }`}
-                    style={{ "--bar-delay": `${index * 150}ms` }}
+                    style={{
+                      "--bar-delay": `${index * 150}ms`,
+                    }}
                   >
                     <strong className="host-analytics-count">
                       {count}
@@ -420,7 +436,10 @@ function Game() {
                       <div
                         className={`host-analytics-bar host-analytics-${answerColors[index]}`}
                         style={{
-                          "--bar-height": `${Math.max(4, percentage)}%`,
+                          "--bar-height": `${Math.max(
+                            4,
+                            percentage
+                          )}%`,
                         }}
                       />
                     </div>
@@ -449,117 +468,120 @@ function Game() {
           </section>
         )}
 
-        {/* LEADERBOARD */}
-        
-{phase === "leaderboard" && (
-  <section className="host-leaderboard-screen">
-    <div className="host-leaderboard-heading">
-      <span className="host-eyebrow">
-        Correct answer ·{" "}
-        {currentQuestion.answers[currentQuestion.correctAnswer]}
-      </span>
+        {/* HOST LEADERBOARD */}
+        {phase === "leaderboard" && (
+          <section className="host-leaderboard-screen">
+            <div className="host-leaderboard-heading">
+              <span className="host-eyebrow">
+                Correct answer ·{" "}
+                {currentQuestion.answers[currentQuestion.correctAnswer]}
+              </span>
 
-      <h1>Leaderboard</h1>
+              <h1>Leaderboard</h1>
 
-      <p>
-        After question {questionIndex + 1} of {totalQuestions}
-        {" · "}
-        {questionIndex === totalQuestions - 1
-          ? "Team results"
-          : "Next question"}{" "}
-        in <strong>{phaseTime}</strong>s
-      </p>
-    </div>
-
-    <div className="host-leaderboard-layout">
-      <div className="host-leaderboard">
-        {rankedPlayers.slice(0, 8).map((player, index) => (
-          <div
-            className={`host-leaderboard-row ${
-              index < 3 ? "top-player" : ""
-            }`}
-            key={player.id}
-            style={{ "--player-team": {
-              blue: "#4285f4",
-              red: "#ea4335",
-              yellow: "#f9ab00",
-              green: "#188038",
-            }[player.color] }}
-          >
-            <span className="host-rank">{index + 1}</span>
-
-            <Devu
-              color={player.color}
-              number={player.number}
-              size={44}
-            />
-
-            <strong className="host-player-name">
-              {player.name}
-            </strong>
-
-            <span className={`host-player-team team-${player.color}`}>
-              {teamNames[player.color]}
-            </span>
-
-            <span className="host-last-points">
-              +{player.lastPoints.toLocaleString()}
-            </span>
-
-            <strong className="host-player-score">
-              {player.score.toLocaleString()}
-            </strong>
-          </div>
-        ))}
-      </div>
-
-      <aside className="host-team-panel">
-        <div className="host-team-heading">
-          <strong>Team standings</strong>
-          <span>Avg points per player</span>
-        </div>
-
-        {teamStats.map((team, index) => (
-          <div className="host-team-row" key={team.color}>
-            <div className="host-team-row-top">
-              <span className="host-team-rank">{index + 1}</span>
-
-              <Devu
-                color={team.color}
-                number={1}
-                size={30}
-              />
-
-              <strong>Team {team.name}</strong>
-
-              <b>{team.average.toLocaleString()}</b>
+              <p>
+                After question {questionIndex + 1} of {totalQuestions}
+                {" · "}
+                {questionIndex === totalQuestions - 1
+                  ? "Team results"
+                  : "Next question"}{" "}
+                in <strong>{phaseTime}</strong>s
+              </p>
             </div>
 
-            <div className="host-team-bar">
-              <span
-                className={`host-team-bar-fill ${team.color}`}
-                style={{
-                  width: `${
-                    (team.average /
-                      Math.max(
-                        ...teamStats.map((item) => item.average),
-                        1
-                      )) * 100
-                  }%`,
-                }}
-              />
+            <div className="host-leaderboard-layout">
+              <div className="host-leaderboard">
+                {rankedPlayers.slice(0, 8).map((player, index) => (
+                  <div
+                    className={`host-leaderboard-row ${
+                      index < 3 ? "top-player" : ""
+                    }`}
+                    key={player.id}
+                    style={{
+                      "--player-team": teamHexColors[player.color],
+                    }}
+                  >
+                    <span className="host-rank">
+                      {index + 1}
+                    </span>
+
+                    <Devu
+                      color={player.color}
+                      number={player.number}
+                      size={44}
+                    />
+
+                    <strong className="host-player-name">
+                      {player.name}
+                    </strong>
+
+                    <span
+                      className={`host-player-team team-${player.color}`}
+                    >
+                      {teamNames[player.color]}
+                    </span>
+
+                    <span className="host-last-points">
+                      +{player.lastPoints.toLocaleString()}
+                    </span>
+
+                    <strong className="host-player-score">
+                      {player.score.toLocaleString()}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+
+              <aside className="host-team-panel">
+                <div className="host-team-heading">
+                  <strong>Team standings</strong>
+                  <span>Avg points per player</span>
+                </div>
+
+                {teamStats.map((team, index) => (
+                  <div className="host-team-row" key={team.color}>
+                    <div className="host-team-row-top">
+                      <span className="host-team-rank">
+                        {index + 1}
+                      </span>
+
+                      <Devu
+                        color={team.color}
+                        number={1}
+                        size={30}
+                      />
+
+                      <strong>Team {team.name}</strong>
+
+                      <b>{team.average.toLocaleString()}</b>
+                    </div>
+
+                    <div className="host-team-bar">
+                      <span
+                        className={`host-team-bar-fill ${team.color}`}
+                        style={{
+                          width: `${
+                            (team.average /
+                              Math.max(
+                                ...teamStats.map((item) => item.average),
+                                1
+                              )) *
+                            100
+                          }%`,
+                        }}
+                      />
+                    </div>
+
+                    <small>
+                      {team.count} player
+                      {team.count === 1 ? "" : "s"}
+                    </small>
+                  </div>
+                ))}
+              </aside>
             </div>
-
-            <small>
-              {team.count} player{team.count === 1 ? "" : "s"}
-            </small>
-          </div>
-        ))}
-      </aside>
-    </div>
-  </section>
-)}
-
+          </section>
+        )}
 
         {/* NEXT QUESTION */}
         {phase === "next" && (
@@ -602,7 +624,7 @@ function Game() {
               <h1>
                 Team{" "}
                 <span
-                  className={`host-winning-name ${teamStats[0]?.color}`}
+                  className={`host-winning-name ${teamStats[0]?.color || ""}`}
                 >
                   {teamStats[0]?.name}
                 </span>{" "}
@@ -625,7 +647,8 @@ function Game() {
                   <strong>Team {team.name}</strong>
 
                   <span>
-                    {team.count} player{team.count === 1 ? "" : "s"}
+                    {team.count} player
+                    {team.count === 1 ? "" : "s"}
                   </span>
 
                   <div className="host-podium-block">
@@ -637,8 +660,8 @@ function Game() {
             </div>
 
             <p className="host-podium-note">
-              Ranked by average points per player, so team size doesn't
-              matter. Top 3 players next.
+              Ranked by average points per player, so team size
+              doesn't matter. Top 3 players next.
             </p>
           </section>
         )}
@@ -663,8 +686,10 @@ function Game() {
                     className={`host-podium-player rank-${rank + 1} ${player.color}`}
                   >
                     {rank === 0 && (
-                      <span className="host-crown">♛</span>
-                    )}
+  <span className="host-crown" aria-label="First place">
+    👑
+  </span>
+)}
 
                     <Devu
                       color={player.color}
@@ -674,7 +699,9 @@ function Game() {
 
                     <strong>{player.name}</strong>
 
-                    <span>{player.score.toLocaleString()} pts</span>
+                    <span>
+                      {player.score.toLocaleString()} pts
+                    </span>
 
                     <div className="host-podium-block">
                       <b>{rank + 1}</b>
@@ -690,13 +717,18 @@ function Game() {
           </section>
         )}
 
-        {/* FINAL RESULTS */}
+        {/* FINAL LEADERBOARD */}
         {phase === "final" && (
           <section className="host-final-screen">
             <div className="host-final-heading">
               <div>
-                <span className="host-eyebrow">QUIZ COMPLETED</span>
-                <h1>Final leaderboard.</h1>
+                <span className="host-eyebrow host-final-eyebrow">
+                  FINAL RESULTS · {currentQuestion.topic}
+                </span>
+
+                <h1 className="host-final-title">
+                  Final leaderboard<span>.</span>
+                </h1>
               </div>
 
               <Link
@@ -707,35 +739,48 @@ function Game() {
               </Link>
             </div>
 
-            <div className="host-final-table">
-              <div className="host-final-table-heading">
-                <span>RANK</span>
-                <span>PLAYER</span>
-                <span>CORRECT</span>
-                <span>SCORE</span>
-              </div>
-
+            <div
+              className="host-final-grid"
+              style={{
+                "--rows": Math.ceil(rankedPlayers.length / 2),
+              }}
+            >
               {rankedPlayers.map((player, index) => (
-                <div className="host-final-row" key={player.id}>
-                  <span>{index + 1}</span>
+                <div
+                  className={`host-final-row team-${player.color} ${
+                    index < 3 ? "top" : ""
+                  }`}
+                  key={player.id}
+                >
+                  <span className="host-final-rank">
+                    {index + 1}
+                  </span>
+
+                  <Devu
+                    color={player.color}
+                    number={player.number}
+                    size={48}
+                  />
 
                   <span className="host-final-player">
-                    <Devu
-                      color={player.color}
-                      number={player.number}
-                      size={42}
-                    />
                     <strong>{player.name}</strong>
                   </span>
 
-                  <span>
+                  <span className="host-final-correct">
                     {player.correct}/{totalQuestions}
                   </span>
 
-                  <strong>{player.score.toLocaleString()}</strong>
+                  <strong className="host-final-score">
+                    {player.score.toLocaleString()}
+                  </strong>
                 </div>
               ))}
             </div>
+
+            <p className="host-final-footer">
+              {rankedPlayers.length} players · {totalQuestions}{" "}
+              questions · Thanks for playing!
+            </p>
           </section>
         )}
       </main>
@@ -746,7 +791,7 @@ function Game() {
         <span className="host-footer-yellow" />
         <span className="host-footer-green" />
       </footer>
-    </main>
+    </div>
   );
 }
 

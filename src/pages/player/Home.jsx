@@ -1,11 +1,9 @@
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import BrandLogo from "../../components/common/BrandLogo";
 import HangingDevu from "../../components/common/HangingDevu";
+import Navbar from "../../components/common/Navbar.jsx";
 import "./Home.css";
-
-// Temporary until the backend provides the quiz list.
+import { Link, useNavigate } from "react-router-dom";// Temporary until the backend provides the quiz list.
 // Expected quiz fields: id, status, topic, title, desc, questions, pin.
 const quizzes = [];
 
@@ -63,28 +61,7 @@ function Home() {
 
   return (
     <>
-      <header className="site-head">
-        <nav className="site-nav" aria-label="Main navigation">
-          <Link to="/" className="home-brand">
-            <BrandLogo />
-          </Link>
-
-          <div className="home-nav-links">
-            <a className="nav-pill active" href="#join">
-              Join
-            </a>
-            <a className="nav-pill" href="#quizzes">
-              Quizzes
-            </a>
-            <a className="nav-pill how-link" href="#how">
-              How it works
-            </a>
-            <Link to="/admin/login" className="nav-admin">
-              Admin sign in
-            </Link>
-          </div>
-        </nav>
-      </header>
+      <Navbar />
 
       <main>
         <section className="home-hero hero" id="join">

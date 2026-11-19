@@ -1,9 +1,10 @@
 
 import { useState } from "react";
-import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 
 import AvatarPicker from "../../components/player/AvatarPicker";
 import Devu from "../../components/common/Devu";
+import Navbar from "../../components/common/Navbar";
 import "./JoinQuiz.css";
 
 const randomNames = [
@@ -83,24 +84,7 @@ function JoinQuiz() {
 
   return (
     <div className="join-page">
-      <header className="join-navbar">
-        <Link to="/" className="join-brand">
-          <span className="join-brand-mark">
-            <i className="red" />
-            <i className="green" />
-            <i className="blue" />
-            <i className="yellow" />
-          </span>
-
-          <span>
-            GDG KAU <strong>Quiz</strong>
-          </span>
-        </Link>
-
-        <Link to="/" className="back-link">
-          ← Back to home
-        </Link>
-      </header>
+      <Navbar />
 
       <main className="join-container">
         <div className="join-heading">

@@ -1,12 +1,14 @@
 
-import { Link, useLocation } from "react-router-dom";
+import { useLocation, useParams, Link } from "react-router-dom";
+
 import Devu from "../../components/common/Devu";
+import Navbar from "../../components/common/Navbar";
 import "./Lobby.css";
 
 function Lobby() {
   const location = useLocation();
+  const { quizId } = useParams();
 
-  // Retrieve player information from navigation state or localStorage
   const nickname =
     location.state?.nickname ||
     localStorage.getItem("gdgNickname") ||
@@ -24,6 +26,8 @@ function Lobby() {
   }
 
   const avatar = location.state?.avatar || savedAvatar;
+  const quizTitle = location.state?.quizTitle || "";
+  const gamePin = location.state?.pin || "";
 
   const teamNames = {
     blue: "Blue",
@@ -35,23 +39,10 @@ function Lobby() {
   const teamName = teamNames[avatar.color] || "Blue";
 
   return (
-    <main className="lobby-page">
-      <header className="lobby-header">
-        <Link to="/" className="lobby-brand">
-          <span className="brand-dots" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-          </span>
+    <div className="lobby-page">
+      <Navbar />
 
-          <span className="lobby-brand-name">
-            GDG KAU <strong>Quiz</strong>
-          </span>
-        </Link>
-      </header>
-
-      <section className="lobby-content">
+      <main className="lobby-content">
         <div className="lobby-center">
           <div className="lobby-avatar">
             <Devu
@@ -66,7 +57,7 @@ function Lobby() {
           </h1>
 
           <p className="lobby-message">
-            {nickname}, you're in! Waiting for the host
+            <strong>{nickname}</strong>, you're in! Waiting for the host
             to start the game
             <span className="waiting-ellipsis" aria-label="Loading">
               <span>.</span>
@@ -75,15 +66,30 @@ function Lobby() {
             </span>
           </p>
 
+          {quizTitle && (
+            <p className="lobby-quiz-title">{quizTitle}</p>
+          )}
+
+          {gamePin && (
+            <div className="lobby-pin">
+              Game PIN: <strong>{gamePin}</strong>
+            </div>
+          )}
+
           <span className={`lobby-team-chip team-${avatar.color}`}>
             Team {teamName}
           </span>
 
-          <span className="lobby-host-link">
-            Open the host screen to start
-          </span>
+          <div className="lobby-status">
+            <span className="lobby-status-dot" />
+            Waiting for host
+          </div>
+
+          <Link to="/" className="lobby-home-link">
+            Leave game
+          </Link>
         </div>
-      </section>
+      </main>
 
       <footer className="lobby-footer">
         <div className="lobby-colorbar" aria-hidden="true">
@@ -93,7 +99,7 @@ function Lobby() {
           <span />
         </div>
       </footer>
-    </main>
+    </div>
   );
 }
 

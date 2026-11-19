@@ -3,8 +3,9 @@
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  color: var(--foreground, #202124);
+  color: var(--text);
   text-decoration: none;
+  transition: color 0.25s ease;
 }
 
 .brand-logo__image {
@@ -19,17 +20,20 @@
   flex-direction: column;
   gap: 3px;
   line-height: 1.25;
+  color: var(--text);
+  transition: color 0.25s ease;
 }
 
 .brand-logo__text span:first-child {
   font-size: 14px;
   font-weight: 700;
+  color: var(--text);
 }
 
 .brand-logo__text span:last-child {
   font-size: 12px;
   font-weight: 400;
-  color: var(--muted, #5f6368);
+  color: var(--text-secondary);
 }
 
 .brand-logo--compact .brand-logo__image {

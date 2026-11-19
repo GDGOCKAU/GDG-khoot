@@ -7,65 +7,12 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--canvas);
-  color: var(--foreground);
-}
-
-.lobby-header {
-  height: 72px;
-  flex-shrink: 0;
-  padding: 0 7%;
-  display: flex;
-  align-items: center;
   background: var(--background);
-  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  transition: background-color 220ms ease, color 220ms ease;
 }
 
-.lobby-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--foreground);
-  font-weight: 700;
-  font-size: 18px;
-  text-decoration: none;
-}
-
-.brand-dots {
-  display: grid;
-  grid-template-columns: repeat(2, 8px);
-  gap: 3px;
-}
-
-.brand-dots span {
-  width: 8px;
-  height: 8px;
-  border-radius: 3px;
-}
-
-.brand-dots span:nth-child(1) {
-  background: var(--g-blue);
-}
-
-.brand-dots span:nth-child(2) {
-  background: var(--g-red);
-}
-
-.brand-dots span:nth-child(3) {
-  background: var(--g-yellow);
-}
-
-.brand-dots span:nth-child(4) {
-  background: var(--g-green);
-}
-
-.lobby-brand-name strong {
-  color: var(--g-blue-strong);
-}
-
-/* ========================================
-   CENTERED WAITING SCREEN
-======================================== */
+/* Main waiting screen */
 
 .lobby-content {
   flex: 1;
@@ -104,19 +51,46 @@
   font-weight: 750;
   letter-spacing: -1.5px;
   line-height: 1.15;
+  color: var(--text);
 }
 
 .lobby-title span {
-  color: #34a853;
+  color: var(--green-b);
 }
 
 .lobby-message {
   max-width: 30rem;
   margin: 0;
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 18px;
   line-height: 1.6;
 }
+
+.lobby-message strong {
+  color: var(--text);
+}
+
+.lobby-quiz-title {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.lobby-pin {
+  padding: 9px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.lobby-pin strong {
+  color: var(--text);
+  letter-spacing: 0.08em;
+}
+
+/* Waiting animation */
 
 .waiting-ellipsis {
   display: inline-flex;
@@ -148,9 +122,7 @@
   }
 }
 
-/* ========================================
-   TEAM CHIP
-======================================== */
+/* Team chip */
 
 .lobby-team-chip {
   display: inline-flex;
@@ -163,55 +135,64 @@
 }
 
 .team-blue {
-  background: #e8f0fe;
-  color: #1a73e8;
+  background: var(--blue-soft);
+  color: var(--blue-txt);
 }
 
 .team-red {
-  background: #fce8e6;
-  color: #c5221f;
+  background: var(--red-soft);
+  color: var(--red-txt);
 }
 
 .team-yellow {
-  background: #fef7e0;
-  color: #a46b00;
+  background: var(--yellow-soft);
+  color: var(--yellow-txt);
 }
 
 .team-green {
-  background: #e6f4ea;
-  color: #188038;
+  background: var(--green-soft);
+  color: var(--green-b);
 }
 
-/* ========================================
-   HOST INSTRUCTION
-======================================== */
+/* Status */
 
-.lobby-host-link {
+.lobby-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.lobby-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green-b);
+  box-shadow: 0 0 0 4px var(--green-soft);
+}
+
+.lobby-home-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
-  margin-top: 2px;
-  padding: 10px 20px;
-  border: 1px solid var(--border-strong);
+  min-height: 42px;
+  margin-top: 4px;
+  padding: 9px 20px;
+  border: 1px solid var(--border);
   border-radius: 100px;
-  color: var(--foreground);
-  font-size: 14px;
+  color: var(--text-secondary);
+  font-size: 13px;
   font-weight: 600;
-  text-decoration: none;
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-.lobby-host-link:hover {
-  background: var(--surface-2);
-  border-color: var(--g-blue);
+.lobby-home-link:hover {
+  background: var(--surface-secondary);
+  border-color: var(--border-strong);
 }
 
-/* ========================================
-   FOOTER COLOR BAR
-======================================== */
+/* Footer */
 
 .lobby-footer {
   flex-shrink: 0;
@@ -243,40 +224,9 @@
   background: #34a853;
 }
 
-/* ========================================
-   DARK MODE
-======================================== */
-
-html.dark .team-blue {
-  background: #1a365d;
-  color: #8ab4f8;
-}
-
-html.dark .team-red {
-  background: #5f2120;
-  color: #f28b82;
-}
-
-html.dark .team-yellow {
-  background: #594719;
-  color: #fdd663;
-}
-
-html.dark .team-green {
-  background: #174b2b;
-  color: #81c995;
-}
-
-/* ========================================
-   MOBILE
-======================================== */
+/* Mobile */
 
 @media (max-width: 600px) {
-  .lobby-header {
-    height: 64px;
-    padding: 0 5%;
-  }
-
   .lobby-content {
     padding: 30px 22px;
   }
@@ -298,7 +248,7 @@ html.dark .team-green {
     font-size: 16px;
   }
 
-  .lobby-host-link {
+  .lobby-home-link {
     width: 100%;
     max-width: 300px;
   }
