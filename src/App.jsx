@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-do
 import { G, hosted, startHost, stopGame } from './lib/engine';
 import { isAdmin, quizById, useAppState } from './lib/store';
 import { installSpiderDrag } from './lib/ui';
+import { toast } from './lib/ui';
 import { Bounce, LivePill } from './components/common/UI';
 
 // Player pages
@@ -15,6 +16,7 @@ import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import CreateQuiz from './pages/admin/CreateQuiz';
 import HostGame from './pages/admin/HostGame';
+import { apiRequest } from './api/client';
 
 function Loading() {
   return <main className="loading" aria-busy="true"><h1>Loading<Bounce /></h1></main>;
@@ -40,7 +42,20 @@ function HostRoute() {
   const quiz = quizById(quizId);
   const running = hosted() && G.quiz.id === quizId;
   useEffect(() => {
-    if (!(hosted() && G.quiz.id === quizId) && quiz && isAdmin()) startHost(quiz);
+    if (!(hosted() && G.quiz.id === quizId) && quiz && isAdmin()) {
+      startHost(quiz);
+      apiRequest('/api/v1/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ quizId }),
+      }).then((session) => {
+        G.backendSessionId = session.id;
+        G.pin = session.pin;
+      }).catch((error) => {
+        toast(error.status === 400
+          ? 'This quiz is not published or has no questions.'
+          : 'Could not create the live session.');
+      });
+    }
   }, [quizId, quiz]);
   if (running) return <HostGame />;
   if (quiz && isAdmin()) return null;

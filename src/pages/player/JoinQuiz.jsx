@@ -7,6 +7,8 @@ import { toast, useWide } from '../../lib/ui';
 import { Ico } from '../../components/common/UI';
 import { MascotGrid, TeamTabs } from '../../components/player/AvatarPicker';
 import { LapShell } from '../../components/layout/Shells';
+import { apiRequest } from '../../api/client';
+import { connectSocket } from '../../api/socket';
 
 function JoinQuiz({ quiz, live }) {
   const navigate = useNavigate();
@@ -20,10 +22,40 @@ function JoinQuiz({ quiz, live }) {
   const T = TEAMS[look.team];
   const pin = live ? G.pin : quiz.pin;
 
-  const join = (e) => {
+  const join = async (e) => {
     if (e) e.preventDefault();
+    if (!live) {
+      toast('Open this quiz from a live host session PIN.');
+      return;
+    }
+    const name = (look.name || '').trim();
+    if (!name) { toast('Pick a nickname first.'); document.getElementById('nickIn')?.focus(); return; }
+    try {
+      const participant = await apiRequest('/api/v1/sessions/join', {
+        method: 'POST',
+        body: JSON.stringify({
+          pin,
+          name,
+          mascot: `${look.team}-${look.idx}`,
+          team: look.team,
+        }),
+      });
+      localStorage.setItem('gdgParticipantId', participant.id);
+      localStorage.setItem('gdgSessionId', participant.sessionId);
+      UI.look = { ...look, participantId: participant.id, sessionId: participant.sessionId };
+      const socket = connectSocket();
+      socket.emit('game:join', participant.sessionId, participant.id, () => {});
+      UI.liveSocket = socket;
+    } catch (error) {
+      toast(error.status === 409
+        ? 'That nickname is already in this session. Choose another.'
+        : error.status === 404
+          ? 'This live session no longer exists.'
+          : 'Could not join the live session.');
+      return;
+    }
     const err = joinGame(look, quiz);
-    if (err) { toast(err); if (err.startsWith('Pick')) document.getElementById('nickIn')?.focus(); return; }
+    if (err) { toast(err); return; }
     navigate('/play');
   };
 

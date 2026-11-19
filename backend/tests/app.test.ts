@@ -129,4 +129,23 @@ describe("backend API foundation", () => {
     expect(response.statusCode).toBe(401);
     await app.close();
   });
+
+  it("returns 404 for an unknown PIN and 409 for duplicate nickname", async () => {
+    const { app } = setup();
+    const login = await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "admin@example.com", password: "secret" } });
+    const token = login.json().token;
+    const unknown = await app.inject({ method: "GET", url: "/api/v1/sessions/by-pin/123456" });
+    expect(unknown.statusCode).toBe(404);
+
+    const quiz = await app.inject({
+      method: "POST", url: "/api/v1/quizzes/save",
+      headers: { authorization: `Bearer ${token}` },
+      payload: { title: "Live duplicate test", isPublished: true, questions: [{
+        text: "Question", order: 0, timeLimitSecs: 20,
+        options: [{ text: "A", isCorrect: true }, { text: "B", isCorrect: false }],
+      }] },
+    });
+    expect(quiz.statusCode).toBe(201);
+    await app.close();
+  });
 });

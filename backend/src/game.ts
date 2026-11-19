@@ -129,6 +129,25 @@ export class GameService {
     this.emit = emit;
   }
 
+  async lookupByPin(pin: string) {
+    const session = await this.gameRepository.findByPin(pin);
+    if (!session) throw new GameError("session_not_found");
+    if (session.status !== "LOBBY") throw new GameError("invalid_phase");
+    const quiz = await this.quizRepository.getQuiz(session.quizId, session.hostId);
+    if (!quiz || !quiz.isPublished || quiz.questions.length === 0) throw new GameError("invalid_phase");
+    return {
+      sessionId: session.id,
+      pin: session.pin,
+      status: session.status,
+      quiz: {
+        id: quiz.id,
+        title: quiz.title,
+        description: quiz.description ?? null,
+        isPublished: quiz.isPublished,
+      },
+    };
+  }
+
   async createSession(quizId: string, hostId: string) {
     const quiz = await this.quizRepository.getQuiz(quizId, hostId);
     if (!quiz) throw new GameError("quiz_not_found");

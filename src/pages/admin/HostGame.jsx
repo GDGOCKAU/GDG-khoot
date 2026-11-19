@@ -8,6 +8,7 @@ import { toast, useAnims } from '../../lib/ui';
 import { Answered, ColorBar, Count, Ico, LiveRing, Modal, Secs, TopicChip } from '../../components/common/UI';
 import { AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
 import { HostShell } from '../../components/layout/Shells';
+import { QRCodeSVG } from 'qrcode.react';
 
 function PChip({ p }) {
   const t = TEAMS[p.team];
@@ -27,6 +28,10 @@ function HostGame() {
   const pinChip = <span className="chip chip-blue">Game PIN {pinFmt(G.pin)}</span>;
   const over = <span className="chip">Game over · {n} of {n} questions</span>;
   const shell = (right, children) => <HostShell right={right} onExit={() => setAskExit(true)}>{children}</HostShell>;
+  const hostName = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? window.location.hostname
+    : window.location.hostname;
+  const joinUrl = `${window.location.protocol}//${hostName}:${window.location.port || '5173'}/join/${G.quiz.id}`;
 
   const exitModal = askExit && (
     <Modal id="exitT" icon="door" title="Are you sure you want to exit the game?" onClose={() => setAskExit(false)}>
@@ -48,6 +53,8 @@ function HostGame() {
           <div className="card pinbox">
             <div style={css('font-size:14px;color:var(--muted)')}>Join on the home page with</div>
             <div><div style={css('font-size:14px;color:var(--muted)')}>Game PIN</div><div className="pinbig num">{G.pin.slice(0, 3)}<br />{G.pin.slice(3)}</div></div>
+            <QRCodeSVG value={joinUrl} size={160} level="H" includeMargin />
+            <p style={css('margin:0;font-size:12px;color:var(--muted);text-align:center')}>{joinUrl}</p>
             <ColorBar />
             {G.me ? <p style={css('margin:0;font-size:14px;color:var(--green-txt);font-weight:600')}>You joined as {G.me.name}.</p> : <Link className="btn btn-tonal" to="/live">Join as a player on this device</Link>}
             <p style={css('margin:0;font-size:13px;color:var(--muted);line-height:1.6')}>Practice players join by themselves in this demo. You can also go to the home page and enter the PIN.</p>

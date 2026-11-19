@@ -139,6 +139,12 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
         return reply.code(201).send(await gameService.createSession(body.quizId, request.user.id));
       } catch (error) { return gameError(reply, error); }
     });
+    app.get("/api/v1/sessions/by-pin/:pin", async (request, reply) => {
+      try {
+        const params = request.params as { pin: string };
+        return reply.send(await gameService.lookupByPin(params.pin));
+      } catch (error) { return gameError(reply, error); }
+    });
     app.post("/api/v1/sessions/join", async (request, reply) => {
       try {
         const body = z.object({ pin: z.string().regex(/^\d{6}$/), name: z.string().trim().min(1).max(40), mascot: z.string().trim().min(1).max(40), team: z.string().trim().min(1).max(40) }).parse(request.body);

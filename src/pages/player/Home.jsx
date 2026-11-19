@@ -6,6 +6,7 @@ import { G, UI, hosted } from '../../lib/engine';
 import { toast } from '../../lib/ui';
 import { ColorBar, Hang, Ico, Logo, ThemeButton, TopicChip, TopicIcon } from '../../components/common/UI';
 import SiteFooter from '../../components/common/SiteFooter';
+import { apiRequest } from '../../api/client';
 
 const SECTIONS = ['join', 'quizzes', 'how'];
 
@@ -45,14 +46,25 @@ function Home() {
   const pickFilter = (f) => { UI.homeFilter = f; setFilter(f); document.getElementById('quizzes').scrollIntoView(); };
 
   const onPin = (e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 6); setPin(d.length > 3 ? d.slice(0, 3) + ' ' + d.slice(3) : d); };
-  const submitPin = (e) => {
+  const submitPin = async (e) => {
     e.preventDefault();
     const p = pin.replace(/\D/g, '');
-    const qz = DB.quizzes.find((x) => x.pin === p && ready(x));
-    if (hosted() && p === G.pin) { setPinError(''); UI.look = null; navigate('/live'); return; }
-    if (p.length !== 6) setPinError('Enter the 6-digit PIN.');
-    else if (!qz) setPinError('No game with that PIN. Press Play on a quiz below to try one.');
-    else { setPinError(''); UI.look = null; navigate('/join/' + qz.id); return; }
+    if (p.length !== 6) { setPinError('Enter the 6-digit PIN.'); if (pinRef.current) pinRef.current.focus(); return; }
+    try {
+      const live = await apiRequest(`/api/v1/sessions/by-pin/${p}`);
+      const localQuiz = DB.quizzes.find((x) => x.id === live.quiz.id);
+      if (!localQuiz) {
+        setPinError('This live quiz is not loaded in this browser. Open the host dashboard again.');
+        return;
+      }
+      setPinError('');
+      UI.look = { key: 'live:' + live.quiz.id, quizId: live.quiz.id, live: true, sessionId: live.sessionId, pin: p, name: UI.look ? UI.look.name : '', team: 'blue', idx: 0 };
+      navigate('/join/' + live.quiz.id);
+    } catch (error) {
+      setPinError(error.status === 404
+        ? 'No live session with that PIN. Wait until the host opens the lobby.'
+        : 'This game is not accepting players yet.');
+    }
     if (pinRef.current) pinRef.current.focus();
   };
 
