@@ -4,6 +4,11 @@ const browserApiUrl = typeof window !== "undefined" && window.location.hostname
   : "http://localhost:3000";
 export const API_URL = (configuredApiUrl || browserApiUrl).replace(/\/$/, "");
 
+/* uploaded images are stored as /uploads/... on the API server */
+export function assetUrl(url) {
+  return typeof url === "string" && url.startsWith("/uploads/") ? `${API_URL}${url}` : url;
+}
+
 export function getStoredToken() {
   return localStorage.getItem("gdgAdminToken") || "";
 }

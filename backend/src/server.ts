@@ -13,7 +13,7 @@ const gameService = new GameService(
   quizRepository,
   gameRepository,
 );
-const app = buildApp(quizRepository, config.JWT_SECRET, gameService);
+const app = buildApp(quizRepository, config.JWT_SECRET, gameService, { uploadDir: config.UPLOAD_DIR });
 
 await app.ready();
 const io = attachRealtime(app.server, {

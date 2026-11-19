@@ -6,6 +6,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(16).default("development-secret-change-me"),
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default("0.0.0.0"),
+  UPLOAD_DIR: z.string().default("uploads"),
 });
 
 export const config = envSchema.parse(process.env);

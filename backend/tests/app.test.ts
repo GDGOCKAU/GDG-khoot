@@ -1,4 +1,7 @@
 import bcrypt from "bcryptjs";
+import { mkdtemp } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app.js";
 import { MemoryRepository } from "../src/repository/memory.js";
@@ -164,6 +167,32 @@ describe("backend API foundation", () => {
     expect(pinLookup.json().quiz.questionCount).toBe(1);
     expect(JSON.stringify(pinLookup.json())).not.toContain('"isCorrect"');
     expect(JSON.stringify(pinLookup.json())).not.toContain('"options"');
+    await app.close();
+  });
+
+  it("stores uploaded pictures as files and refuses base64 picture URLs in quizzes", async () => {
+    const repository = new MemoryRepository();
+    repository.admins.push({ id: "admin-1", email: "admin@example.com", passwordHash: bcrypt.hashSync("secret", 4) });
+    const uploadDir = await mkdtemp(path.join(os.tmpdir(), "kauhoot-uploads-"));
+    const app = buildApp(repository, "test-secret-that-is-long", new GameService(repository, new MemoryGameRepository()), { uploadDir });
+    const token = (await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "admin@example.com", password: "secret" } })).json().token;
+    const auth = { authorization: `Bearer ${token}` };
+    const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+    expect((await app.inject({ method: "POST", url: "/api/v1/uploads", payload: { dataUrl: png } })).statusCode).toBe(401);
+    const upload = await app.inject({ method: "POST", url: "/api/v1/uploads", headers: auth, payload: { dataUrl: png } });
+    expect(upload.statusCode).toBe(201);
+    const url = upload.json().url as string;
+    expect(url).toMatch(/^\/uploads\/[0-9a-f-]{36}\.png$/);
+    const served = await app.inject({ method: "GET", url });
+    expect(served.statusCode).toBe(200);
+    expect(served.headers["content-type"]).toBe("image/png");
+    expect((await app.inject({ method: "GET", url: "/uploads/..%2Fsecret.png" })).statusCode).toBe(404);
+    const question = (pictureUrls: string[]) => ({ text: "Pics", order: 0, timeLimitSecs: 20, type: "pic", pictureUrls, word: "DOORMAN",
+      options: [{ text: "DOORMAN", isCorrect: true }, { text: "NOT_DOORMAN", isCorrect: false }] });
+    const base64 = await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: { title: "P", isPublished: true, questions: [question([png, png])] } });
+    expect(base64.statusCode).toBe(400);
+    const saved = await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: { title: "P", isPublished: true, questions: [question([url, url])] } });
+    expect(saved.statusCode).toBe(201);
     await app.close();
   });
 });

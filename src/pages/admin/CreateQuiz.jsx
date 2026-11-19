@@ -9,7 +9,7 @@ import { shrinkImage, toast } from '../../lib/ui';
 import { Dots, Ico, Modal } from '../../components/common/UI';
 import { Boxes } from '../../components/game/Blocks';
 import { AdminShell } from '../../components/layout/Shells';
-import { apiRequest } from '../../api/client';
+import { API_URL, apiRequest } from '../../api/client';
 
 /* the open editor survives moving away and back, like the prototype */
 let E = null;
@@ -39,21 +39,40 @@ function backendQuestions(d) {
         { text: norm(question.word) ? 'NOT_' + norm(question.word) : '', isCorrect: false },
       ];
     } else {
+      /* empty optional answers are left out, or publishing would reject the quiz */
       options = (question.answers || []).slice(0, 4).map((text, optionIndex) => ({
         text: String(text || ''),
         isCorrect: question.correct === optionIndex,
-      }));
+      })).filter((option) => option.text.trim() || option.isCorrect);
     }
     return {
       text: String(question.text || ''),
       order: index,
       timeLimitSecs: Number(question.time || 20),
       options,
+      type,
+      code: type === 'code' ? String(question.code || '') : undefined,
+      language: type === 'code' ? String(question.lang || '') : undefined,
+      pictureUrls: type === 'pic' ? (question.pics || []).map(storedUrl) : undefined,
+      word: type === 'pic' ? norm(question.word) : undefined,
     };
   });
 }
+/* pictures are uploaded as files first; only their URL is saved with the quiz */
+const storedUrl = (u) => (typeof u === 'string' && u.startsWith(API_URL + '/uploads/') ? u.slice(API_URL.length) : u);
+async function uploadPictures(d) {
+  for (const question of d.questions) {
+    if (qType(question) !== 'pic') continue;
+    question.pics = await Promise.all((question.pics || []).map(async (src) => {
+      if (typeof src !== 'string' || !src.startsWith('data:')) return src;
+      const { url } = await apiRequest('/api/v1/uploads', { method: 'POST', body: JSON.stringify({ dataUrl: src }) });
+      return API_URL + url;
+    }));
+  }
+}
 async function saveBackend(d, ed, setSaveState) {
   try {
+    await uploadPictures(d);
     const quiz = await apiRequest('/api/v1/quizzes/save', {
       method: 'POST',
       body: JSON.stringify({

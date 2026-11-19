@@ -2,10 +2,15 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { z } from "zod";
 import type { Repository } from "./domain.js";
 import { GameError, type GameService } from "./game.js";
 
+const pictureUrl = z.string().max(500).refine((value) => !value.startsWith("data:"), "upload images first; data URLs are not stored");
+const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/gif": "gif" };
 const loginSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
 const quizSchema = z.object({ title: z.string().trim().min(1).max(200), description: z.string().trim().max(2000).optional() });
 const quizUpdateSchema = quizSchema.partial().extend({ isPublished: z.boolean().optional() });
@@ -17,7 +22,7 @@ const questionSchema = z.object({
   type: z.enum(["mc", "tf", "code", "pic"]).optional(),
   code: z.string().trim().max(10000).optional(),
   language: z.string().trim().max(40).optional(),
-  pictureUrls: z.array(z.string()).max(20).optional(),
+  pictureUrls: z.array(pictureUrl).max(20).optional(),
   word: z.string().trim().max(100).optional(),
 });
 const saveQuizSchema = z.object({
@@ -36,7 +41,7 @@ const saveQuizSchema = z.object({
     type: z.enum(["mc", "tf", "code", "pic"]).optional(),
     code: z.string().trim().max(10000).optional(),
     language: z.string().trim().max(40).optional(),
-    pictureUrls: z.array(z.string()).max(20).optional(),
+    pictureUrls: z.array(pictureUrl).max(20).optional(),
     word: z.string().trim().max(100).optional(),
   })),
 });
@@ -53,8 +58,9 @@ declare module "fastify" {
   }
 }
 
-export function buildApp(repository: Repository, jwtSecret: string, gameService?: GameService): FastifyInstance {
+export function buildApp(repository: Repository, jwtSecret: string, gameService?: GameService, options: { uploadDir?: string } = {}): FastifyInstance {
   const app = Fastify({ logger: false });
+  const uploadDir = path.resolve(options.uploadDir ?? "uploads");
   app.register(cors, { origin: true });
   app.register(jwt, { secret: jwtSecret });
 
@@ -76,6 +82,30 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
     } catch {
       return reply.code(401).send({ error: "unauthorized" });
     }
+  });
+
+  // Images are stored as files on disk; only their /uploads/... path goes into PostgreSQL.
+  app.post("/api/v1/uploads", { onRequest: [app.authenticate], bodyLimit: 4 * 1024 * 1024 }, async (request, reply) => {
+    const parsed = z.object({ dataUrl: z.string().max(4 * 1024 * 1024) }).safeParse(request.body);
+    const match = parsed.success ? /^data:(image\/[a-z]+);base64,([A-Za-z0-9+/=]+)$/.exec(parsed.data.dataUrl) : null;
+    const ext = match ? IMAGE_TYPES[match[1]] : undefined;
+    if (!match || !ext) return reply.code(400).send({ error: "invalid_image" });
+    const bytes = Buffer.from(match[2], "base64");
+    if (bytes.length === 0 || bytes.length > 3 * 1024 * 1024) return reply.code(400).send({ error: "invalid_image" });
+    const file = `${randomUUID()}.${ext}`;
+    await mkdir(uploadDir, { recursive: true });
+    await writeFile(path.join(uploadDir, file), bytes);
+    return reply.code(201).send({ url: `/uploads/${file}` });
+  });
+  app.get<{ Params: { file: string } }>("/uploads/:file", async (request, reply) => {
+    const file = request.params.file;
+    const match = /^[0-9a-f-]{36}\.(png|jpg|webp|gif)$/.exec(file);
+    if (!match) return reply.code(404).send({ error: "not_found" });
+    try {
+      const bytes = await readFile(path.join(uploadDir, file));
+      const type = Object.keys(IMAGE_TYPES).find((key) => IMAGE_TYPES[key] === match[1])!;
+      return reply.header("content-type", type).header("cache-control", "public, max-age=86400").send(bytes);
+    } catch { return reply.code(404).send({ error: "not_found" }); }
   });
 
   app.get("/api/v1/quizzes", { onRequest: [app.authenticate] }, async (request) => repository.listQuizzes(request.user.id));

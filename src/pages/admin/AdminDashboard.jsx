@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { DB, upsertQuiz, useAppState } from '../../lib/store';
 import { Ico, TopicChip } from '../../components/common/UI';
 import { AdminShell } from '../../components/layout/Shells';
-import { apiRequest } from '../../api/client';
+import { apiRequest, assetUrl } from '../../api/client';
 
 let lastFilter = 'All', lastSearch = '';
 
@@ -25,15 +25,24 @@ function AdminDashboard() {
           status: quiz.isPublished ? 'ready' : 'draft',
           pin: String(100000 + Math.floor(Math.random() * 900000)),
           lastHosted: null,
-          questions: (quiz.questions || []).map((question) => ({
-            type: 'mc',
-            text: question.text,
-            answers: (question.options || []).map((option) => option.text),
-            correct: (question.options || []).findIndex((option) => option.isCorrect),
-            time: question.timeLimitSecs,
-            points: 1,
-            img: null,
-          })),
+          questions: (quiz.questions || []).map((question) => {
+            const type = question.type || 'mc', options = question.options || [];
+            const answers = type === 'pic' ? ['', '', '', ''] : options.map((option) => option.text);
+            while (answers.length < 4) answers.push('');
+            return {
+              type,
+              text: question.text,
+              answers,
+              correct: type === 'pic' ? -1 : options.findIndex((option) => option.isCorrect),
+              time: question.timeLimitSecs,
+              points: 1,
+              img: null,
+              code: question.code || '',
+              lang: question.language || 'Dart',
+              pics: (question.pictureUrls || []).map(assetUrl),
+              word: type === 'pic' ? (question.word || options.find((option) => option.isCorrect)?.text || '') : '',
+            };
+          }),
         }));
       })
       .catch(() => {});

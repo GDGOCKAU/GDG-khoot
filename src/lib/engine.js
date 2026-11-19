@@ -4,6 +4,7 @@ import { useSyncExternalStore } from 'react';
 import { TEAM_KEYS, BOT_NAMES, mascot, pick, rnd, shuffle, uid, newPin } from './constants';
 import { qType, norm, isCorrect, wrongGuess, qProblem } from './questions';
 import { DB, quizById, save, notify } from './store';
+import { assetUrl } from '../api/client';
 
 /* the live game (or null) */
 export let G = null;
@@ -257,7 +258,7 @@ export function liveQuestion(q) {
     type: q.type || 'mc', text: q.text, questionId: q.questionId,
     answers: (q.options || []).map((o) => o.text), optionIds: (q.options || []).map((o) => o.id),
     correct: -1, time: q.timeLimitSecs, points: 1, img: null,
-    code: q.code || '', lang: q.language || 'Dart', pics: q.pictureUrls || [],
+    code: q.code || '', lang: q.language || 'Dart', pics: (q.pictureUrls || []).map(assetUrl),
     /* only the letter count is known until Reveal */
     word: q.type === 'pic' ? 'X'.repeat(q.wordLength || 0) : '',
   };
