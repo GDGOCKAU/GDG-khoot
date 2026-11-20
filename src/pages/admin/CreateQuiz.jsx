@@ -2,7 +2,7 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LETTERS, ansCls, css, newPin, uid } from '../../lib/constants';
-import { LANGS, QTYPES, blankQ, norm, qProblem, qType, setQType } from '../../lib/questions';
+import { LANGS, QTYPES, blankQ, norm, normalizeDraft, qProblem, qType, setQType } from '../../lib/questions';
 import { DB, addTopic, deleteQuiz, quizById, topicNames, upsertQuiz } from '../../lib/store';
 import { UI } from '../../lib/engine';
 import { shrinkImage, toast } from '../../lib/ui';
@@ -16,7 +16,7 @@ let E = null;
 function openEditor(quiz) {
   const forId = quiz ? quiz.id : 'new';
   if (!E || E.forId !== forId) {
-    E = { forId, cur: 0, saved: !!quiz, draft: quiz ? JSON.parse(JSON.stringify(quiz)) : { id: uid(), title: '', topic: 'Mobile', desc: '', status: 'draft', pin: newPin(), lastHosted: null, questions: [blankQ()] } };
+    E = { forId, cur: 0, saved: !!quiz, draft: quiz ? normalizeDraft(JSON.parse(JSON.stringify(quiz))) : { id: uid(), title: '', topic: 'Mobile', desc: '', status: 'draft', pin: newPin(), lastHosted: null, questions: [blankQ()] } };
   }
   return E;
 }
@@ -150,7 +150,7 @@ function CreateQuiz({ quiz }) {
     });
   }
   function discard() {
-    ed.draft = JSON.parse(JSON.stringify(stored)); ed.dirty = 0; ed.cur = Math.min(ed.cur, ed.draft.questions.length - 1);
+    ed.draft = normalizeDraft(JSON.parse(JSON.stringify(stored))); ed.dirty = 0; ed.cur = Math.min(ed.cur, ed.draft.questions.length - 1);
     rerender(); toast('Changes discarded');
   }
   function duplicateQuiz() {

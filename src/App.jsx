@@ -5,6 +5,7 @@ import { isAdmin, notify, quizById, useAppState } from './lib/store';
 import { installSpiderDrag } from './lib/ui';
 import { toast } from './lib/ui';
 import { Bounce, LivePill } from './components/common/UI';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 // Player pages
 import Home from './pages/player/Home';
@@ -141,7 +142,7 @@ function App() {
 
   if (!booted) return <Loading />;
 
-  return <>
+  return <ErrorBoundary resetKey={location.pathname}>
     <Routes>
       {/* Player routes */}
       <Route path="/" element={<Home />} />
@@ -160,7 +161,7 @@ function App() {
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
     <LivePill />
-  </>;
+  </ErrorBoundary>;
 }
 
 export default App;

@@ -63,8 +63,12 @@ function seed() {
 
 export let DB;
 try { DB = JSON.parse(lsGet(KEY)) || seed(); } catch { DB = seed(); }
-if (!DB.quizzes) DB = seed();
-if (!DB.topics) DB.topics = [];
+if (!DB || !Array.isArray(DB.quizzes)) DB = seed();
+if (!Array.isArray(DB.topics)) DB.topics = [];
+if (!Array.isArray(DB.games)) DB.games = [];
+/* old or half-saved quizzes: keep them, but always with a list of question objects */
+DB.quizzes = DB.quizzes.filter((z) => z && typeof z === 'object' && z.id)
+  .map((z) => ({ ...z, title: typeof z.title === 'string' ? z.title : '', questions: Array.isArray(z.questions) ? z.questions.filter((x) => x && typeof x === 'object') : [] }));
 if (!DB.mixedAdded) { DB.quizzes.unshift(mixedQuiz()); DB.mixedAdded = true; }
 DB.quizzes.forEach((z) => z.questions.forEach((x) => { if (!x.type) x.type = 'mc'; }));
 DB.topics.forEach((t) => { if (!TOPICS[t.name]) TOPICS[t.name] = { c: t.c, icon: 'star' }; });
