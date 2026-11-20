@@ -22,9 +22,17 @@ function mixedQuiz() {
     { type: 'tf', text: 'Gemini is a family of AI models made by Google.', answers: ['True', 'False', '', ''], correct: 0, time: 15, points: 1, img: null },
   ] };
 }
+/* a short 2-question quiz for quick tests, PIN 123 456 */
+function quickQuiz() {
+  return { id: uid(), title: 'Quick Test', topic: 'Other', desc: 'Two quick questions to try the game.', status: 'ready', pin: '123456', lastHosted: null, questions: [
+    q('Which company created the Flutter framework?', ['Google', 'Meta', 'Microsoft', 'Apple'], 0, 15),
+    { type: 'tf', text: 'GDG stands for Google Developer Groups.', answers: ['True', 'False', '', ''], correct: 0, time: 10, points: 1, img: null },
+  ] };
+}
 function seed() {
   return {
     quizzes: [
+      quickQuiz(),
       mixedQuiz(),
       { id: uid(), title: 'Flutter Basics', topic: 'Mobile', desc: 'Widgets, state and hot reload.', status: 'ready', pin: '482913', lastHosted: null, questions: [
         q('Which company created the Flutter framework?', ['Google', 'Meta', 'Microsoft', 'Apple'], 0),
@@ -58,6 +66,7 @@ function seed() {
     games: [],
     topics: [],
     mixedAdded: true,
+    quickAdded: true,
   };
 }
 
@@ -66,6 +75,7 @@ try { DB = JSON.parse(lsGet(KEY)) || seed(); } catch { DB = seed(); }
 if (!DB.quizzes) DB = seed();
 if (!DB.topics) DB.topics = [];
 if (!DB.mixedAdded) { DB.quizzes.unshift(mixedQuiz()); DB.mixedAdded = true; }
+if (!DB.quickAdded) { if (!DB.quizzes.some((z) => z.pin === '123456')) DB.quizzes.unshift(quickQuiz()); DB.quickAdded = true; }
 DB.quizzes.forEach((z) => z.questions.forEach((x) => { if (!x.type) x.type = 'mc'; }));
 DB.topics.forEach((t) => { if (!TOPICS[t.name]) TOPICS[t.name] = { c: t.c, icon: 'star' }; });
 
