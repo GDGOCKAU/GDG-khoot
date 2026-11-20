@@ -34,9 +34,9 @@ function AdminDashboard() {
       <section className="card tbl-wrap">
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <h2 style={{ margin: 0, fontSize: 22 }}>Your quizzes</h2>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+          <div className="dash-tools" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
             <label className="sr" htmlFor="dashSearch">Search quizzes</label>
-            <input className="input" id="dashSearch" placeholder="Search quizzes" value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: 220, minHeight: 42, fontSize: 14 }} />
+            <input id="dashSearch" placeholder="Search quizzes" value={search} onChange={(e) => setSearch(e.target.value)} className="input dash-search" style={{ minHeight: 42, fontSize: 14 }} />
             <div className="seg" role="tablist" aria-label="Filter quizzes">
               {['All', 'Ready', 'Drafts'].map((f) => <button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => setFilter(f)}>{f}</button>)}
             </div>

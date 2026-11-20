@@ -100,8 +100,8 @@ function HostGame() {
       view = shell(<><span className="chip">Question {G.qi + 1} of {n}</span>{pinChip}</>, <>
         <div className="card qcard">{qType(qq) === 'tf' ? <span className="chip chip-yellow">True or false</span> : <TopicChip t={G.quiz.topic} />}{qq.points === 2 && <span className="chip chip-red">Double points</span>}<h1>{qq.text}</h1>{qq.img && ['mc', 'tf'].includes(qType(qq)) && <img className="qimg" src={qq.img} alt="" />}</div>
         <div className="qbar">
-          <div className="tring" style={css('display:flex;align-items:center;gap:16px')}><LiveRing size={104} stroke={10} color="#1a73e8"><span style={{ fontSize: 38 }}><Secs /></span></LiveRing><span style={{ color: 'var(--muted)', fontSize: 15 }}>seconds left{qType(qq) === 'pic' ? ` · ${qq.word.replace(/[^A-Za-z0-9]/g, '').length} letters` : ''}</span></div>
-          <div style={css('display:flex;align-items:center;gap:14px')}>
+          <div className="tring" style={css('display:flex;align-items:center;gap:16px')}><LiveRing size={104} stroke={10} color="#1a73e8"><span style={{ fontSize: 38 }}><Secs /></span></LiveRing><span className="tlabel" style={{ color: 'var(--muted)', fontSize: 15 }}>seconds left{qType(qq) === 'pic' ? ` · ${qq.word.replace(/[^A-Za-z0-9]/g, '').length} letters` : ''}</span></div>
+          <div className="qbar-r" style={css('display:flex;align-items:center;gap:14px')}>
             <span className="ans-in" style={css('display:flex;flex-direction:column;align-items:flex-end')}><span><b className="num"><Answered /></b><span className="of num"> / {G.players.length}</span></span><span style={css('font-size:14px;color:var(--muted)')}>answers in</span></span>
             <button type="button" className="btn btn-tonal" onClick={skip}>Skip</button>
           </div>

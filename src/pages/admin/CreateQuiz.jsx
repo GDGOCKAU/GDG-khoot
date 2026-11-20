@@ -174,9 +174,9 @@ function CreateQuiz({ quiz }) {
 
   return (
     <AdminShell>
-      <div className="adm-head">
+      <div className="adm-head ed-head">
         <div>
-          <Link to="/admin" style={css('color:var(--muted);font-size:14px;text-decoration:none')}>← Back to dashboard</Link>
+          <Link to="/admin" style={css('color:var(--muted);font-size:14px;text-decoration:none;white-space:nowrap')}>← Back to dashboard</Link>
           <h1 style={{ marginTop: 8 }}>{isNew ? 'Create a quiz' : 'Edit quiz'}<span style={{ color: '#ea4335' }}>.</span></h1>
           {!isNew && (
             <div className="ed-status">

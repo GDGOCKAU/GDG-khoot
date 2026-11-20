@@ -323,7 +323,7 @@ tr:last-child td { border-bottom: 0; }
   .podium { gap: 8px; }
   .pod .nm { font-size: 16px; }
 }
-@media (max-width: 560px) { .hero-text { padding-left: 0; } .hero .hang { display: none; } }
+@media (max-width: 560px) { .hero-text { padding-left: 0; } }
 
 .adm-side .hang { z-index: 0; }
 
@@ -842,3 +842,66 @@ html.dark .danger-zone { border-color: #5c2b29; }
 .gfoot-row .gfoot-site { margin-top: 0; padding: 11px 20px; font-size: 15px; }
 @media (max-width: 560px) { .gfoot-in.gfoot-row { padding: 22px 20px; } }
 .gdg-logo { display: block; object-fit: contain; flex-shrink: 0; max-width: 100%; max-height: 100%; }
+
+/* ================= phone polish (v15) ================= */
+/* home spider: big one on laptops, a small one hanging on the right on phones */
+.hang-lg, .hang-sm { display: contents; }
+.hang-sm .hang { display: none; }
+@media (max-width: 560px) {
+  .hang-lg .hang { display: none; }
+  .hang-sm .hang { display: block; }
+  .hero h1 { padding-right: 64px; }
+}
+
+@media (max-width: 700px) {
+  /* host screens: brand + theme + exit on one row, the status chips on the row below */
+  .host-top { flex-wrap: wrap; row-gap: 10px; padding: 12px 16px; }
+  .host-top > div { display: contents !important; }
+  .host-top > .brand { order: 0; }
+  .host-top .icon-btn { order: 1; margin-left: auto; }
+  .host-top > div > .btn { order: 2; }
+  .host-top::after { content: ''; order: 3; flex-basis: 100%; }
+  .host-top > div > .chip { order: 4; }
+  .host-main, .host-main.wide, .host-main.mid, .host-main.narrow { padding: 4px 16px 96px; gap: 18px; }
+  .qcard { padding: 22px 16px; border-radius: 1.25rem; }
+  .qcard h1 { font-size: 26px; }
+  .qcard.res { padding: 20px 16px; }
+  .qcard.res h1 { font-size: 24px; }
+  .qbar { flex-wrap: wrap; gap: 12px; }
+  .qbar .tring { gap: 10px !important; }
+  .qbar .tlabel { font-size: 13px !important; max-width: 64px; }
+  .qbar-r { margin-left: auto; gap: 10px !important; }
+  .qbar .ans-in b { font-size: 30px; }
+  .qbar .ans-in .of { font-size: 18px; }
+  .qbar-r .btn { min-height: 44px; padding: 0 16px; }
+  /* floating "you're the host / back to game" pill: a tidy bar across the bottom */
+  .live-pill { left: 12px; right: 12px; transform: none; max-width: none; justify-content: space-between; flex-wrap: nowrap; bottom: 12px; }
+  .live-pill > span:not(.live-dot) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* quiz editor header: back link, title, then status + buttons in a row */
+  .adm-head.ed-head { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 12px; }
+  .adm-head.ed-head h1 { font-size: 30px; }
+  .adm-head.ed-head > div:last-child { justify-content: flex-start; }
+  .adm-head.ed-head > div:last-child .btn { flex: 1 1 0; min-height: 44px; }
+  .adm-head.ed-head > div:last-child > span { flex-basis: 100%; }
+
+  /* dashboard: full-width search, filters below */
+  .dash-tools { width: 100%; }
+  .dash-search { flex: 1 1 100%; width: 100%; }
+}
+.dash-search { width: 220px; }
+
+/* bigger tap targets on touch screens */
+@media (max-width: 700px), (pointer: coarse) {
+  .over-links { gap: 4px; flex-wrap: wrap; }
+  .over-links a, .over-links button { padding: 10px 8px; min-height: 44px; display: inline-flex; align-items: center; }
+  .seg button { min-height: 40px; }
+  .ans input[type=radio] { width: 26px; height: 26px; }
+  .btn-sm { min-height: 40px; }
+}
+@media (max-width: 700px) {
+  .host-top .brand { font-size: 16px; }
+  .host-top .brand .gdg-logo { width: 40px; height: 22px; }
+  .host-exit { padding: 0 12px; }
+}
+@media (max-width: 420px) { .host-exit-t { display: none; } }
