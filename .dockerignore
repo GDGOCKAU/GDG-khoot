@@ -1,0 +1,14 @@
+# build context for docker/web.Dockerfile (the frontend); the API uses backend/ as its own context
+node_modules
+dist
+backend
+.git
+.github
+.vite
+.cert
+docs
+scripts
+.env
+.env.*
+!.env.example
+*.log
