@@ -92,7 +92,7 @@ export function LivePill() {
   if (!hosted()) return null;
   if (G.ended) {
     if (r === 'play') return null;
-    return <div className="live-pill" role="region" aria-label="Finished game"><span><b>Game over</b> · {G.quiz.title}</span><button type="button" className="btn btn-primary btn-sm" onClick={() => { UI.showOver = true; UI.overTab = null; navigate('/play'); }}>My result &amp; share <Ico n="arrow" /></button></div>;
+    return <div className="live-pill" role="region" aria-label="Finished game"><span><b>Game over</b> · {G.quiz.title}</span><button type="button" className="btn btn-primary btn-sm" onClick={() => { UI.showOver = true; UI.overTab = null; navigate('/play'); }}>Share my results <Ico n="arrow" /></button></div>;
   }
   let label, btn;
   if (r === 'host') {
