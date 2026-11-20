@@ -1,6 +1,6 @@
 /* Game-over sharing: text, links and the 1080×1920 story image */
 import { SHARE_URL, TEAMS, fmt, ord, mascot } from './constants';
-import { LOGO } from './icons';
+import { LOGO_SRC } from './icons';
 import { G, ranked, rankOf, teamStats } from './engine';
 import { toast, copyText } from './ui';
 
@@ -45,7 +45,7 @@ async function drawStory(kind) {
   if (kind === 'me') { circle(270, 350, 190, SOFT[me.team]); circle(510, 30, 150, '#e2ebfa'); circle(-10, 750, 130, '#e8f3ed'); }
   else { circle(480, 60, 180, '#e2ebfa'); circle(-20, 450, 150, '#e8f3ed'); circle(520, 550, 130, '#f8e8e9'); circle(20, 760, 140, '#fcf0d6'); }
   /* header */
-  const logo = await loadImg('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(LOGO));
+  const logo = await loadImg(LOGO_SRC);
   if (logo) x.drawImage(logo, 36 * S, 40 * S, 64 * S, 36 * S);
   x.font = F(700, 22); const w1 = x.measureText('GDG KAU').width / S;
   text('GDG KAU', 112, 58, F(700, 22), '#1f2328'); text('HOOT', 112 + w1, 58, F(700, 22), '#1a73e8');

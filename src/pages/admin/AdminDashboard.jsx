@@ -48,7 +48,7 @@ function AdminDashboard() {
         </section>
       ) : !DB.quizzes.length ? (
         <section className="card tbl-wrap">
-          <EmptyState icon="plusc" title="No quizzes yet" text="Create your first quiz. Once you publish it, it shows on the home page and you can host it live.">
+          <EmptyState icon="plusc" title="No quizzes yet" text="Create your first quiz. Once you publish it, you can host it live.">
             <Link className="btn btn-primary" to="/admin/new"><Ico n="plus" />Create quiz</Link>
           </EmptyState>
         </section>

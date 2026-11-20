@@ -64,9 +64,3 @@ export async function ensureQuiz(id) {
     return quiz;
   } catch { return null; }
 }
-
-/* public home page: published quizzes, title/topic/count only */
-export async function loadPublicQuizzes() {
-  const items = await apiRequest('/api/v1/public/quizzes');
-  return items.map((q) => ({ id: q.id, title: q.title, desc: q.description || '', topic: knownTopic(q.topic), questionCount: q.questionCount }));
-}

@@ -33,7 +33,7 @@ a { color: var(--blue-txt); }
 
 /* ---------- shared atoms ---------- */
 .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); font-weight: 700; font-size: 18px; }
-.brand svg { width: 50px; height: 28px; flex-shrink: 0; }
+.brand .gdg-logo { width: 50px; height: 28px; flex-shrink: 0; }
 .brand b { color: var(--blue-txt); }
 .brand small { display: block; font-size: 11px; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 22px; border-radius: 100px; border: 1px solid transparent; font-size: 15px; font-weight: 500; text-decoration: none; transition: transform .12s, background .2s, border-color .2s; white-space: nowrap; }
@@ -145,7 +145,7 @@ html.dark .toast { background: #e8eaed; color: #1f2328; }
 .pl-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 44px; }
 .pl-head { background: var(--bg); border-bottom: 1px solid var(--border); }
 .pl-head .in { max-width: 560px; margin: 0 auto; height: 60px; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; }
-.pl-head .brand { font-size: 16px; } .pl-head .brand svg { width: 40px; height: 22px; }
+.pl-head .brand { font-size: 16px; } .pl-head .brand .gdg-logo { width: 40px; height: 22px; }
 .pl-foot { border-top: 1px solid var(--border); background: var(--bg); }
 .pl-foot .in { max-width: 560px; margin: 0 auto; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-weight: 600; }
 .pl h1 { margin: 0; letter-spacing: -.03em; }
@@ -535,7 +535,7 @@ body:has(.spider-fly) { cursor: grabbing; user-select: none; }
 .gfoot { background: var(--canvas); border-top: 1px solid var(--border); color: var(--ink); }
 .gfoot-in { max-width: 80rem; margin: 0 auto; padding: 64px 32px 32px; }
 .gfoot-brand { display: flex; align-items: center; gap: 16px; }
-.gfoot-logo svg { width: 56px; height: 32px; display: block; }
+.gfoot-logo .gdg-logo { width: 56px; height: 32px; display: block; }
 .gfoot-brand b { display: block; font-size: 26px; letter-spacing: -.01em; }
 .gfoot-brand small { display: block; font-size: 17px; color: var(--muted); margin-top: 2px; }
 .gfoot-tag { margin: 28px 0 0; max-width: 48rem; font-size: 22px; line-height: 1.7; color: var(--muted); }
@@ -761,7 +761,7 @@ html.dark .danger-zone { border-color: #5c2b29; }
   .adm { flex-direction: column; flex-wrap: nowrap; min-height: 100dvh; }
   .adm-side { display: none !important; }
   .adm-phead { display: flex; position: sticky; top: 0; z-index: 30; height: 60px; padding: 0 16px; align-items: center; justify-content: space-between; gap: 10px; background: var(--bg); border-bottom: 1px solid var(--border); }
-  .adm-phead .brand { font-size: 16px; } .adm-phead .brand svg { width: 40px; height: 22px; }
+  .adm-phead .brand { font-size: 16px; } .adm-phead .brand .gdg-logo { width: 40px; height: 22px; }
   .adm-main { flex: 1; padding: 20px 16px 24px; gap: 16px; }
   .adm-main h1 { font-size: 30px; }
   .adm-head p { display: none; }
@@ -798,7 +798,7 @@ html.dark .danger-zone { border-color: #5c2b29; }
 }
 
 .brand > span { white-space: nowrap; }
-@media (max-width: 700px) { .host-top { flex-wrap: wrap; } .host-top .brand { font-size: 16px; } .host-top .brand svg { width: 40px; height: 22px; } .host-top > div > .chip { font-size: 12px; padding: 4px 10px; } }
+@media (max-width: 700px) { .host-top { flex-wrap: wrap; } .host-top .brand { font-size: 16px; } .host-top .brand .gdg-logo { width: 40px; height: 22px; } .host-top > div > .chip { font-size: 12px; padding: 4px 10px; } }
 
 /* ---------- waiting screen: poke Devu + code snack ---------- */
 .poke { display: flex; flex-direction: column; align-items: center; gap: 10px; }
@@ -825,3 +825,20 @@ html.dark .danger-zone { border-color: #5c2b29; }
 .snack-cursor { display: inline-block; width: .55em; height: 1.1em; margin-left: 3px; vertical-align: -.18em; background: #8ab4f8; animation: snack-blink 1s steps(1) infinite; }
 @keyframes snack-blink { 50% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .poke-pop, .poke-float, .snack-body, .snack-cursor { animation: none !important; } .poke-float { display: none; } }
+.gfoot-site { display: inline-flex; align-items: center; gap: 10px; margin-top: 32px; padding: 14px 26px; border-radius: 100px; background: var(--ink); color: var(--bg); font-size: 18px; font-weight: 600; text-decoration: none; transition: transform .15s; }
+.gfoot-site:hover { transform: translateY(-2px); }
+.gfoot-site + .gfoot-bottom { margin-top: 48px; }
+/* home: navbar + hero + footer fit in one screen; the hero takes the space left over */
+.home-page { min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; }
+.home-page > main { flex: 1; display: flex; flex-direction: column; }
+.home-page .hero { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.home-page .hero-in { width: 100%; padding-top: clamp(24px, 6vh, 88px); padding-bottom: clamp(24px, 6vh, 96px); }
+/* compact footer: logo on the left, website button on the right */
+.gfoot-in.gfoot-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; padding: 28px 32px; }
+.gfoot-row .gfoot-logo .gdg-logo { width: 44px; height: 26px; }
+.gfoot-row .gfoot-brand { gap: 12px; }
+.gfoot-row .gfoot-brand b { font-size: 19px; }
+.gfoot-row .gfoot-brand small { font-size: 14px; }
+.gfoot-row .gfoot-site { margin-top: 0; padding: 11px 20px; font-size: 15px; }
+@media (max-width: 560px) { .gfoot-in.gfoot-row { padding: 22px 20px; } }
+.gdg-logo { display: block; object-fit: contain; flex-shrink: 0; max-width: 100%; max-height: 100%; }

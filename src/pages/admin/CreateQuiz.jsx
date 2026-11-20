@@ -212,7 +212,7 @@ function CreateQuiz({ quiz }) {
     if (!saved) { d.status = wasReady ? 'ready' : 'draft'; return; }
     E = null;
     navigate('/admin');
-    toast(wasReady ? 'Changes saved' : 'Quiz published. It now shows on the home page.');
+    toast(wasReady ? 'Changes saved' : 'Quiz published. Host it live from the dashboard.');
   }
   function preview() {
     if (!d.questions.some((x) => !qProblem(x))) { toast('Add at least one complete question to preview.'); return; }

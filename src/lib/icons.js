@@ -30,4 +30,5 @@ export const ICONS = {
   sidebar: '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg>',
   star: '<svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></svg>',
 };
-export const LOGO = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 970 540" stroke-linecap="round" fill="none" role="img" aria-label="GDG logo"><path d="M175 255 L335 135" stroke="#202124" stroke-width="188"/><path d="M175 255 L335 135" stroke="#EA4335" stroke-width="160"/><path d="M120 270 L320 420" stroke="#202124" stroke-width="188"/><path d="M120 270 L320 420" stroke="#4285F4" stroke-width="160"/><path d="M795 285 L635 405" stroke="#202124" stroke-width="188"/><path d="M795 285 L635 405" stroke="#FBBC04" stroke-width="160"/><path d="M850 270 L650 120" stroke="#202124" stroke-width="188"/><path d="M850 270 L650 120" stroke="#34A853" stroke-width="160"/></svg>';
+/* the GDG logo picture lives in public/img/gdg-logo.png */
+export const LOGO_SRC = '/img/gdg-logo.png';

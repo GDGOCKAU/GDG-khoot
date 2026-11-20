@@ -1,7 +1,7 @@
 /* Small building blocks used on every screen */
 import { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ICONS, LOGO } from '../../lib/icons';
+import { ICONS, LOGO_SRC } from '../../lib/icons';
 import { TEAMS, TOPICS, SPIDER, css, pinFmt } from '../../lib/constants';
 import { isDark, toggleTheme } from '../../lib/theme';
 import { G, UI, hosted, liveTime, useTick } from '../../lib/engine';
@@ -13,7 +13,7 @@ export function Ico({ n, s }) {
   if (s) svg = svg.replace(/width="\d+" height="\d+"/, `width="${s}" height="${s}"`);
   return <span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: svg }} />;
 }
-export function Logo() { return <span style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: LOGO }} />; }
+export function Logo() { return <img className="gdg-logo" src={LOGO_SRC} alt="GDG logo" />; }
 
 export function Brand({ sub }) {
   return <span className="brand"><Logo /><span>GDG KAU<b>HOOT</b>{sub ? <small>{sub}</small> : null}</span></span>;
