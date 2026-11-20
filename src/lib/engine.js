@@ -273,7 +273,13 @@ export function liveReveal(r, host) {
     if (Number.isInteger(r.correctIndex) && r.correctIndex >= 0) qq.correct = r.correctIndex;
     if (r.word) qq.word = r.word;
   }
-  if (host) applyStandings(host.standings, host.choices, qq);
+  /* why the question closed (all answered, time, skip) for the host's results line */
+  G.revealInfo = { index: r.index, closedBy: r.closedBy || null };
+  if (host) {
+    applyStandings(host.standings, host.choices, qq);
+    /* the counts are in now: a new key re-runs the count-up numbers (they started at 0 with the phase) */
+    G.hostRevealIdx = r.index;
+  }
   notify();
 }
 /* result (one phone): my answer, points, streak, rank and total */

@@ -23,7 +23,7 @@ const bigRing = <LiveRing size={220} stroke={17} color="#1a73e8"><span style={{ 
 function HostGame() {
   const navigate = useNavigate();
   const [askExit, setAskExit] = useState(false);
-  useAnims(`${G.phase}:${G.qi}`);
+  useAnims(`${G.phase}:${G.qi}:${G.liveHost && G.hostRevealIdx === G.qi ? 'counts' : ''}`);
 
   const n = G.qs.length, qq = curQ();
   const pinChip = <span className="chip chip-blue">Game PIN {pinFmt(G.pin)}</span>;

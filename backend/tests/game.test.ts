@@ -190,6 +190,63 @@ describe("server-owned game flow", () => {
   });
 });
 
+describe("host reveal: counts and why the question closed", () => {
+  const revealHost = (index: number) => (e: Ev) => e.event === "reveal_host" && e.payload.index === index;
+  it("one right, one wrong on MC, True/False and Picture: counts, choices and 'all_answered'", async () => {
+    const { service, events } = setup();
+    const session = await service.createSession(quiz.id, HOST);
+    const right = await service.joinByPin(session.pin, { name: "Right", mascot: "blue-0", team: "blue" });
+    const wrong = await service.joinByPin(session.pin, { name: "Wrong", mascot: "red-0", team: "red" });
+    await service.start(HOST, session.id);
+    const expected = [
+      { counts: [1, 1, 0, 0], choices: { [right.id]: 0, [wrong.id]: 1 } },
+      { counts: [1, 1], choices: { [right.id]: 0, [wrong.id]: 1 } },
+      { counts: { right: 1, wrong: 1, none: 0 }, choices: { [right.id]: true, [wrong.id]: false } },
+    ];
+    for (let i = 0; i < 3; i++) {
+      const q = (await until(events, question(i), 3000)).payload;
+      if (q.type === "pic") {
+        await service.answer(session.id, right.id, q.questionId, { text: "doorman" });
+        await service.answer(session.id, wrong.id, q.questionId, { text: "doormen" });
+      } else {
+        await service.answer(session.id, right.id, q.questionId, { optionId: q.options[0].id });
+        await service.answer(session.id, wrong.id, q.questionId, { optionId: q.options[1].id });
+      }
+      const host = (await until(events, revealHost(i))).payload;
+      expect(host.closedBy).toBe("all_answered");
+      expect(host.counts).toEqual(expected[i].counts);
+      expect(host.choices).toEqual(expected[i].choices);
+      expect(host.total).toBe(2);
+      // the right player is credited, the wrong one is not
+      expect(host.standings.find((p: { id: string }) => p.id === right.id).lastOk).toBe(true);
+      expect(host.standings.find((p: { id: string }) => p.id === wrong.id).lastOk).toBe(false);
+      // phones see the same reason (no host-only data)
+      expect(events.find((e) => e.event === "reveal" && e.payload.index === i)!.payload.closedBy).toBe("all_answered");
+    }
+    await until(events, (e) => e.event === "final", 3000);
+  });
+
+  it("says 'skip' when the host skips and 'time' when the timer runs out", async () => {
+    // a 0.3 s question so the timer really runs out
+    const short: Quiz = { ...quiz, questions: [mc(2, 0, { timeLimitSecs: 0.3 }), mc(6, 1)] };
+    const events: Ev[] = [];
+    const service = new GameService({ getQuiz: async () => short }, new MemoryGameRepository(), (_s, event, payload, audience) => events.push({ event, payload, audience }), undefined, FAST);
+    const session = await service.createSession(short.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "A", mascot: "blue-0", team: "blue" });
+    await service.joinByPin(session.pin, { name: "B", mascot: "red-0", team: "red" });
+    await service.start(HOST, session.id);
+    const q1 = (await until(events, question(0))).payload;
+    await service.answer(session.id, a.id, q1.questionId, { optionId: q1.options[0].id });
+    const timeUp = (await until(events, revealHost(0), 3000)).payload;
+    expect(timeUp.closedBy).toBe("time");
+    expect(timeUp.counts).toEqual([1, 0, 0, 0]);
+
+    await until(events, question(1), 3000);
+    await service.skip(HOST, session.id);
+    expect((await until(events, revealHost(1))).payload.closedBy).toBe("skip");
+  });
+});
+
 describe("power-ups", () => {
   async function inQuestion(powerUps: boolean, index = 0) {
     const ctx = setup({ ...FAST, earlyClose: 10_000 });

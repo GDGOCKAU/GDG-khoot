@@ -155,7 +155,7 @@ type Live = {
   locked: boolean;
   powerUps: boolean;
   power: Map<string, PowerState>;
-  reveal: ReturnType<GameService["revealPayload"]> | null;
+  reveal: (ReturnType<GameService["revealPayload"]> & { closedBy?: "all_answered" | "time" | "skip" }) | null;
   results: Map<string, unknown>;
   hostReveal: unknown;
   final: unknown;
@@ -619,11 +619,16 @@ export class GameService {
     const session = await this.gameRepository.findById(sessionId);
     if (!live || !session || live.index !== index) return;
     const question = live.questions[index];
+    const closedAt = this.clock();
+    const elapsedMs = closedAt.getTime() - (session.questionStartedAt?.getTime() ?? closedAt.getTime());
     session.status = "REVEAL";
-    session.closesAt = this.clock();
+    session.closesAt = closedAt;
     await this.gameRepository.save(session);
     const { standings, answers } = await this.standings(sessionId, question.id);
-    live.reveal = this.revealPayload(question, index, answers, standings.length);
+    // why it closed: everyone answered, the timer ran out, or the host skipped it
+    const everyone = standings.length > 0 && standings.every((player) => answers.some((answer) => answer.participantId === player.id));
+    const closedBy: "all_answered" | "time" | "skip" = everyone ? "all_answered" : elapsedMs < question.timeLimitSecs * 1000 - 250 ? "skip" : "time";
+    live.reveal = { ...this.revealPayload(question, index, answers, standings.length), closedBy };
     // each phone gets only its own result
     standings.forEach((player, i) => {
       const answer = answers.find((item) => item.participantId === player.id);
