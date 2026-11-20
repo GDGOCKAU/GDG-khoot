@@ -12,9 +12,12 @@ import { LapShell, PShell } from '../../components/layout/Shells';
 import { CodeSnack, PokeDevu } from '../../components/player/WaitFun';
 import GameOver from './GameOver';
 import GameClosed from './GameClosed';
+import { activatePowerUp } from '../../lib/live';
 
 function PlayerGame() {
   useAppState();
+  /* live game: nothing to play until the server has sent a question */
+  if (G && G.live && G.me && G.phase === 'lobby') return <Navigate to="/lobby" replace />;
   if (G && G.me) return <PlayerView />;
   if (UI.closed) return <GameClosed />;
   return <Navigate to="/" replace />;
@@ -46,7 +49,7 @@ function PlayerView() {
       const qq = curQ(), t = qType(qq);
       if (t === 'pic') { if (/^[a-z0-9]$/i.test(e.key)) document.getElementById('picIn')?.focus(); return; }
       const m = (t === 'tf' ? { 1: 0, 2: 1, t: 0, f: 1 } : { 1: 0, 2: 1, 3: 2, 4: 3, a: 0, b: 1, c: 2, d: 3 })[e.key.toLowerCase()];
-      if (m !== undefined && (qq.answers[m] || '').trim()) answer('me', m);
+      if (m !== undefined && (qq.answers[m] || '').trim() && !(G.removed || []).includes(qq.optionIds?.[m])) answer('me', m);
     };
     document.addEventListener('keydown', k);
     return () => document.removeEventListener('keydown', k);
@@ -63,6 +66,10 @@ function PlayerView() {
   if (UI.showOver) return <GameOver />;
 
   const me = G.me, qq = curQ(), n = G.qs.length;
+  /* 50/50: the options the server removed simply don't render, like empty answer slots */
+  const removed = G.live ? (G.removed || []) : [];
+  const qqView = qq && removed.length ? { ...qq, answers: qq.answers.map((a, i) => (removed.includes(qq.optionIds?.[i]) ? '' : a)) } : qq;
+  const powers = G.live && G.power && G.power.enabled && G.phase === 'question' && !G.answers.me ? <PowerUps qq={qq} /> : null;
   const qLabel = qq ? `Question ${G.qi + 1} of ${n}` : '';
   const T = TEAMS[me.team];
   const av = (size, extra) => <span style={{ position: 'relative', display: 'inline-flex' }}><img className="avatar" src={me.img} alt="" width={size} height={size} style={{ '--team': T.solid, borderWidth: size > 100 ? 7 : 4 }} />{extra}</span>;
@@ -94,12 +101,13 @@ function PlayerView() {
       if (!G.answers.me) {
         const T2 = qType(qq), qimg = qq.img && (T2 === 'mc' || T2 === 'tf');
         const tip = T2 === 'pic' ? 'Tip: just start typing, Enter submits' : T2 === 'tf' ? 'Tip: press 1 for True, 2 for False' : 'Tip: press 1, 2, 3 or 4 to answer';
-        const area = <PlayerAnswerArea qq={qq} wide={wide} typed={typed} onType={setTyped} onSubmitPic={submitPic} onAnswer={(i) => answer('me', i)} showCode={showCode ?? !hosted()} onToggleCode={() => setShowCode(!(showCode ?? !hosted()))} />;
+        const area = <PlayerAnswerArea qq={qqView} wide={wide} typed={typed} onType={setTyped} onSubmitPic={submitPic} onAnswer={(i) => answer('me', i)} showCode={showCode ?? !hosted()} onToggleCode={() => setShowCode(!(showCode ?? !hosted()))} />;
         if (wide) {
           return (
             <LapShell right={<MePill p={me} />} main="q">
               <div style={css('display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:16px')}><span className="chip" style={css('font-size:14px;padding:8px 16px')}>{qLabel}</span><span style={css('display:flex;align-items:center;gap:12px')}><span className="tbar"><LiveBar /></span><b className="num" style={{ fontSize: 22 }}><Secs />s</b></span></div>
               <div className="card lap-q" style={css('text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px')}><h1>{qq.text}</h1>{qimg && <img src={qq.img} alt="" style={css('max-height:180px;max-width:100%;border-radius:1rem')} />}</div>
+              {powers}
               {area}
               <div style={css('display:flex;justify-content:space-between;color:var(--muted);font-size:14px')}><span>{tip}</span><b className="num" style={{ color: 'var(--ink)', fontWeight: 600 }}>{fmt(me.score)} pts</b></div>
             </LapShell>
@@ -111,6 +119,7 @@ function PlayerView() {
             <p className="pq-text">{qq.text}</p>
             <main className="pq-main">
               {qimg && <img src={qq.img} alt="" style={css('max-height:160px;max-width:100%;border-radius:1rem;align-self:center')} />}
+              {powers}
               {area}
             </main>
             <footer className="pq-foot"><span>{me.name}</span><span className="num" style={{ fontWeight: 700 }}>{fmt(me.score)} pts</span></footer>
@@ -124,7 +133,7 @@ function PlayerView() {
           <PokeDevu me={me} team={T} size={wide ? 170 : 130} />
           <ChosenPill qq={qq} choice={a.choice} big={wide} />
           <CodeSnack />
-          <p style={css('margin:0;color:var(--muted)')} className={wide ? 'lead18' : ''}>Waiting for the others… <b style={{ color: 'var(--ink)' }}><Answered /></b> / {G.players.length} answered</p>
+          <p style={css('margin:0;color:var(--muted)')} className={wide ? 'lead18' : ''}>{G.live ? <>Waiting for the others…{G.power && G.power.doubleActive ? ' Double points is on.' : ''}</> : <>Waiting for the others… <b style={{ color: 'var(--ink)' }}><Answered /></b> / {G.players.length} answered</>}</p>
           <div style={css('display:flex;align-items:center;gap:12px')}><div className="tbar"><LiveBar /></div><span className="num" style={css('color:var(--muted);font-size:16px;font-weight:600')}><Secs />s</span></div>
           <p style={css('margin:0;font-size:15px;color:var(--muted)')}>{wide ? 'Look at the big screen. The answer shows when time is up.' : 'The answer shows when time is up.'}</p>
         </div>, stateOpts(TEAMS[me.team].bright));
@@ -141,10 +150,10 @@ function PlayerView() {
           <h1 style={{ fontSize: wide ? 64 : 42, color: ok ? 'var(--green-txt)' : timeUp ? 'var(--yellow-txt)' : 'var(--red-txt)' }}>{ok ? 'Correct!' : timeUp ? "Time's up!" : 'Not quite!'}</h1>
           {timeUp && <p style={css('margin:-8px 0 0;color:var(--muted)')}>No answer this time. Be quicker on the next one!</p>}
           {ok
-            ? <div style={css('display:flex;flex-wrap:wrap;gap:10px;justify-content:center')}><span className="pts-pill num">+{fmt(L.pts)} points</span>{me.streak > 1 && <span className="pts-pill" style={css('font-size:16px;display:flex;align-items:center;gap:6px;color:var(--green-txt)')}><Ico n="flame" />Streak: {me.streak}</span>}</div>
+            ? <div style={css('display:flex;flex-wrap:wrap;gap:10px;justify-content:center')}><span className="pts-pill num">+{fmt(L.pts)} points</span>{L.doubled && <span className="pts-pill" style={css('font-size:16px;display:flex;align-items:center;gap:6px;color:var(--blue-txt)')}><Ico n="star" />Double points</span>}{me.streak > 1 && <span className="pts-pill" style={css('font-size:16px;display:flex;align-items:center;gap:6px;color:var(--green-txt)')}><Ico n="flame" />Streak: {me.streak}</span>}</div>
             : <><span style={{ color: 'var(--muted)' }}>The answer was</span>{qType(qq) === 'pic' ? <div className="boxes reveal"><Boxes word={qq.word} mode="reveal" /></div> : <ChosenPill qq={qq} choice={qq.correct} />}</>}
           <div className={`stat-card${wide ? ' big' : ''}`} style={{ width: 'min(380px,100%)', ...(wide ? { width: '100%' } : {}) }}><div style={{ textAlign: 'left' }}><small>Your rank</small><strong>{ord(rankOf(me))} place</strong></div><div style={{ textAlign: 'right' }}><small>Total</small><strong className="num">{fmt(me.score)}</strong></div></div>
-          <p style={css('margin:0;font-size:13px;color:var(--muted)')}>{wide ? 'Look at the big screen for the leaderboard.' : <>{hosted() ? 'Answers on the host screen · leaderboard' : 'Answer results'} in <Secs />s</>}</p>
+          <p style={css('margin:0;font-size:13px;color:var(--muted)')}>{wide ? 'Look at the big screen for the leaderboard.' : <>{hosted() || G.live ? 'Answers on the host screen · leaderboard' : 'Answer results'} in <Secs />s</>}</p>
         </div>, stateOpts(ok ? '#34a853' : timeUp ? '#f9ab00' : '#ea4335', { bg: ok ? 'var(--green-soft)' : timeUp ? 'var(--yellow-soft)' : 'var(--red-soft)' }));
     }
     case 'answers':
@@ -169,6 +178,37 @@ function PlayerView() {
     default:
       return null;
   }
+}
+
+/* /lobby — a live player waits here. It moves to /play only when the server opens a question. */
+export function PlayerLobby() {
+  useAppState();
+  const wide = useWide();
+  useAnims('lobby');
+  if (!G || !G.live || !G.me) return UI.closed ? <GameClosed /> : <Navigate to="/" replace />;
+  if (G.phase !== 'lobby') return <Navigate to="/play" replace />;
+  const me = G.me, T = TEAMS[me.team];
+  return (
+    <PShell wide={wide} center main="state" glow={wide ? T.bright : undefined}>
+      <div className="center-col">
+        <img className="avatar" src={me.img} alt="" width={wide ? 170 : 140} height={wide ? 170 : 140} style={{ '--team': T.solid, borderWidth: 7 }} />
+        <h1 style={{ fontSize: wide ? 60 : 38 }}>You&apos;re in<span style={{ color: '#34a853' }}>!</span></h1>
+        <p style={css('margin:0;color:var(--muted);font-size:18px;max-width:30rem')}>Your nickname is on the host screen. Waiting for the host to start the game<Bounce /></p>
+        <span className={`chip chip-${me.team}`}>Team {T.name}</span>
+      </div>
+    </PShell>
+  );
+}
+
+/* live power-ups (only when the host switched them on): each one once per game, checked on the server */
+function PowerUps({ qq }) {
+  const p = G.power || {};
+  return (
+    <div className="powerups" role="group" aria-label="Power-ups" style={css('display:flex;gap:10px;justify-content:center;flex-wrap:wrap')}>
+      <button type="button" className={`btn btn-sm ${p.doubleActive ? 'btn-primary' : 'btn-tonal'}`} disabled={!!p.doubleUsed || qq.points === 0} aria-pressed={!!p.doubleActive} onClick={() => activatePowerUp('double')}><Ico n="star" s={16} />{p.doubleActive ? 'Double points on' : 'Double points'}</button>
+      {qType(qq) === 'mc' && <button type="button" className="btn btn-sm btn-tonal" disabled={!!p.fiftyUsed} onClick={() => activatePowerUp('fifty')}>50/50</button>}
+    </div>
+  );
 }
 
 export default PlayerGame;

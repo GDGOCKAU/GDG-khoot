@@ -2,22 +2,47 @@
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LETTERS, ansCls, css, newPin, uid } from '../../lib/constants';
-import { LANGS, QTYPES, blankQ, norm, qProblem, qType, setQType } from '../../lib/questions';
+import { LANGS, QTYPES, blankQ, norm, normalizeDraft, qProblem, qType, setQType } from '../../lib/questions';
 import { DB, addTopic, deleteQuiz, quizById, topicNames, upsertQuiz } from '../../lib/store';
 import { UI } from '../../lib/engine';
 import { shrinkImage, toast } from '../../lib/ui';
 import { Dots, Ico, Modal } from '../../components/common/UI';
 import { Boxes } from '../../components/game/Blocks';
 import { AdminShell } from '../../components/layout/Shells';
+import { apiRequest } from '../../api/client';
+import { isUuid, saveQuizToServer } from '../../lib/quizPayload';
 
 /* the open editor survives moving away and back, like the prototype */
 let E = null;
 function openEditor(quiz) {
   const forId = quiz ? quiz.id : 'new';
   if (!E || E.forId !== forId) {
-    E = { forId, cur: 0, saved: !!quiz, draft: quiz ? JSON.parse(JSON.stringify(quiz)) : { id: uid(), title: '', topic: 'Mobile', desc: '', status: 'draft', pin: newPin(), lastHosted: null, questions: [blankQ()] } };
+    E = { forId, cur: 0, saved: !!quiz, draft: quiz ? normalizeDraft(JSON.parse(JSON.stringify(quiz))) : { id: uid(), title: '', topic: 'Mobile', desc: '', status: 'draft', pin: newPin(), lastHosted: null, questions: [blankQ()] } };
   }
   return E;
+}
+
+/* saves of one editor run one after another: an autosave still uploading a picture must finish
+   before Publish saves, or Publish could be overwritten as a draft (or a new quiz saved twice) */
+function saveBackend(d, ed, setSaveState) {
+  const run = () => saveBackendNow(d, ed, setSaveState);
+  const next = (ed.queue || Promise.resolve()).then(run, run);
+  ed.queue = next.catch(() => {});
+  return next;
+}
+async function saveBackendNow(d, ed, setSaveState) {
+  try {
+    const quiz = await saveQuizToServer(d);
+    d.id = quiz.id;
+    upsertQuiz(d);
+    ed.saved = true;
+    setSaveState?.(d.status === 'ready' ? 'All changes saved' : 'Draft saved');
+    return true;
+  } catch (error) {
+    setSaveState?.(error.status === 401 ? 'Sign in required' : 'Backend save failed');
+    toast(error.status === 401 ? 'Please sign in again.' : 'Could not save to the backend.');
+    return false;
+  }
 }
 
 function CreateQuiz({ quiz }) {
@@ -46,11 +71,14 @@ function CreateQuiz({ quiz }) {
   useEffect(() => () => clearTimeout(saveT.current), []);
   useEffect(() => { if (focusText.current && textRef.current) { focusText.current = false; textRef.current.focus(); } });
 
-  function persistDraft() {
-    upsertQuiz(d);
-    ed.saved = true;
-    setSaveState(d.status === 'ready' ? 'All changes saved' : 'Draft saved');
-    if (ed.forId === 'new') { ed.forId = d.id; navigate('/admin/edit/' + d.id, { replace: true }); }
+  async function persistDraft() {
+    const saved = await saveBackend(d, ed, setSaveState);
+    /* only while this editor is still open (Publish, Delete or Back may have left it meanwhile).
+       The editor takes the saved id and the URL in the same step, so no render sees a mismatch. */
+    const inEditor = /^\/admin\/(new|edit\/)/.test(window.location.pathname);
+    if (!saved || E !== ed || !inEditor) return;
+    ed.forId = d.id;
+    navigate('/admin/edit/' + d.id, { replace: true });
   }
   function softSave() {
     setSaveState('Saving…');
@@ -65,19 +93,42 @@ function CreateQuiz({ quiz }) {
     if (!d.title.trim()) { toast('Give the quiz a title.'); document.querySelector('[data-f="title"]')?.focus(); return; }
     const i = d.questions.findIndex(qProblem);
     if (i >= 0) { ed.cur = i; rerender(); toast(`Question ${i + 1} ${qProblem(d.questions[i])}.`); return; }
-    upsertQuiz(d); ed.dirty = 0; rerender(); toast('Changes saved');
+    saveBackend(d, ed, setSaveState).then((saved) => {
+      if (!saved) return;
+      ed.dirty = 0; rerender(); toast('Changes saved');
+    });
   }
   function discard() {
-    ed.draft = JSON.parse(JSON.stringify(stored)); ed.dirty = 0; ed.cur = Math.min(ed.cur, ed.draft.questions.length - 1);
+    ed.draft = normalizeDraft(JSON.parse(JSON.stringify(stored))); ed.dirty = 0; ed.cur = Math.min(ed.cur, ed.draft.questions.length - 1);
     rerender(); toast('Changes discarded');
   }
-  function duplicateQuiz() {
+  /* the copy is saved on the server as a new draft before it opens */
+  async function duplicateQuiz() {
     const copy = { ...JSON.parse(JSON.stringify(d)), id: uid(), pin: newPin(), title: `${d.title || 'Untitled quiz'} (copy)`, status: 'draft', lastHosted: null };
-    upsertQuiz(copy); E = null;
+    if (!(await saveBackend(copy, { forId: copy.id }))) return;
+    E = null;
     navigate('/admin/edit/' + copy.id);
     toast('Quiz duplicated as a draft');
   }
   const setQ = (k, v) => change(() => { qq[k] = v; });
+  /* the server owns saved quizzes: delete there first, then drop the local copy */
+  async function removeQuiz() {
+    clearTimeout(saveT.current);
+    if (isUuid(d.id)) {
+      try {
+        await apiRequest(`/api/v1/quizzes/${d.id}`, { method: 'DELETE' });
+      } catch (error) {
+        if (error.status !== 404) {
+          setAskDelete(false);
+          toast(error.body?.error === 'quiz_in_live_game' ? 'This quiz is in a live game right now. End the game first.'
+            : error.status === 401 ? 'Please sign in again.' : 'Could not delete the quiz on the server.');
+          return;
+        }
+      }
+      try { localStorage.removeItem(`kauhoot:host:${d.id}`); } catch { /* ignore */ }
+    }
+    deleteQuiz(d.id); E = null; navigate('/admin'); toast('Quiz deleted');
+  }
 
   function doAddTopic(name) {
     const n = name.trim().replace(/\s+/g, ' ');
@@ -87,15 +138,18 @@ function CreateQuiz({ quiz }) {
     setAddingTopic(false);
     change(() => { d.topic = r.name; });
   }
-  function publish() {
+  async function publish() {
     if (!d.title.trim()) { toast('Give the quiz a title.'); document.querySelector('[data-f="title"]')?.focus(); return; }
     const i = d.questions.findIndex(qProblem);
     if (i >= 0) { ed.cur = i; rerender(); toast(`Question ${i + 1} ${qProblem(d.questions[i])}.`); return; }
     const wasReady = d.status === 'ready';
     clearTimeout(saveT.current);
-    d.status = 'ready'; upsertQuiz(d); E = null;
+    d.status = 'ready';
+    const saved = await saveBackend(d, ed, setSaveState);
+    if (!saved) { d.status = wasReady ? 'ready' : 'draft'; return; }
+    E = null;
     navigate('/admin');
-    toast(wasReady ? 'Changes saved' : 'Quiz published. It now shows on the home page.');
+    toast(wasReady ? 'Changes saved' : 'Quiz published. Host it live from the dashboard.');
   }
   function preview() {
     if (!d.questions.some((x) => !qProblem(x))) { toast('Add at least one complete question to preview.'); return; }
@@ -249,10 +303,10 @@ function CreateQuiz({ quiz }) {
       )}
       {askDelete && (
         <Modal id="delT" icon="trash" title="Are you sure you want to delete the quiz?" onClose={() => setAskDelete(false)}>
-          <p>&quot;{d.title || 'Untitled quiz'}&quot; and its {d.questions.length} question{d.questions.length > 1 ? 's' : ''} will be deleted. This can&apos;t be undone.</p>
+          <p>&quot;{d.title || 'Untitled quiz'}&quot; and its {d.questions.length} question{d.questions.length > 1 ? 's' : ''} will be deleted, with the results of its past games. This can&apos;t be undone.</p>
           <div style={css('display:flex;gap:10px;justify-content:flex-end')}>
             <button type="button" className="btn btn-outline" onClick={() => setAskDelete(false)} autoFocus>Cancel</button>
-            <button type="button" className="btn btn-danger-solid" onClick={() => { clearTimeout(saveT.current); deleteQuiz(d.id); E = null; navigate('/admin'); toast('Quiz deleted'); }}>Yes, delete quiz</button>
+            <button type="button" className="btn btn-danger-solid" onClick={removeQuiz}>Yes, delete quiz</button>
           </div>
         </Modal>
       )}

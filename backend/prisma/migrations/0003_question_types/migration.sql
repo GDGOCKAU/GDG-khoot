@@ -1,0 +1,6 @@
+ALTER TABLE "Question"
+ADD COLUMN "type" TEXT NOT NULL DEFAULT 'mc',
+ADD COLUMN "code" TEXT,
+ADD COLUMN "language" TEXT,
+ADD COLUMN "pictureUrls" JSONB,
+ADD COLUMN "word" TEXT;

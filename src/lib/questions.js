@@ -38,6 +38,37 @@ export function highlight(code) {
 export function blankQ() {
   return { type: 'mc', text: '', answers: ['', '', '', ''], correct: -1, time: 20, points: 1, img: null, code: '', lang: 'Dart', pics: [], word: '' };
 }
+/* Any stored question (old, partial or from the server) in the shape the editor expects. */
+const TIMES = [5, 10, 15, 20, 30, 60];
+const str = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v));
+export function normalizeQ(x) {
+  const q = x && typeof x === 'object' ? x : {};
+  const b = blankQ();
+  const type = QTYPES.some(([t]) => t === q.type) ? q.type : 'mc';
+  const answers = (Array.isArray(q.answers) ? q.answers : []).slice(0, 4).map(str);
+  while (answers.length < 4) answers.push('');
+  const correct = Number.isInteger(q.correct) && q.correct >= 0 && q.correct < 4 ? q.correct : -1;
+  return {
+    ...q,
+    type,
+    text: str(q.text),
+    answers: type === 'tf' ? ['True', 'False', '', ''] : answers,
+    correct: type === 'tf' && correct > 1 ? -1 : correct,
+    time: TIMES.includes(Number(q.time)) ? Number(q.time) : (type === 'code' || type === 'pic' ? 30 : b.time),
+    points: [0, 1, 2].includes(q.points) ? q.points : b.points,
+    img: typeof q.img === 'string' && q.img ? q.img : null,
+    code: str(q.code),
+    lang: LANGS.includes(q.lang) ? q.lang : b.lang,
+    pics: (Array.isArray(q.pics) ? q.pics : []).filter((u) => typeof u === 'string' && u),
+    word: str(q.word),
+  };
+}
+/* a draft always has a title string and at least one question to show */
+export function normalizeDraft(d) {
+  const x = d && typeof d === 'object' ? d : {};
+  const questions = (Array.isArray(x.questions) ? x.questions : []).map(normalizeQ);
+  return { ...x, title: str(x.title), desc: str(x.desc), topic: str(x.topic) || 'Other', status: x.status === 'ready' ? 'ready' : 'draft', questions: questions.length ? questions : [blankQ()] };
+}
 export function qProblem(x) {
   const t = qType(x);
   if (!x.text.trim()) return 'needs a question';

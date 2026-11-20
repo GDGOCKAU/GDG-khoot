@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { DB, useAppState } from '../../lib/store';
-import { Ico, TopicChip } from '../../components/common/UI';
+import { DB, setAdmin, useAppState } from '../../lib/store';
+import { EmptyState, Ico, TopicChip } from '../../components/common/UI';
 import { AdminShell } from '../../components/layout/Shells';
+import { loadQuizzes } from '../../lib/serverQuizzes';
 import ImportCsv from '../../components/admin/ImportCsv';
 import { quizToCSV, downloadText, csvName } from '../../lib/csvQuiz';
 
@@ -20,9 +21,17 @@ function AdminDashboard() {
   const setFilter = (v) => { lastFilter = v; setFilterS(v); };
   const setSearch = (v) => { lastSearch = v; setSearchS(v); };
 
-  const games = DB.games.filter((g) => g.mode === 'host');
-  const acc = DB.games.length ? Math.round(100 * DB.games.reduce((s, g) => s + g.accuracy, 0) / DB.games.length) + '%' : '—';
-  const players = DB.games.reduce((s, g) => s + g.players, 0);
+  /* quizzes and totals come only from the server (totals: finished games) */
+  const [stats, setStats] = useState(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    /* an expired sign-in goes back to the password page */
+    loadQuizzes().then(setStats).catch((error) => { if (error.status === 401) setAdmin(false); else setFailed(true); });
+  }, []);
+
+  const games = { length: stats ? stats.gamesHosted : 0 };
+  const acc = stats && stats.accuracy !== null ? Math.round(100 * stats.accuracy) + '%' : '—';
+  const players = stats ? stats.players : 0;
   const term = search.trim().toLowerCase();
   const list = DB.quizzes.filter((x) => (filter === 'All' || (filter === 'Ready' ? x.status === 'ready' : x.status === 'draft')) && (!term || x.title.toLowerCase().includes(term)));
 
@@ -41,6 +50,19 @@ function AdminDashboard() {
         <div className="card stat" style={{ '--c': '#f9ab00' }}><b className="num">{players}</b><span>Players so far</span></div>
         <div className="card stat" style={{ '--c': '#34a853' }}><b className="num">{acc}</b><span>Average accuracy</span></div>
       </div>
+      {!DB.loaded ? (
+        <section className="card tbl-wrap">
+          {failed
+            ? <EmptyState icon="x" tone="red" title="Could not load your quizzes" text="The server did not answer. Check that it is running, then reload this page."><button type="button" className="btn btn-outline" onClick={() => window.location.reload()}>Reload</button></EmptyState>
+            : <p style={{ margin: 0, textAlign: 'center', color: 'var(--muted)', padding: 32 }}>Loading quizzes…</p>}
+        </section>
+      ) : !DB.quizzes.length ? (
+        <section className="card tbl-wrap">
+          <EmptyState icon="plusc" title="No quizzes yet" text="Create your first quiz. Once you publish it, you can host it live.">
+            <Link className="btn btn-primary" to="/admin/new"><Ico n="plus" />Create quiz</Link>
+          </EmptyState>
+        </section>
+      ) : (
       <section className="card tbl-wrap">
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <h2 style={{ margin: 0, fontSize: 22 }}>Your quizzes</h2>
@@ -88,6 +110,7 @@ function AdminDashboard() {
           )) : <p style={{ margin: 0, textAlign: 'center', color: 'var(--muted)', padding: 24 }}>No quizzes match.</p>}
         </div>
       </section>
+      )}
       {importing && <ImportCsv onClose={() => setImporting(false)} />}
     </AdminShell>
   );

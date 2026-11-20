@@ -110,6 +110,14 @@ export function HostAnswerArea({ qq }) {
 }
 
 /* ---------- answer results ---------- */
+/* why the question ended: the server says so in a live game; practice works it out */
+function closedLine(answered, total) {
+  const by = G.liveHost
+    ? (G.revealInfo && G.revealInfo.index === G.qi ? G.revealInfo.closedBy : null)
+    : (total > 0 && answered >= total ? 'all_answered' : 'time');
+  const why = by === 'all_answered' ? 'Everyone answered' : by === 'skip' ? 'Skipped' : by === 'time' ? 'Time’s up' : '';
+  return <span style={{ color: 'var(--muted)', fontSize: 15 }}>{why ? `${why} · ` : ''}Leaderboard in <Secs />s</span>;
+}
 /* the little label on a question card: the question type for true/false, code and picture questions, otherwise the topic */
 export function QKindChip({ qq }) {
   const t = qType(qq);
@@ -131,7 +139,7 @@ function PicAnswersBlock() {
     <div style={css('display:flex;flex-direction:column;align-items:center;gap:14px')}><PicsRow qq={qq} size={isWide() ? 110 : 76} /><div className="boxes reveal"><Boxes word={qq.word} mode="reveal" /></div></div>
     <div style={css('display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px')}>
       <span className="chip chip-green res-chip"><b data-count={right} data-start="0" data-delay="1500" data-dur="600">0</b>&nbsp;of {total} guessed it</span>
-      <span style={{ color: 'var(--muted)', fontSize: 15 }}>Time&apos;s up · Leaderboard in <Secs />s</span>
+      {closedLine(vals.length, total)}
     </div>
     <div className="achart" style={{ '--n': 3, minHeight: 220 }}>
       {cols.map(([ci, label, n, ok, ic], k) => (
@@ -155,7 +163,7 @@ export function AnswersBlock() {
     <QHead qq={qq} />
     <div style={css('display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px')}>
       <span className="chip chip-green res-chip"><b data-count={right} data-start="0" data-delay="1500" data-dur="600">0</b>&nbsp;of {total} got it right</span>
-      <span style={{ color: 'var(--muted)', fontSize: 15 }}>Time&apos;s up · Leaderboard in <Secs />s</span>
+      {closedLine(Object.keys(G.answers).length, total)}
     </div>
     <div className="achart" style={{ '--n': qq.answers.filter((a) => a.trim()).length }}>
       {qq.answers.map((a, i) => (a.trim() ? (

@@ -1,16 +1,28 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ADMIN_PASSWORD, css } from '../../lib/constants';
+import { css } from '../../lib/constants';
 import { setAdmin } from '../../lib/store';
 import { Brand, ColorBar, Ico, ThemeButton } from '../../components/common/UI';
+import { apiRequest } from '../../api/client';
 
 function AdminLogin() {
   const [pw, setPw] = useState('');
   const [error, setError] = useState('');
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    if (pw === ADMIN_PASSWORD) { setError(''); setAdmin(true); }
-    else setError('That password is not right. Try again.');
+    try {
+      await apiRequest('/api/v1/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email: 'admin@gdg-kauhoot.local', password: pw }),
+      }).then((result) => {
+        localStorage.setItem('gdgAdminToken', result.token);
+      });
+      setError('');
+      setAdmin(true);
+    } catch (error) {
+      /* the server is the only judge: a local password would give an admin screen with no token */
+      setError(error.status === 401 ? 'That password is not right. Try again.' : 'Could not reach the server. Try again.');
+    }
   };
   return (
     <div className="signin">
@@ -23,7 +35,6 @@ function AdminLogin() {
         <label className="field"><span>Password</span><input className="input" type="password" id="pwIn" autoComplete="current-password" autoFocus aria-describedby="pwErr" value={pw} onChange={(e) => setPw(e.target.value)} /></label>
         {error ? <p className="err" id="pwErr" role="alert">{error}</p> : <span id="pwErr" />}
         <button className="btn btn-primary btn-lg" type="submit">Sign in</button>
-        <p style={css('margin:0;font-size:13px;color:var(--muted);text-align:center')}>Demo password: <b>{ADMIN_PASSWORD}</b></p>
         <ColorBar />
       </form>
     </div>
