@@ -63,9 +63,12 @@ function AdminDashboard() {
                 <td style={{ color: 'var(--muted)' }}>{x.lastHosted ? new Date(x.lastHosted).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Never'}</td>
                 <td>{x.status === 'ready' ? <span className="status" style={{ color: 'var(--green-txt)' }}>Ready</span> : <span className="status" style={{ color: 'var(--muted)' }}>Draft</span>}</td>
                 <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  {x.status === 'ready'
-                    ? <><CsvBtn x={x} /> <Link className="btn btn-outline btn-sm" to={`/admin/edit/${x.id}`}>Edit</Link> <Link className="btn btn-primary btn-sm" to={`/host/${x.id}`}>Host live</Link></>
-                    : <><CsvBtn x={x} /> <Link className="btn btn-outline btn-sm" to={`/admin/edit/${x.id}`}>Continue editing</Link></>}
+                  <div className="row-acts">
+                    <CsvBtn x={x} />
+                    {x.status === 'ready'
+                      ? <><Link className="btn btn-outline btn-sm" to={`/admin/edit/${x.id}`}>Edit</Link><Link className="btn btn-primary btn-sm" to={`/host/${x.id}`}>Host live</Link></>
+                      : <Link className="btn btn-outline btn-sm wide" to={`/admin/edit/${x.id}`}>Continue editing</Link>}
+                  </div>
                 </td>
               </tr>
             )) : <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--muted)', padding: 32 }}>No quizzes match.</td></tr>}

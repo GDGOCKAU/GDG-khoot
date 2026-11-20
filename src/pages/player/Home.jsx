@@ -65,9 +65,9 @@ function Home() {
             <p style={css('margin:0;text-align:center;font-size:13px;color:var(--muted)')}>Can't see a PIN? Ask the host to open the game.</p>
           </form>
         </div>
+        <SiteFooter />
       </section>
     </main>
-    <SiteFooter />
   </div>;
 }
 

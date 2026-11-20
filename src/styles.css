@@ -946,3 +946,25 @@ html.dark .danger-zone { border-color: #5c2b29; }
 @media (max-width: 420px) { .dash-imp { width: 40px; padding: 0; justify-content: center; } .dash-imp .imp-t { display: none; } }
 /* Arabic (or any right-to-left) text picks its own direction */
 input, textarea, .imp-q b, .imp-ans span, .pq-text, .qcard h1, .tile, .htile, .lb-row .nm, .chosen { unicode-bidi: plaintext; }
+/* dashboard row buttons: fixed columns so every row lines up */
+.row-acts { display: inline-grid; grid-template-columns: 80px 72px 108px; gap: 8px; align-items: center; vertical-align: middle; }
+.row-acts > .btn { width: 100%; justify-content: center; padding-left: 0; padding-right: 0; }
+.row-acts > .wide { grid-column: 2 / span 2; }
+
+/* home: the logo + website link sit at the bottom of the hero, on the same background (no footer band) */
+.home-page .hero-in { margin-top: auto; margin-bottom: auto; }
+.hero .gfoot { position: relative; z-index: 1; flex-shrink: 0; background: transparent; border: 0; }
+.hero .gfoot-in.gfoot-row { padding: 0 32px 24px; }
+.hero .gfoot-brand { gap: 10px; }
+.hero .gfoot-logo .gdg-logo { width: 34px; height: 20px; }
+.hero .gfoot-brand > span { display: flex; align-items: baseline; gap: 8px; }
+.hero .gfoot-brand b { font-size: 15px; font-weight: 600; }
+.hero .gfoot-brand small { margin: 0; font-size: 13px; color: var(--muted); }
+.hero .gfoot-brand small::before { content: '·'; margin-right: 8px; }
+.hero .gfoot-site { padding: 9px 16px; font-size: 14px; font-weight: 500; background: color-mix(in srgb, var(--surface) 70%, transparent); color: var(--ink); border: 1px solid var(--border-strong); backdrop-filter: blur(8px); }
+.hero .gfoot-site:hover { border-color: var(--ink); transform: none; }
+@media (max-width: 560px) {
+  .hero .gfoot-in.gfoot-row { padding: 8px 20px 20px; justify-content: space-between; flex-wrap: nowrap; }
+  .hero .gfoot-brand small { display: none; }
+  .hero .gfoot-site { padding: 8px 14px; font-size: 13px; }
+}
