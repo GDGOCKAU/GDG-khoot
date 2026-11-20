@@ -100,7 +100,11 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
   app.get("/api/v1/public/quizzes", async () => repository.listPublishedQuizzes());
   app.post("/api/v1/quizzes/save", { onRequest: [app.authenticate] }, async (request, reply) => {
     const parsed = saveQuizSchema.safeParse(request.body);
-    if (!parsed.success) return reply.code(400).send({ error: "invalid_request", details: parsed.error.flatten() });
+    if (!parsed.success) {
+      // issues carry their path ("questions.3.text"), so a client can point at the exact question
+      const issues = parsed.error.issues.map((issue) => ({ path: issue.path.join("."), message: issue.message }));
+      return reply.code(400).send({ error: "invalid_request", details: parsed.error.flatten(), issues });
+    }
     const questions = parsed.data.questions.map(normalizeQuestion);
     if (parsed.data.isPublished) {
       // publishing needs every question complete (drafts may autosave half-written questions)

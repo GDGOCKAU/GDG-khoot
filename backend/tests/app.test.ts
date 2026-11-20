@@ -307,4 +307,20 @@ describe("backend API foundation", () => {
     expect(await onDisk(pic2)).toBe(false);
     await app.close();
   });
+  it("says which question breaks a save rule (for the CSV import) and caps a quiz at 100 questions", async () => {
+    const { app } = setup();
+    const token = (await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "admin@example.com", password: "secret" } })).json().token;
+    const auth = { authorization: `Bearer ${token}` };
+    const ok = { text: "Fine", order: 0, timeLimitSecs: 20, options: [{ text: "A", isCorrect: true }, { text: "B", isCorrect: false }] };
+    const bad = await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: { title: "Import", isPublished: false, questions: [
+      ok, { ...ok, order: 1, text: "x".repeat(161) }, { ...ok, order: 2, timeLimitSecs: 45 },
+    ] } });
+    expect(bad.statusCode).toBe(400);
+    const paths = bad.json().issues.map((issue: { path: string }) => issue.path);
+    expect(paths).toEqual(expect.arrayContaining(["questions.1.text", "questions.2.timeLimitSecs"]));
+    const many = Array.from({ length: 101 }, (_, i) => ({ ...ok, order: i }));
+    expect((await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: { title: "Huge", isPublished: false, questions: many } })).statusCode).toBe(400);
+    expect((await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: { title: "Max", isPublished: false, questions: many.slice(0, 100) } })).statusCode).toBe(201);
+    await app.close();
+  });
 });

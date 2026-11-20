@@ -66,7 +66,8 @@ function Home() {
     </nav></header>
     <main>
       <section className="hero" id="join">
-        <Hang width={120} style="top:0;left:-3px;width:120px;height:360px" />
+        <span className="hang-lg"><Hang width={120} style="top:0;left:-3px;width:120px;height:360px" /></span>
+        <span className="hang-sm"><Hang width={70} style="top:0;right:6px;width:76px;height:215px" /></span>
         <div className="grid-bg" aria-hidden="true" />
         <div className="orb" aria-hidden="true" style={css('background:#4285f4;top:-60px;left:-120px')} />
         <div className="orb" aria-hidden="true" style={css('background:#34a853;bottom:-120px;right:-100px')} />
@@ -86,9 +87,9 @@ function Home() {
             <p style={css('margin:0;text-align:center;font-size:13px;color:var(--muted)')}>Can't see a PIN? Ask the host to open the game.</p>
           </form>
         </div>
+        <SiteFooter />
       </section>
     </main>
-    <SiteFooter />
   </div>;
 }
 

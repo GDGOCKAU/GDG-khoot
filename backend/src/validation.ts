@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { SaveQuestionInput } from "./domain.js";
 
 export const ALLOWED_TIMES = [5, 10, 15, 20, 30, 60] as const;
+export const MAX_QUESTIONS = 100;
 export const LANGUAGES = ["Dart", "Python", "JavaScript", "Kotlin", "Java", "C++", "Go", "SQL"] as const;
 
 /** Uploaded files only (/uploads/... or http URLs). Data URLs would put base64 into PostgreSQL. */
@@ -31,7 +32,7 @@ export const saveQuizSchema = z.object({
   description: z.string().trim().max(90).optional(),
   topic: z.string().trim().min(1).max(20).optional(),
   isPublished: z.boolean(),
-  questions: z.array(questionSchema).min(1),
+  questions: z.array(questionSchema).min(1).max(MAX_QUESTIONS),
 });
 export type SaveQuizBody = z.infer<typeof saveQuizSchema>;
 

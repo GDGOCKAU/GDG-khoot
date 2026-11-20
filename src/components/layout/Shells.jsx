@@ -40,7 +40,7 @@ export function HostShell({ right, onExit, main = '', children }) {
       <header className="host-top"><Brand />
         <div style={css('display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end')}>
           {right}<ThemeButton />
-          {done ? <Link className="btn btn-ghost btn-sm" to="/admin">Dashboard</Link> : <button type="button" className="btn btn-danger btn-sm" onClick={onExit}><Ico n="door" s={16} />Exit game</button>}
+          {done ? <Link className="btn btn-ghost btn-sm" to="/admin">Dashboard</Link> : <button type="button" className="btn btn-danger btn-sm host-exit" onClick={onExit} aria-label="Exit game"><Ico n="door" s={16} /><span className="host-exit-t">Exit game</span></button>}
         </div>
       </header>
       <main className={`host-main${main ? ' ' + main : ''}`}>{children}</main>

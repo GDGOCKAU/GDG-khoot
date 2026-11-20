@@ -9,7 +9,8 @@ import { shrinkImage, toast } from '../../lib/ui';
 import { Dots, Ico, Modal } from '../../components/common/UI';
 import { Boxes } from '../../components/game/Blocks';
 import { AdminShell } from '../../components/layout/Shells';
-import { API_URL, apiRequest } from '../../api/client';
+import { apiRequest } from '../../api/client';
+import { isUuid, saveQuizToServer } from '../../lib/quizPayload';
 
 /* the open editor survives moving away and back, like the prototype */
 let E = null;
@@ -21,59 +22,6 @@ function openEditor(quiz) {
   return E;
 }
 
-function isUuid(value) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || '');
-}
-function backendQuestions(d) {
-  return d.questions.map((question, index) => {
-    const type = qType(question);
-    let options = [];
-    if (type === 'tf') {
-      options = [
-        { text: 'True', isCorrect: question.correct === 0 },
-        { text: 'False', isCorrect: question.correct === 1 },
-      ];
-    } else if (type === 'pic') {
-      options = [
-        { text: norm(question.word), isCorrect: true },
-        { text: norm(question.word) ? 'NOT_' + norm(question.word) : '', isCorrect: false },
-      ];
-    } else {
-      /* empty optional answers are left out, or publishing would reject the quiz */
-      options = (question.answers || []).slice(0, 4).map((text, optionIndex) => ({
-        text: String(text || ''),
-        isCorrect: question.correct === optionIndex,
-      })).filter((option) => option.text.trim() || option.isCorrect);
-    }
-    return {
-      text: String(question.text || ''),
-      order: index,
-      timeLimitSecs: Number(question.time || 20),
-      options,
-      type,
-      code: type === 'code' ? String(question.code || '') : undefined,
-      language: type === 'code' ? String(question.lang || '') : undefined,
-      pictureUrls: type === 'pic' ? (question.pics || []).map(storedUrl) : undefined,
-      word: type === 'pic' ? norm(question.word) : undefined,
-      points: [0, 1, 2].includes(question.points) ? question.points : 1,
-      imageUrl: (type === 'mc' || type === 'tf') && question.img ? storedUrl(question.img) : null,
-    };
-  });
-}
-/* pictures are uploaded as files first; only their URL is saved with the quiz */
-const storedUrl = (u) => (typeof u === 'string' && u.startsWith(API_URL + '/uploads/') ? u.slice(API_URL.length) : u);
-const upload = async (src) => {
-  if (typeof src !== 'string' || !src.startsWith('data:')) return src;
-  const { url } = await apiRequest('/api/v1/uploads', { method: 'POST', body: JSON.stringify({ dataUrl: src }) });
-  return API_URL + url;
-};
-async function uploadPictures(d) {
-  for (const question of d.questions) {
-    const t = qType(question);
-    if (t === 'pic') question.pics = await Promise.all((question.pics || []).map(upload));
-    if ((t === 'mc' || t === 'tf') && question.img) question.img = await upload(question.img);
-  }
-}
 /* saves of one editor run one after another: an autosave still uploading a picture must finish
    before Publish saves, or Publish could be overwritten as a draft (or a new quiz saved twice) */
 function saveBackend(d, ed, setSaveState) {
@@ -84,18 +32,7 @@ function saveBackend(d, ed, setSaveState) {
 }
 async function saveBackendNow(d, ed, setSaveState) {
   try {
-    await uploadPictures(d);
-    const quiz = await apiRequest('/api/v1/quizzes/save', {
-      method: 'POST',
-      body: JSON.stringify({
-        quizId: isUuid(d.id) ? d.id : undefined,
-        title: d.title.trim() || 'Untitled Quiz',
-        description: d.desc || '',
-        topic: d.topic || undefined,
-        isPublished: d.status === 'ready',
-        questions: backendQuestions(d),
-      }),
-    });
+    const quiz = await saveQuizToServer(d);
     d.id = quiz.id;
     upsertQuiz(d);
     ed.saved = true;
@@ -291,9 +228,9 @@ function CreateQuiz({ quiz }) {
 
   return (
     <AdminShell>
-      <div className="adm-head">
+      <div className="adm-head ed-head">
         <div>
-          <Link to="/admin" style={css('color:var(--muted);font-size:14px;text-decoration:none')}>← Back to dashboard</Link>
+          <Link to="/admin" style={css('color:var(--muted);font-size:14px;text-decoration:none;white-space:nowrap')}>← Back to dashboard</Link>
           <h1 style={{ marginTop: 8 }}>{isNew ? 'Create a quiz' : 'Edit quiz'}<span style={{ color: '#ea4335' }}>.</span></h1>
           {!isNew && (
             <div className="ed-status">
