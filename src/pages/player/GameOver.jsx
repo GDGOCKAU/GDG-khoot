@@ -44,7 +44,7 @@ function GameOver() {
             </div>
             <div>{tabs}</div>
             <div style={css('display:flex;flex-direction:column;gap:10px')}>
-              <button type="button" className="btn btn-primary over-btn" onClick={() => doShare('shareStory', tab)}><Ico n="share" s={20} />Share to story</button>
+              <button type="button" className="btn btn-primary over-btn" onClick={() => doShare('share', tab)}><Ico n="share" s={20} />Share</button>
               <button type="button" className="btn btn-outline over-btn" onClick={() => doShare('saveImg', tab)}><Ico n="down" s={20} />Save image</button>
               <button type="button" className="btn btn-outline over-btn" onClick={() => doShare('copyLink', tab)}><Ico n="copy" s={20} />Copy link</button>
             </div>
@@ -65,7 +65,7 @@ function GameOver() {
         {tabs}
         <div className="story-wrap small"><Story kind={tab} /></div>
         <div style={css('width:100%;display:flex;gap:8px')}>
-          <button type="button" className="btn btn-primary" style={css('flex:1 1 0;min-height:50px')} onClick={() => doShare('shareStory', tab)}>Share to story</button>
+          <button type="button" className="btn btn-primary" style={css('flex:1 1 0;min-height:50px')} onClick={() => doShare('share', tab)}><Ico n="share" s={18} />Share</button>
           <button type="button" className="btn btn-outline" style={css('flex:1 1 0;min-height:50px')} onClick={() => doShare('saveImg', tab)}>Save image</button>
         </div>
         {links}

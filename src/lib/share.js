@@ -94,6 +94,13 @@ async function drawStory(kind) {
 export async function doShare(act, kind) {
   const text = shareText(kind);
   if (act === 'copyLink') return toast((await copyText(text + ' ' + SHARE_URL)) ? 'Link copied' : 'Could not copy the link');
+  /* share the link anywhere: the phone's share menu, or copy it on computers without one */
+  if (act === 'share') {
+    try {
+      if (navigator.share) { await navigator.share({ title: 'GDG KAUHOOT', text, url: SHARE_URL }); return; }
+    } catch (e) { if (e && e.name === 'AbortError') return; }
+    return toast((await copyText(text + ' ' + SHARE_URL)) ? 'Link copied. Paste it anywhere.' : 'Could not copy the link');
+  }
   const blob = await drawStory(kind);
   const name = `kauhoot-${kind === 'me' ? 'my-result' : 'top-3'}.png`;
   if (act === 'saveImg') { offerFile(blob, name); toast('Image saved'); return; }
