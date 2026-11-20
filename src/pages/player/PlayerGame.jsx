@@ -174,7 +174,7 @@ function PlayerView() {
     case 'podium':
       return shell(<PodiumBlock />, { phoneRight: <span className="chip">Game over</span> });
     case 'final':
-      return shell(<FinalBlock action={<button type="button" className="btn btn-primary btn-lg" onClick={() => { G.autoOver = true; UI.showOver = true; UI.overTab = null; notify(); }}>My result &amp; share <Ico n="arrow" /></button>} />, { phoneRight: <span className="chip">Game over</span> });
+      return shell(<FinalBlock action={<button type="button" className="btn btn-primary btn-lg" onClick={() => { G.autoOver = true; UI.showOver = true; UI.overTab = null; notify(); }}>Share my results <Ico n="arrow" /></button>} />, { phoneRight: <span className="chip">Game over</span> });
     default:
       return null;
   }

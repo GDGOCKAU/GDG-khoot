@@ -1,6 +1,7 @@
 /* Shared constants and small helpers */
 
-export const SHARE_URL = 'https://claude.ai/artifact/WsgxAm8MSFwLqQU45E91iV';
+/* the link people share: this site's own address (your real domain once it's online) */
+export const SHARE_URL = typeof window !== 'undefined' && /^https?:/.test(window.location.origin) ? window.location.origin + '/' : 'https://gdgkau.com';
 export const ADMIN_PASSWORD = 'gdgkau';
 export const LETTERS = ['A', 'B', 'C', 'D'];
 export const ANS_COLORS = ['blue', 'red', 'yellow', 'green'];

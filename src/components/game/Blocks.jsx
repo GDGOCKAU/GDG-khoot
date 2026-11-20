@@ -118,8 +118,16 @@ function closedLine(answered, total) {
   const why = by === 'all_answered' ? 'Everyone answered' : by === 'skip' ? 'Skipped' : by === 'time' ? 'Time’s up' : '';
   return <span style={{ color: 'var(--muted)', fontSize: 15 }}>{why ? `${why} · ` : ''}Leaderboard in <Secs />s</span>;
 }
+/* the little label on a question card: the question type for true/false, code and picture questions, otherwise the topic */
+export function QKindChip({ qq }) {
+  const t = qType(qq);
+  if (t === 'tf') return <span className="chip chip-yellow">True or false</span>;
+  if (t === 'code') return <span className="chip chip-blue">Code</span>;
+  if (t === 'pic') return <span className="chip chip-green">Picture puzzle</span>;
+  return <TopicChip t={G.quiz.topic} />;
+}
 function QHead({ qq }) {
-  return <div className="card qcard res"><TopicChip t={G.quiz.topic} /><h1>{qq.text}</h1></div>;
+  return <div className="card qcard res"><QKindChip qq={qq} /><h1>{qq.text}</h1></div>;
 }
 function PicAnswersBlock() {
   const qq = curQ(), total = G.players.length, vals = Object.values(G.answers);
@@ -162,7 +170,7 @@ export function AnswersBlock() {
         <div key={i} className={`acol ${ansCls(i)} ${i === qq.correct ? 'right' : 'wrong'}`} style={{ '--d': `${i * 150}ms` }}>
           <Num className="acount num" to={counts[i]} delay={200 + i * 150} dur={1100} />
           <div className="atrack"><div className="abar" style={{ '--h': `${Math.max(4, 100 * counts[i] / max)}%` }} /></div>
-          <div className={`alabel${mono}`}><span className="L">{tf ? tfIco(i, 18) : LETTERS[i]}</span><span className="t">{a}</span>{i === qq.correct && <span className="ok"><Ico n="check" s={20} /></span>}</div>
+          <div className={`alabel${mono}${tf ? ' tf' : ''}`}><span className="L">{tf ? tfIco(i, 18) : LETTERS[i]}</span><span className="t">{a}</span></div>
         </div>
       ) : null))}
     </div>

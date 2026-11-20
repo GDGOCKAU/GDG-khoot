@@ -28,3 +28,6 @@ dist-ssr
 .env.*
 !.env.example
 backend/uploads/
+
+# self-signed certificate for `npm run phone` (made on first run; never commit the key)
+.cert/

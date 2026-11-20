@@ -10,6 +10,9 @@ export function shareText(kind) {
   const t = ranked().slice(0, 3).map((p, i) => `${i + 1}. ${p.name}`).join(', ');
   return `Top 3 in "${G.quiz.title}" on GDG KAUHOOT: ${t}`;
 }
+/* the phone's share menu only exists on secure (https) pages */
+export const canNativeShare = () => typeof navigator !== 'undefined' && !!navigator.share && window.isSecureContext !== false;
+export { SHARE_URL };
 export function shareLink(where, kind) {
   const text = shareText(kind);
   return where === 'x'
@@ -94,6 +97,13 @@ async function drawStory(kind) {
 export async function doShare(act, kind) {
   const text = shareText(kind);
   if (act === 'copyLink') return toast((await copyText(text + ' ' + SHARE_URL)) ? 'Link copied' : 'Could not copy the link');
+  /* share the link anywhere: the phone's own share menu (needs an https page) */
+  if (act === 'share') {
+    if (canNativeShare()) {
+      try { await navigator.share({ title: 'GDG KAUHOOT', text, url: SHARE_URL }); return true; } catch (e) { if (e && e.name === 'AbortError') return true; }
+    }
+    return false;
+  }
   const blob = await drawStory(kind);
   const name = `kauhoot-${kind === 'me' ? 'my-result' : 'top-3'}.png`;
   if (act === 'saveImg') { offerFile(blob, name); toast('Image saved'); return; }
