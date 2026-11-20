@@ -905,3 +905,44 @@ html.dark .danger-zone { border-color: #5c2b29; }
   .host-exit { padding: 0 12px; }
 }
 @media (max-width: 420px) { .host-exit-t { display: none; } }
+
+/* ---------- CSV import / export ---------- */
+.dash-acts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.csv-btn { gap: 6px; color: var(--muted); }
+.csv-btn:hover { color: var(--ink); }
+.modal.imp { width: min(760px, 100%); max-height: calc(100vh - 40px); max-height: calc(100dvh - 40px); overflow: hidden; padding: 24px; }
+.imp-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.imp-drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 170px; padding: 20px; border: 2px dashed var(--border-strong); border-radius: 1.25rem; background: var(--surface-2); color: var(--muted); text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+.imp-drop:hover, .imp-drop.on { border-color: #1a73e8; background: var(--blue-soft); }
+.imp-drop b { color: var(--ink); font-size: 17px; }
+.imp-ic { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: var(--blue-soft); color: var(--blue-txt); margin-bottom: 6px; }
+.imp-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.imp-meta { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+.imp-meta .imp-desc { grid-column: 1 / -1; }
+.imp-sum { font-size: 14px; }
+.imp-list { list-style: none; margin: 0; padding: 0 4px 0 0; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; min-height: 120px; flex: 1; }
+.imp-list li { border: 1px solid var(--border); border-radius: 1rem; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+.imp-list li.bad { border-color: color-mix(in srgb, #d93025 55%, var(--border)); }
+.imp-q { display: flex; align-items: flex-start; gap: 10px; font-size: 15px; }
+.imp-q b { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.imp-q .chip { flex-shrink: 0; font-size: 11px; }
+.imp-n { width: 24px; height: 24px; flex-shrink: 0; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--muted); }
+.imp-ans { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 34px; }
+.imp-ans span { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 100px; background: var(--surface-2); font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.imp-ans span.ok { background: var(--green-soft); color: var(--green-txt); font-weight: 600; }
+.imp-note { padding-left: 34px; font-size: 13px; color: var(--red-txt); }
+@media (max-width: 700px) {
+  .modal-bg:has(.imp) { padding: 0; align-items: stretch; }
+  .modal.imp { border-radius: 0; max-height: none; height: 100%; padding: 18px 16px; }
+  .imp-meta { grid-template-columns: 1fr; }
+  .imp-foot .btn { flex: 1 1 auto; }
+  .dash-imp { min-height: 40px; padding: 0 14px; font-size: 14px; }
+  .qcard-m .r3 .csv-btn { flex: 0 0 auto; }
+}
+@media (max-width: 700px) {
+  .adm-head:has(.dash-acts) { align-items: center; }
+  .dash-acts { flex-wrap: nowrap; }
+}
+@media (max-width: 420px) { .dash-imp { width: 40px; padding: 0; justify-content: center; } .dash-imp .imp-t { display: none; } }
+/* Arabic (or any right-to-left) text picks its own direction */
+input, textarea, .imp-q b, .imp-ans span, .pq-text, .qcard h1, .tile, .htile, .lb-row .nm, .chosen { unicode-bidi: plaintext; }
