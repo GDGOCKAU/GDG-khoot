@@ -828,9 +828,11 @@ html.dark .danger-zone { border-color: #5c2b29; }
 .gfoot-site { display: inline-flex; align-items: center; gap: 10px; margin-top: 32px; padding: 14px 26px; border-radius: 100px; background: var(--ink); color: var(--bg); font-size: 18px; font-weight: 600; text-decoration: none; transition: transform .15s; }
 .gfoot-site:hover { transform: translateY(-2px); }
 .gfoot-site + .gfoot-bottom { margin-top: 48px; }
-/* home: the hero fills the first screen, the footer starts below it */
-.hero { min-height: calc(100vh - 4rem - 1px); min-height: calc(100svh - 4rem - 1px); display: flex; flex-direction: column; justify-content: center; }
-.hero-in { width: 100%; }
+/* home: navbar + hero + footer fit in one screen; the hero takes the space left over */
+.home-page { min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; }
+.home-page > main { flex: 1; display: flex; flex-direction: column; }
+.home-page .hero { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.home-page .hero-in { width: 100%; padding-top: clamp(24px, 6vh, 88px); padding-bottom: clamp(24px, 6vh, 96px); }
 /* compact footer: logo on the left, website button on the right */
 .gfoot-in.gfoot-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 24px; padding: 28px 32px; }
 .gfoot-row .gfoot-logo .gdg-logo { width: 44px; height: 26px; }

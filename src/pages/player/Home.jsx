@@ -34,7 +34,7 @@ function Home() {
     if (pinRef.current) pinRef.current.focus();
   };
 
-  return <>
+  return <div className="home-page">
     <header className="site-head"><nav className="site-nav" aria-label="Main">
       <Link to="/" className="brand" style={{ textDecoration: 'none' }}><Logo /><span>GDG KAU<b>HOOT</b></span></Link>
       <div className="links">
@@ -67,7 +67,7 @@ function Home() {
       </section>
     </main>
     <SiteFooter />
-  </>;
+  </div>;
 }
 
 export default Home;
