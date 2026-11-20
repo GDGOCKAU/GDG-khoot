@@ -11,6 +11,12 @@ export class PrismaRepository implements Repository {
   async findAdminByEmail(email: string) {
     return this.prisma.admin.findUnique({ where: { email } });
   }
+  async createAdmin(email: string, passwordHash: string) {
+    return this.prisma.admin.create({ data: { email, passwordHash } });
+  }
+  async setAdminPassword(id: string, passwordHash: string) {
+    await this.prisma.admin.update({ where: { id }, data: { passwordHash } });
+  }
 
   async listQuizzes(hostId: string) {
     const quizzes = await this.prisma.quiz.findMany({ where: { hostId }, orderBy: { updatedAt: "desc" }, include: { questions: { include: { options: true }, orderBy: { order: "asc" } } } });

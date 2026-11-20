@@ -24,12 +24,21 @@ echo "== build + migrations"
 ( cd "$REPO" && npm run build ) >> "$LOG/build.log" 2>&1 || { echo "web build failed: see $LOG/build.log"; exit 1; }
 
 echo "== servers"
+echo "=== start $(date '+%F %T')" >> "$LOG/api.log"
 ( cd "$REPO/backend" && nohup npm start >> "$LOG/api.log" 2>&1 & echo $! > "$RUN/api.pid" )
 ( cd "$REPO" && nohup npx vite preview --host 0.0.0.0 --port 5173 --strictPort >> "$LOG/web.log" 2>&1 & echo $! > "$RUN/web.pid" )
 # keep the Mac awake (display, idle, disk, system) for as long as the API runs
 nohup caffeinate -dimsu -w "$(cat "$RUN/api.pid")" >/dev/null 2>&1 & echo $! > "$RUN/caffeinate.pid"
 
 for i in {1..30}; do curl -sf http://127.0.0.1:5173/health >/dev/null && break; sleep 0.5; done
+
+# the API refuses to start without a valid ADMIN_PASSWORD in backend/.env: show why
+if ! curl -sf http://127.0.0.1:3000/health >/dev/null && ! kill -0 "$(cat "$RUN/api.pid")" 2>/dev/null; then
+  echo "== API did not start:"
+  # only this run's lines (after the last "=== start" mark)
+  awk '/^=== start /{buf=""} {buf=buf $0 "\n"} END{printf "%s", buf}' "$LOG/api.log" | grep -v "^=== start" | grep -A4 "will not start" \
+    || awk '/^=== start /{buf=""} {buf=buf $0 "\n"} END{printf "%s", buf}' "$LOG/api.log" | tail -n 12
+fi
 
 if [ "${1:-}" = "--tunnel" ]; then
   echo "== tunnel"

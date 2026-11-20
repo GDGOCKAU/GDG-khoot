@@ -8,6 +8,15 @@ export class MemoryRepository implements Repository {
   async findAdminByEmail(email: string) {
     return this.admins.find((admin) => admin.email === email) ?? null;
   }
+  async createAdmin(email: string, passwordHash: string) {
+    const admin = { id: randomUUID(), email, passwordHash };
+    this.admins.push(admin);
+    return admin;
+  }
+  async setAdminPassword(id: string, passwordHash: string) {
+    const admin = this.admins.find((item) => item.id === id);
+    if (admin) admin.passwordHash = passwordHash;
+  }
 
   async listQuizzes(hostId: string) {
     return this.quizzes.filter((quiz) => quiz.hostId === hostId);

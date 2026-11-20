@@ -6,16 +6,17 @@ Prisma/PostgreSQL for persistence, and Socket.IO for realtime session events.
 ## Local setup
 
 ```sh
-cp .env.example .env
+cp .env.example .env      # then set ADMIN_PASSWORD (8+ characters) and JWT_SECRET
 npm install
 npm run prisma:generate
 npm run prisma:migrate
-npm run prisma:seed
 npm run dev
 ```
 
-The seed creates `admin@gdg-kauhoot.local` with the development password
-`change-me`; replace it before using a shared environment.
+The admin (`admin@gdg-kauhoot.local`) signs in with `ADMIN_PASSWORD` from `.env`. The server
+creates the admin on first start and, on every start, replaces the stored password if the value
+in `.env` changed (older sign-ins are signed out). It refuses to start when `ADMIN_PASSWORD` is
+missing, shorter than 8 characters, or still the example value.
 
 ## Initial API contract
 

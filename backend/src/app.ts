@@ -2,7 +2,7 @@ import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest }
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import bcrypt from "bcryptjs";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -28,13 +28,15 @@ const questionSchema = z.object({
 });
 declare module "@fastify/jwt" {
   interface FastifyJWT {
-    user: { id: string; email: string };
+    user: { id: string; email: string; pv?: string };
   }
 }
 
 declare module "fastify" {
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    /** A host token -> the admin id; throws when it is invalid or older than the current password. */
+    verifyAdminToken: (token: string) => Promise<string>;
   }
 }
 
@@ -44,6 +46,9 @@ function uploadedFiles(quiz: Quiz): string[] {
     .map((url) => /^\/uploads\/([0-9a-f-]{36}\.(?:png|jpg|webp|gif))$/.exec(url ?? "")?.[1])
     .filter((file): file is string => !!file);
 }
+
+/** A short fingerprint of the stored password hash, carried in tokens so a new password signs old sessions out. */
+export const passwordVersion = (passwordHash: string) => createHash("sha256").update(passwordHash).digest("hex").slice(0, 16);
 
 export function buildApp(repository: Repository, jwtSecret: string, gameService?: GameService, options: { uploadDir?: string } = {}): FastifyInstance {
   const app = Fastify({ logger: false });
@@ -60,15 +65,26 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
     if (!admin || !(await bcrypt.compare(parsed.data.password, admin.passwordHash))) {
       return reply.code(401).send({ error: "invalid_credentials" });
     }
-    return { token: app.jwt.sign({ id: admin.id, email: admin.email }) };
+    return { token: app.jwt.sign({ id: admin.id, email: admin.email, pv: passwordVersion(admin.passwordHash) }) };
   });
 
+  // a token is good only while the password it was issued under is still the current one
+  const stillValid = async (user: { id: string; email: string; pv?: string }) => {
+    const admin = await repository.findAdminByEmail(user.email);
+    return !!admin && admin.id === user.id && user.pv === passwordVersion(admin.passwordHash);
+  };
   app.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       await request.jwtVerify();
+      if (!(await stillValid(request.user))) throw new Error("password changed");
     } catch {
       return reply.code(401).send({ error: "unauthorized" });
     }
+  });
+  app.decorate("verifyAdminToken", async (token: string) => {
+    const user = app.jwt.verify<{ id: string; email: string; pv?: string }>(token);
+    if (!(await stillValid(user))) throw new Error("unauthorized");
+    return user.id;
   });
 
   // Images are stored as files on disk; only their /uploads/... path goes into PostgreSQL.

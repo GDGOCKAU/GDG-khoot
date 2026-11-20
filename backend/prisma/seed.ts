@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 async function main() {
+  // Optional: the server itself creates/updates the admin from ADMIN_PASSWORD on every start.
   // The admin login page signs in as this email; only the password is typed.
   const email = process.env.ADMIN_EMAIL ?? "admin@gdg-kauhoot.local";
   const password = process.env.ADMIN_PASSWORD;

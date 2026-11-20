@@ -30,6 +30,8 @@ export type PublicQuiz = { id: string; title: string; description: string | null
 
 export interface Repository {
   findAdminByEmail(email: string): Promise<Admin | null>;
+  createAdmin(email: string, passwordHash: string): Promise<Admin>;
+  setAdminPassword(id: string, passwordHash: string): Promise<void>;
   listQuizzes(hostId: string): Promise<Quiz[]>;
   /** Published quizzes for the public home page: metadata only, never questions or answers. */
   listPublishedQuizzes(): Promise<PublicQuiz[]>;

@@ -29,7 +29,7 @@ async function setup() {
   const gameService = new GameService(repository, new MemoryGameRepository(), undefined, undefined, { ready: 20, reveal: 2000, earlyClose: 20 });
   const app = buildApp(repository, "test-secret-that-is-long", gameService);
   await app.ready();
-  const io: Server = attachRealtime(app.server, { gameService, verifyHostToken: (t) => app.jwt.verify<{ id: string }>(t).id });
+  const io: Server = attachRealtime(app.server, { gameService, verifyHostToken: (t) => app.verifyAdminToken(t) });
   gameService.setEmitter(roomEmitter(io));
   await app.listen({ port: 0, host: "127.0.0.1" });
   const url = `http://127.0.0.1:${(app.server.address() as AddressInfo).port}`;
