@@ -968,3 +968,22 @@ input, textarea, .imp-q b, .imp-ans span, .pq-text, .qcard h1, .tile, .htile, .l
   .hero .gfoot-brand small { display: none; }
   .hero .gfoot-site { padding: 8px 14px; font-size: 13px; }
 }
+/* bottom row, as in the design: GDG Game Hub · Coming soon ......... Visit gdgkau.com */
+.hub { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.hub-dots { display: inline-flex; gap: 4px; }
+.hub-dots i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+.hub b { font-size: 15px; font-weight: 600; white-space: nowrap; }
+.hub-sep { width: 4px; height: 4px; border-radius: 50%; background: var(--muted); opacity: .6; }
+.hub-soon { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 100px; background: color-mix(in srgb, #f9ab00 18%, transparent); color: #b06000; font-size: 13px; font-weight: 600; white-space: nowrap; }
+html.dark .hub-soon { color: #fdd663; }
+.hub-soon::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.hero .gfoot-site { padding: 10px 20px; font-size: 15px; font-weight: 500; background: #fff; color: #1f2328; border: 1px solid var(--border); backdrop-filter: none; box-shadow: var(--shadow-sm); white-space: nowrap; }
+.hero .gfoot-site:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+html:not(.dark) .hero .gfoot-site { background: #1f2328; color: #fff; border-color: #1f2328; }
+@media (max-width: 560px) {
+  .hub { gap: 8px; } .hub b { font-size: 14px; }
+  .hub-soon { padding: 4px 10px; font-size: 12px; }
+  .hero .gfoot-site { padding: 8px 14px; font-size: 13px; }
+}
+@media (max-width: 380px) { .hub-sep, .hub-dots { display: none; } }
+@media (max-width: 560px) { .hero .gfoot-in.gfoot-row { flex-wrap: wrap; row-gap: 12px; } }
