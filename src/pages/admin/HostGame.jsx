@@ -6,8 +6,8 @@ import { LETTERS, TEAMS, ansCls, css, pinFmt } from '../../lib/constants';
 import { qType } from '../../lib/questions';
 import { G, curQ, endGame, exitGame, skip, startGame, toggleLock } from '../../lib/engine';
 import { toast, useAnims } from '../../lib/ui';
-import { Answered, ColorBar, Count, Ico, LiveRing, Modal, Secs, TopicChip } from '../../components/common/UI';
-import { AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
+import { Answered, ColorBar, Count, Ico, LiveRing, Modal, Secs } from '../../components/common/UI';
+import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
 import { HostShell } from '../../components/layout/Shells';
 
 function PChip({ p }) {
@@ -72,7 +72,7 @@ function HostGame() {
     }
     case 'ready': {
       const t1 = qType(G.qs[0]);
-      view = shell(<span className="chip chip-blue">{G.players.length} players ready</span>,
+      view = shell(<span className="chip chip-blue">{G.players.length} {G.players.length === 1 ? 'player' : 'players'} ready</span>,
         <div style={css('flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;text-align:center')}>
           <span className="chip">QUESTION 1 OF {n}</span>
           <h1 className="countdown-h1">Are you ready<span style={{ color: '#ea4335' }}>?</span></h1>
@@ -98,7 +98,7 @@ function HostGame() {
       break;
     case 'question':
       view = shell(<><span className="chip">Question {G.qi + 1} of {n}</span>{pinChip}</>, <>
-        <div className="card qcard">{qType(qq) === 'tf' ? <span className="chip chip-yellow">True or false</span> : <TopicChip t={G.quiz.topic} />}{qq.points === 2 && <span className="chip chip-red">Double points</span>}<h1>{qq.text}</h1>{qq.img && ['mc', 'tf'].includes(qType(qq)) && <img className="qimg" src={qq.img} alt="" />}</div>
+        <div className="card qcard"><QKindChip qq={qq} />{qq.points === 2 && <span className="chip chip-red">Double points</span>}<h1>{qq.text}</h1>{qq.img && ['mc', 'tf'].includes(qType(qq)) && <img className="qimg" src={qq.img} alt="" />}</div>
         <div className="qbar">
           <div className="tring" style={css('display:flex;align-items:center;gap:16px')}><LiveRing size={104} stroke={10} color="#1a73e8"><span style={{ fontSize: 38 }}><Secs /></span></LiveRing><span className="tlabel" style={{ color: 'var(--muted)', fontSize: 15 }}>seconds left{qType(qq) === 'pic' ? ` · ${qq.word.replace(/[^A-Za-z0-9]/g, '').length} letters` : ''}</span></div>
           <div className="qbar-r" style={css('display:flex;align-items:center;gap:14px')}>

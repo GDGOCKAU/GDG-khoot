@@ -110,8 +110,16 @@ export function HostAnswerArea({ qq }) {
 }
 
 /* ---------- answer results ---------- */
+/* the little label on a question card: the question type for true/false, code and picture questions, otherwise the topic */
+export function QKindChip({ qq }) {
+  const t = qType(qq);
+  if (t === 'tf') return <span className="chip chip-yellow">True or false</span>;
+  if (t === 'code') return <span className="chip chip-blue">Code</span>;
+  if (t === 'pic') return <span className="chip chip-green">Picture puzzle</span>;
+  return <TopicChip t={G.quiz.topic} />;
+}
 function QHead({ qq }) {
-  return <div className="card qcard res"><TopicChip t={G.quiz.topic} /><h1>{qq.text}</h1></div>;
+  return <div className="card qcard res"><QKindChip qq={qq} /><h1>{qq.text}</h1></div>;
 }
 function PicAnswersBlock() {
   const qq = curQ(), total = G.players.length, vals = Object.values(G.answers);

@@ -29,3 +29,14 @@ This is a single-device demo: practice players join and answer by themselves.
 A real-time backend can replace `engine.js` later.
 
 The hanging spider mascot loads from `public/img/spider_mascot.png`. Add that file to show it.
+
+## Try it on your phone (with the real share menu)
+
+```bash
+npm run phone
+```
+
+Open the **Network** address it prints (it starts with `https://`) on a phone on the same Wi-Fi.
+The first time, your phone warns that the connection isn't private (it's your own test certificate):
+tap **Show Details → visit this website** (iPhone) or **Advanced → Proceed** (Android).
+Phones only allow the share menu on `https` pages, so use this instead of `npm run dev -- --host` when testing **Share**.

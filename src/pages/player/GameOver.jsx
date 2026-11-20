@@ -1,4 +1,5 @@
 /* "Thanks for playing!" with the story card and share buttons */
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { css, fmt, ord } from '../../lib/constants';
 import { G, UI, hosted, rankOf } from '../../lib/engine';
@@ -7,6 +8,7 @@ import { doShare } from '../../lib/share';
 import { useWide } from '../../lib/ui';
 import { Brand, ColorBar, Ico, MePill } from '../../components/common/UI';
 import { Story } from '../../components/game/Blocks';
+import ShareSheet from '../../components/game/ShareSheet';
 import { LapShell } from '../../components/layout/Shells';
 
 function GameOver() {
@@ -15,6 +17,10 @@ function GameOver() {
   const tab = UI.overTab || (rk <= 3 ? 'top' : 'me');
   const again = hosted() ? '/' : `/join/${G.quiz.id}`;
   const setTab = (v) => { UI.overTab = v; notify(); };
+  const [sheet, setSheet] = useState(false);
+  /* the phone's share menu when it's available, otherwise our own share menu */
+  const share = async () => { if (!(await doShare('share', tab))) setSheet(true); };
+  const sheetEl = sheet && <ShareSheet kind={tab} onClose={() => setSheet(false)} />;
 
   const tabs = (
     <div className="seg" role="tablist" aria-label="Card">
@@ -44,13 +50,14 @@ function GameOver() {
             </div>
             <div>{tabs}</div>
             <div style={css('display:flex;flex-direction:column;gap:10px')}>
-              <button type="button" className="btn btn-primary over-btn" onClick={() => doShare('share', tab)}><Ico n="share" s={20} />Share</button>
+              <button type="button" className="btn btn-primary over-btn" onClick={share}><Ico n="share" s={20} />Share</button>
               <button type="button" className="btn btn-outline over-btn" onClick={() => doShare('saveImg', tab)}><Ico n="down" s={20} />Save image</button>
               <button type="button" className="btn btn-outline over-btn" onClick={() => doShare('copyLink', tab)}><Ico n="copy" s={20} />Copy link</button>
             </div>
             {links}
           </section>
         </div>
+        {sheetEl}
       </LapShell>
     );
   }
@@ -65,12 +72,13 @@ function GameOver() {
         {tabs}
         <div className="story-wrap small"><Story kind={tab} /></div>
         <div style={css('width:100%;display:flex;gap:8px')}>
-          <button type="button" className="btn btn-primary" style={css('flex:1 1 0;min-height:50px')} onClick={() => doShare('share', tab)}><Ico n="share" s={18} />Share</button>
+          <button type="button" className="btn btn-primary" style={css('flex:1 1 0;min-height:50px')} onClick={share}><Ico n="share" s={18} />Share</button>
           <button type="button" className="btn btn-outline" style={css('flex:1 1 0;min-height:50px')} onClick={() => doShare('saveImg', tab)}>Save image</button>
         </div>
         {links}
       </main>
       <ColorBar />
+      {sheetEl}
     </div>
   );
 }
