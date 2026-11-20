@@ -263,4 +263,48 @@ describe("backend API foundation", () => {
     expect((await app.inject({ method: "DELETE", url: `/api/v1/quizzes/${a}`, headers: auth })).statusCode).toBe(404);
     await app.close();
   });
+  it("lists published quizzes publicly with metadata only", async () => {
+    const { app } = setup();
+    const token = (await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "admin@example.com", password: "secret" } })).json().token;
+    const auth = { authorization: `Bearer ${token}` };
+    expect((await app.inject({ method: "GET", url: "/api/v1/public/quizzes" })).json()).toEqual([]);
+    const question = { text: "Secret question?", order: 0, timeLimitSecs: 20, options: [{ text: "Secret answer", isCorrect: true }, { text: "Other", isCorrect: false }] };
+    await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: { title: "Published", description: "Shown", topic: "Cloud", isPublished: true, questions: [question] } });
+    await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: { title: "Draft", isPublished: false, questions: [question] } });
+    const response = await app.inject({ method: "GET", url: "/api/v1/public/quizzes" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual([expect.objectContaining({ title: "Published", description: "Shown", topic: "Cloud", questionCount: 1 })]);
+    const raw = response.body;
+    for (const leak of ["Secret question", "Secret answer", "isCorrect", "options", "questions\"", "hostId"]) expect(raw).not.toContain(leak);
+    await app.close();
+  });
+  it("deleting a quiz removes its uploaded pictures unless another quiz still uses them", async () => {
+    const repository = new MemoryRepository();
+    repository.admins.push({ id: "admin-1", email: "admin@example.com", passwordHash: bcrypt.hashSync("secret", 4) });
+    const uploadDir = await mkdtemp(path.join(os.tmpdir(), "kauhoot-uploads-"));
+    const app = buildApp(repository, "test-secret-that-is-long", new GameService(repository, new MemoryGameRepository()), { uploadDir });
+    const token = (await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "admin@example.com", password: "secret" } })).json().token;
+    const auth = { authorization: `Bearer ${token}` };
+    const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+    const upload = async () => (await app.inject({ method: "POST", url: "/api/v1/uploads", headers: auth, payload: { dataUrl: png } })).json().url as string;
+    const [shared, own, pic1, pic2] = [await upload(), await upload(), await upload(), await upload()];
+    const quiz = (title: string, imageUrl: string, pictureUrls: string[] = []) => ({ title, isPublished: false, questions: [
+      { text: "MC", order: 0, timeLimitSecs: 20, type: "mc", imageUrl, options: [{ text: "A", isCorrect: true }, { text: "B", isCorrect: false }] },
+      ...(pictureUrls.length ? [{ text: "Pic", order: 1, timeLimitSecs: 30, type: "pic", word: "AB", pictureUrls, options: [] }] : []),
+    ] });
+    const a = (await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: quiz("A", own, [pic1, shared]) })).json().id;
+    const b = (await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: quiz("B copy", shared, [pic2]) })).json().id;
+    const onDisk = async (url: string) => (await app.inject({ method: "GET", url })).statusCode === 200;
+
+    expect((await app.inject({ method: "DELETE", url: `/api/v1/quizzes/${a}`, headers: auth })).statusCode).toBe(204);
+    expect(await onDisk(own)).toBe(false);
+    expect(await onDisk(pic1)).toBe(false);
+    expect(await onDisk(shared)).toBe(true); // quiz B still shows it
+    expect(await onDisk(pic2)).toBe(true);
+
+    expect((await app.inject({ method: "DELETE", url: `/api/v1/quizzes/${b}`, headers: auth })).statusCode).toBe(204);
+    expect(await onDisk(shared)).toBe(false);
+    expect(await onDisk(pic2)).toBe(false);
+    await app.close();
+  });
 });

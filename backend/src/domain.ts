@@ -26,9 +26,13 @@ export type Quiz = {
   questions: Question[];
 };
 
+export type PublicQuiz = { id: string; title: string; description: string | null; topic: string | null; questionCount: number };
+
 export interface Repository {
   findAdminByEmail(email: string): Promise<Admin | null>;
   listQuizzes(hostId: string): Promise<Quiz[]>;
+  /** Published quizzes for the public home page: metadata only, never questions or answers. */
+  listPublishedQuizzes(): Promise<PublicQuiz[]>;
   getQuiz(id: string, hostId: string): Promise<Quiz | null>;
   createQuiz(input: { title: string; description?: string; hostId: string }): Promise<Quiz>;
   updateQuiz(id: string, hostId: string, input: { title?: string; description?: string; isPublished?: boolean }): Promise<Quiz | null>;

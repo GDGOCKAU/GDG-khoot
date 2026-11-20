@@ -20,6 +20,7 @@ import CreateQuiz from './pages/admin/CreateQuiz';
 import HostGame from './pages/admin/HostGame';
 import { apiRequest } from './api/client';
 import { syncLiveQuiz } from './lib/liveQuiz';
+import { ensureQuiz } from './lib/serverQuizzes';
 import { connectLiveHost, leaveLive, rememberHostSession, resumeLiveHost, resumeLivePlayer } from './lib/live';
 
 function Loading() {
@@ -78,6 +79,11 @@ function HostRoute() {
   const { quizId } = useParams();
   const quiz = quizById(quizId);
   const running = hosted() && G.quiz.id === quizId;
+  const [missing, setMissing] = useState(null);
+  /* opened directly (refresh, bookmark): fetch the quiz from the server first */
+  useEffect(() => {
+    if (!quiz && !running && isAdmin()) ensureQuiz(quizId).then((q) => { if (!q) setMissing(quizId); });
+  }, [quizId, quiz, running]);
   useEffect(() => {
     if (!(hosted() && G.quiz.id === quizId) && quiz && isAdmin()) {
       startHost(quiz, { live: true });
@@ -104,7 +110,8 @@ function HostRoute() {
   }, [quizId, quiz]);
   if (running) return <HostGame />;
   if (quiz && isAdmin()) return null;
-  return <Navigate to="/" replace />;
+  if (isAdmin() && missing !== quizId) return <Loading />;
+  return <Navigate to={isAdmin() ? '/admin' : '/'} replace />;
 }
 /* /admin/* — needs the admin password */
 function AdminGate({ children }) {
@@ -114,11 +121,18 @@ function AdminGate({ children }) {
 /* one element for /admin/new and /admin/edit/:quizId, so saving a new quiz
    (which swaps the URL) keeps the editor and your cursor in place */
 function EditorRoute() {
+  useAppState();
   const { quizId } = useParams();
+  const quiz = quizId ? quizById(quizId) : null;
+  const [missing, setMissing] = useState(null);
+  /* opened directly (refresh, bookmark): fetch the quiz from the server */
+  useEffect(() => {
+    if (quizId && !quiz) ensureQuiz(quizId).then((q) => { if (!q) setMissing(quizId); });
+  }, [quizId, quiz]);
   if (!quizId) return <CreateQuiz />;
-  const quiz = quizById(quizId);
-  if (!quiz) return <Navigate to="/admin" replace />;
-  return <CreateQuiz quiz={quiz} />;
+  if (quiz) return <CreateQuiz quiz={quiz} />;
+  if (missing === quizId) return <Navigate to="/admin" replace />;
+  return <Loading />;
 }
 
 function App() {

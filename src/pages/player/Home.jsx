@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { TEAMS, TOPICS, css } from '../../lib/constants';
-import { DB, ready, topicNames, useAppState } from '../../lib/store';
-import { G, UI, hosted } from '../../lib/engine';
+import { topicNames, useAppState } from '../../lib/store';
+import { UI } from '../../lib/engine';
+import { loadPublicQuizzes } from '../../lib/serverQuizzes';
 import { toast } from '../../lib/ui';
-import { ColorBar, Hang, Ico, Logo, ThemeButton, TopicChip, TopicIcon } from '../../components/common/UI';
+import { ColorBar, EmptyState, Hang, Ico, Logo, ThemeButton, TopicChip, TopicIcon } from '../../components/common/UI';
 import SiteFooter from '../../components/common/SiteFooter';
 import { apiRequest } from '../../api/client';
 import { syncLiveQuiz } from '../../lib/liveQuiz';
@@ -24,6 +25,9 @@ function Home() {
   const holdRef = useRef(0);
   const pinRef = useRef(null);
   const location = useLocation();
+  /* published quizzes from the server: title, topic and question count only */
+  const [quizzes, setQuizzes] = useState(null);
+  useEffect(() => { loadPublicQuizzes().then(setQuizzes).catch(() => setQuizzes([])); }, []);
 
   /* back from a wrong-PIN page: straight to the PIN box */
   useEffect(() => {
@@ -81,7 +85,8 @@ function Home() {
   };
 
   const filters = ['All', ...topicNames()];
-  const list = DB.quizzes.filter(ready).filter((x) => filter === 'All' || x.topic === filter);
+  const list = (quizzes || []).filter((x) => filter === 'All' || x.topic === filter);
+  const none = quizzes !== null && !quizzes.length;
 
   return <>
     <header className="site-head"><nav className="site-nav" aria-label="Main">
@@ -119,12 +124,14 @@ function Home() {
       <section style={{ background: 'var(--canvas)' }} id="quizzes"><div className="section">
         <div className="sec-head">
           <div><span className="sec-tag" style={{ '--c': '#ea4335' }}>LEARN SOMETHING NEW</span><h2>Explore quizzes</h2></div>
-          <div className="seg filters" role="tablist" aria-label="Filter by topic">
+          {!none && <div className="seg filters" role="tablist" aria-label="Filter by topic">
             {filters.map((f) => <button key={f} type="button" role="tab" aria-selected={filter === f} onClick={() => pickFilter(f)}>{f}</button>)}
-          </div>
+          </div>}
         </div>
-        <div className="quiz-grid">
-          {list.length ? list.map((x) => {
+        {none ? (
+          <EmptyState icon="spark" title="No quizzes yet" text="Quizzes show up here once the GDG KAU team publishes them. Got a PIN from the big screen? Enter it above to join the live game." />
+        ) : <div className="quiz-grid">
+          {quizzes === null ? <div className="empty">Loading quizzes…</div> : list.length ? list.map((x) => {
             const T = TEAMS[(TOPICS[x.topic] || TOPICS.Other).c];
             return (
               <article key={x.id} className="quiz-card" style={{ '--acc': T.bright, '--acc-soft': T.soft, '--acc-txt': T.txt }}>
@@ -132,12 +139,11 @@ function Home() {
                 <span className="ico"><TopicIcon t={x.topic} /></span>
                 <h3>{x.title}</h3>
                 <p>{x.desc || ''}</p>
-                <div className="meta"><span className="chip">{x.questions.length} questions</span><TopicChip t={x.topic} /></div>
-                <Link className="btn btn-tonal btn-sm play" to={`/join/${x.id}`} onClick={() => { UI.look = null; }}>Play <Ico n="arrow" /></Link>
+                <div className="meta"><span className="chip">{x.questionCount} question{x.questionCount === 1 ? '' : 's'}</span><TopicChip t={x.topic} /></div>
               </article>
             );
           }) : <div className="empty">No quizzes in this topic yet.</div>}
-        </div>
+        </div>}
       </div></section>
       <section id="how" style={{ background: 'var(--bg)' }}><div className="section">
         <div className="sec-head"><div><span className="sec-tag" style={{ '--c': '#34a853' }}>HOW IT WORKS</span><h2>Three steps to play</h2></div></div>

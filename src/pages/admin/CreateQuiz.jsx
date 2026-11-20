@@ -74,7 +74,15 @@ async function uploadPictures(d) {
     if ((t === 'mc' || t === 'tf') && question.img) question.img = await upload(question.img);
   }
 }
-async function saveBackend(d, ed, setSaveState) {
+/* saves of one editor run one after another: an autosave still uploading a picture must finish
+   before Publish saves, or Publish could be overwritten as a draft (or a new quiz saved twice) */
+function saveBackend(d, ed, setSaveState) {
+  const run = () => saveBackendNow(d, ed, setSaveState);
+  const next = (ed.queue || Promise.resolve()).then(run, run);
+  ed.queue = next.catch(() => {});
+  return next;
+}
+async function saveBackendNow(d, ed, setSaveState) {
   try {
     await uploadPictures(d);
     const quiz = await apiRequest('/api/v1/quizzes/save', {
@@ -89,7 +97,6 @@ async function saveBackend(d, ed, setSaveState) {
       }),
     });
     d.id = quiz.id;
-    if (ed.forId === 'new') ed.forId = quiz.id;
     upsertQuiz(d);
     ed.saved = true;
     setSaveState?.(d.status === 'ready' ? 'All changes saved' : 'Draft saved');
@@ -129,7 +136,12 @@ function CreateQuiz({ quiz }) {
 
   async function persistDraft() {
     const saved = await saveBackend(d, ed, setSaveState);
-    if (saved && ed.forId !== 'new') navigate('/admin/edit/' + d.id, { replace: true });
+    /* only while this editor is still open (Publish, Delete or Back may have left it meanwhile).
+       The editor takes the saved id and the URL in the same step, so no render sees a mismatch. */
+    const inEditor = /^\/admin\/(new|edit\/)/.test(window.location.pathname);
+    if (!saved || E !== ed || !inEditor) return;
+    ed.forId = d.id;
+    navigate('/admin/edit/' + d.id, { replace: true });
   }
   function softSave() {
     setSaveState('Saving…');
@@ -153,9 +165,11 @@ function CreateQuiz({ quiz }) {
     ed.draft = normalizeDraft(JSON.parse(JSON.stringify(stored))); ed.dirty = 0; ed.cur = Math.min(ed.cur, ed.draft.questions.length - 1);
     rerender(); toast('Changes discarded');
   }
-  function duplicateQuiz() {
+  /* the copy is saved on the server as a new draft before it opens */
+  async function duplicateQuiz() {
     const copy = { ...JSON.parse(JSON.stringify(d)), id: uid(), pin: newPin(), title: `${d.title || 'Untitled quiz'} (copy)`, status: 'draft', lastHosted: null };
-    upsertQuiz(copy); E = null;
+    if (!(await saveBackend(copy, { forId: copy.id }))) return;
+    E = null;
     navigate('/admin/edit/' + copy.id);
     toast('Quiz duplicated as a draft');
   }

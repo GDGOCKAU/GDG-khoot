@@ -13,6 +13,12 @@ export class MemoryRepository implements Repository {
     return this.quizzes.filter((quiz) => quiz.hostId === hostId);
   }
 
+  async listPublishedQuizzes() {
+    return this.quizzes.filter((quiz) => quiz.isPublished).map((quiz) => ({
+      id: quiz.id, title: quiz.title, description: quiz.description ?? null, topic: quiz.topic ?? null, questionCount: quiz.questions.length,
+    }));
+  }
+
   async getQuiz(id: string, hostId: string) {
     return this.quizzes.find((quiz) => quiz.id === id && quiz.hostId === hostId) ?? null;
   }

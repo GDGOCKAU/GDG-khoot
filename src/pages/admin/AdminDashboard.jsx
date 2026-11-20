@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { DB, upsertQuiz, useAppState } from '../../lib/store';
-import { Ico, TopicChip } from '../../components/common/UI';
+import { DB, setAdmin, useAppState } from '../../lib/store';
+import { EmptyState, Ico, TopicChip } from '../../components/common/UI';
 import { AdminShell } from '../../components/layout/Shells';
-import { apiRequest, assetUrl } from '../../api/client';
-import { notify } from '../../lib/store';
+import { loadQuizzes } from '../../lib/serverQuizzes';
 
 let lastFilter = 'All', lastSearch = '';
 
@@ -15,42 +14,12 @@ function AdminDashboard() {
   const setFilter = (v) => { lastFilter = v; setFilterS(v); };
   const setSearch = (v) => { lastSearch = v; setSearchS(v); };
 
-  /* totals come from finished games on the server */
+  /* quizzes and totals come only from the server (totals: finished games) */
   const [stats, setStats] = useState(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
-    Promise.all([apiRequest('/api/v1/quizzes'), apiRequest('/api/v1/stats').catch(() => null)])
-      .then(([items, st]) => {
-        setStats(st);
-        items.forEach((quiz) => upsertQuiz({
-          id: quiz.id,
-          title: quiz.title,
-          topic: quiz.topic || 'Other',
-          desc: quiz.description || '',
-          status: quiz.isPublished ? 'ready' : 'draft',
-          pin: String(100000 + Math.floor(Math.random() * 900000)),
-          lastHosted: st && st.lastHosted[quiz.id] ? Date.parse(st.lastHosted[quiz.id]) : null,
-          questions: (quiz.questions || []).map((question) => {
-            const type = question.type || 'mc', options = question.options || [];
-            const answers = type === 'pic' ? ['', '', '', ''] : options.map((option) => option.text);
-            while (answers.length < 4) answers.push('');
-            return {
-              type,
-              text: question.text,
-              answers,
-              correct: type === 'pic' ? -1 : options.findIndex((option) => option.isCorrect),
-              time: question.timeLimitSecs,
-              points: question.points ?? 1,
-              img: question.imageUrl ? assetUrl(question.imageUrl) : null,
-              code: question.code || '',
-              lang: question.language || 'Dart',
-              pics: (question.pictureUrls || []).map(assetUrl),
-              word: type === 'pic' ? (question.word || options.find((option) => option.isCorrect)?.text || '') : '',
-            };
-          }),
-        }));
-        notify();
-      })
-      .catch(() => {});
+    /* an expired sign-in goes back to the password page */
+    loadQuizzes().then(setStats).catch((error) => { if (error.status === 401) setAdmin(false); else setFailed(true); });
   }, []);
 
   const games = { length: stats ? stats.gamesHosted : 0 };
@@ -71,6 +40,19 @@ function AdminDashboard() {
         <div className="card stat" style={{ '--c': '#f9ab00' }}><b className="num">{players}</b><span>Players so far</span></div>
         <div className="card stat" style={{ '--c': '#34a853' }}><b className="num">{acc}</b><span>Average accuracy</span></div>
       </div>
+      {!DB.loaded ? (
+        <section className="card tbl-wrap">
+          {failed
+            ? <EmptyState icon="x" tone="red" title="Could not load your quizzes" text="The server did not answer. Check that it is running, then reload this page."><button type="button" className="btn btn-outline" onClick={() => window.location.reload()}>Reload</button></EmptyState>
+            : <p style={{ margin: 0, textAlign: 'center', color: 'var(--muted)', padding: 32 }}>Loading quizzes…</p>}
+        </section>
+      ) : !DB.quizzes.length ? (
+        <section className="card tbl-wrap">
+          <EmptyState icon="plusc" title="No quizzes yet" text="Create your first quiz. Once you publish it, it shows on the home page and you can host it live.">
+            <Link className="btn btn-primary" to="/admin/new"><Ico n="plus" />Create quiz</Link>
+          </EmptyState>
+        </section>
+      ) : (
       <section className="card tbl-wrap">
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <h2 style={{ margin: 0, fontSize: 22 }}>Your quizzes</h2>
@@ -115,6 +97,7 @@ function AdminDashboard() {
           )) : <p style={{ margin: 0, textAlign: 'center', color: 'var(--muted)', padding: 24 }}>No quizzes match.</p>}
         </div>
       </section>
+      )}
     </AdminShell>
   );
 }

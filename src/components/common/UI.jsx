@@ -109,6 +109,18 @@ export function LivePill() {
   return <div className="live-pill" role="region" aria-label="Live game"><span className="live-dot" aria-hidden="true" /><span>{label}</span>{btn}</div>;
 }
 
+/* nothing to list yet: icon, title, one line and an optional action, inside the dashed .empty box */
+export function EmptyState({ icon = 'grid', tone = 'blue', title, text, children }) {
+  return (
+    <div className="empty" style={css('display:flex;flex-direction:column;align-items:center;gap:12px;padding:48px 24px')}>
+      <span className="big-ring" style={css(`width:72px;height:72px;background:var(--${tone}-soft);color:var(--${tone}-txt)`)}><Ico n={icon} s={32} /></span>
+      <h3 style={css('margin:4px 0 0;font-size:22px;color:var(--ink)')}>{title}</h3>
+      {text && <p style={css('margin:0;max-width:30rem;font-size:15px')}>{text}</p>}
+      {children}
+    </div>
+  );
+}
+
 /* confirm dialog shell */
 export function Modal({ id, icon, title, children, onClose }) {
   useEffect(() => {

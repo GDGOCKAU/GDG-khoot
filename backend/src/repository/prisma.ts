@@ -13,11 +13,20 @@ export class PrismaRepository implements Repository {
   }
 
   async listQuizzes(hostId: string) {
-    const quizzes = await this.prisma.quiz.findMany({ where: { hostId }, include: { questions: { include: { options: true }, orderBy: { order: "asc" } } } });
+    const quizzes = await this.prisma.quiz.findMany({ where: { hostId }, orderBy: { updatedAt: "desc" }, include: { questions: { include: { options: true }, orderBy: { order: "asc" } } } });
     return quizzes.map((quiz) => ({
       ...quiz,
       questions: quiz.questions.map((question) => ({ ...question, pictureUrls: this.normalizePictureUrls(question.pictureUrls) })),
     }));
+  }
+
+  async listPublishedQuizzes() {
+    const quizzes = await this.prisma.quiz.findMany({
+      where: { isPublished: true },
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, title: true, description: true, topic: true, _count: { select: { questions: true } } },
+    });
+    return quizzes.map(({ _count, ...quiz }) => ({ ...quiz, questionCount: _count.questions }));
   }
 
   async getQuiz(id: string, hostId: string) {

@@ -3,10 +3,10 @@ import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import type { Repository } from "./domain.js";
+import type { Quiz, Repository } from "./domain.js";
 import { GameError, type GameService } from "./game.js";
 import { normalizeQuestion, questionProblem, saveQuizSchema } from "./validation.js";
 
@@ -36,6 +36,13 @@ declare module "fastify" {
   interface FastifyInstance {
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   }
+}
+
+/** File names under /uploads/ that a quiz's questions point to. */
+function uploadedFiles(quiz: Quiz): string[] {
+  return quiz.questions.flatMap((question) => [question.imageUrl, ...(question.pictureUrls ?? [])])
+    .map((url) => /^\/uploads\/([0-9a-f-]{36}\.(?:png|jpg|webp|gif))$/.exec(url ?? "")?.[1])
+    .filter((file): file is string => !!file);
 }
 
 export function buildApp(repository: Repository, jwtSecret: string, gameService?: GameService, options: { uploadDir?: string } = {}): FastifyInstance {
@@ -89,6 +96,8 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
   });
 
   app.get("/api/v1/quizzes", { onRequest: [app.authenticate] }, async (request) => repository.listQuizzes(request.user.id));
+  // public: what the home page lists. Metadata only; questions and answers stay on the server.
+  app.get("/api/v1/public/quizzes", async () => repository.listPublishedQuizzes());
   app.post("/api/v1/quizzes/save", { onRequest: [app.authenticate] }, async (request, reply) => {
     const parsed = saveQuizSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_request", details: parsed.error.flatten() });
@@ -131,8 +140,16 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
         throw error;
       }
     }
+    const quiz = await repository.getQuiz(request.params.id, request.user.id);
     const deleted = await repository.deleteQuiz(request.params.id, request.user.id);
-    return deleted ? reply.code(204).send() : reply.code(404).send({ error: "not_found" });
+    if (!deleted) return reply.code(404).send({ error: "not_found" });
+    // its pictures go too, unless another quiz (e.g. a duplicate) still shows them
+    if (quiz) {
+      const stillUsed = new Set((await repository.listQuizzes(request.user.id)).flatMap(uploadedFiles));
+      await Promise.all(uploadedFiles(quiz).filter((file) => !stillUsed.has(file))
+        .map((file) => unlink(path.join(uploadDir, file)).catch(() => undefined)));
+    }
+    return reply.code(204).send();
   });
   app.post<{ Params: { id: string } }>("/api/v1/quizzes/:id/questions", { onRequest: [app.authenticate] }, async (request, reply) => {
     const parsed = questionSchema.safeParse(request.body);
