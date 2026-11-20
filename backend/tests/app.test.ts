@@ -230,4 +230,37 @@ describe("backend API foundation", () => {
     expect(saved.questions[2].options.map((o: { text: string }) => o.text)).toEqual(["A", "C"]);
     expect(saved.questions[2].points).toBe(0);
   });
+  it("deletes a quiz on the server: closes an unstarted lobby, refuses while a game is being played", async () => {
+    const { app } = setup();
+    const token = (await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "admin@example.com", password: "secret" } })).json().token;
+    const auth = { authorization: `Bearer ${token}` };
+    const makeQuiz = async (title: string) => (await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: { title, isPublished: true, questions: [{
+      text: "Question", order: 0, timeLimitSecs: 20, options: [{ text: "A", isCorrect: true }, { text: "B", isCorrect: false }],
+    }] } })).json().id as string;
+    const open = async (quizId: string) => (await app.inject({ method: "POST", url: "/api/v1/sessions", headers: auth, payload: { quizId } })).json();
+
+    // a lobby nobody started is closed with the quiz; no body and no content type, like the browser sends
+    const a = await makeQuiz("Delete me");
+    const lobby = await open(a);
+    const deleted = await app.inject({ method: "DELETE", url: `/api/v1/quizzes/${a}`, headers: auth });
+    expect(deleted.statusCode).toBe(204);
+    expect((await app.inject({ method: "GET", url: `/api/v1/quizzes/${a}`, headers: auth })).statusCode).toBe(404);
+    expect((await app.inject({ method: "GET", url: `/api/v1/sessions/by-pin/${lobby.pin}` })).statusCode).not.toBe(200);
+
+    // a game in progress blocks the delete until the host ends it
+    const b = await makeQuiz("Being played");
+    const game = await open(b);
+    await app.inject({ method: "POST", url: "/api/v1/sessions/join", payload: { pin: game.pin, name: "Reem", mascot: "blue-0", team: "blue" } });
+    expect((await app.inject({ method: "POST", url: `/api/v1/sessions/${game.id}/start`, headers: auth, payload: {} })).statusCode).toBe(200);
+    const refused = await app.inject({ method: "DELETE", url: `/api/v1/quizzes/${b}`, headers: auth });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json().error).toBe("quiz_in_live_game");
+    expect((await app.inject({ method: "GET", url: `/api/v1/quizzes/${b}`, headers: auth })).statusCode).toBe(200);
+    await app.inject({ method: "POST", url: `/api/v1/sessions/${game.id}/cancel`, headers: auth, payload: {} });
+    expect((await app.inject({ method: "DELETE", url: `/api/v1/quizzes/${b}`, headers: auth })).statusCode).toBe(204);
+
+    // someone else's quiz or an unknown id
+    expect((await app.inject({ method: "DELETE", url: `/api/v1/quizzes/${a}`, headers: auth })).statusCode).toBe(404);
+    await app.close();
+  });
 });

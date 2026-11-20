@@ -125,7 +125,7 @@ export type GameErrorCode =
   | "session_not_found" | "quiz_not_found" | "invalid_phase" | "duplicate_participant"
   | "participant_not_found" | "question_not_found" | "answer_closed" | "answer_already_submitted"
   | "invalid_option" | "game_started" | "game_closed" | "game_locked" | "no_players"
-  | "power_ups_off" | "power_up_used" | "power_up_not_allowed";
+  | "power_ups_off" | "power_up_used" | "power_up_not_allowed" | "quiz_in_live_game";
 
 export class GameError extends Error {
   constructor(public readonly code: GameErrorCode, message = code) { super(message); }
@@ -377,6 +377,14 @@ export class GameService {
       this.emit(sessionId, "closed", { sessionId, reason: "host_ended" });
     }
     return { sessionId, status: session.status };
+  }
+
+  /** Before a quiz is deleted: refuse while one of its games is being played; close lobbies that never started. */
+  async releaseQuiz(hostId: string, quizId: string) {
+    const open = (await this.gameRepository.listSessions(hostId))
+      .filter((session) => session.quizId === quizId && session.status !== "FINISHED" && session.status !== "CANCELLED");
+    if (open.some((session) => session.status !== "LOBBY")) throw new GameError("quiz_in_live_game");
+    for (const session of open) await this.cancel(hostId, session.id);
   }
 
   async leave(sessionId: string, participantId: string) {

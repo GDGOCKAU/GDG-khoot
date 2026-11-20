@@ -124,6 +124,13 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
     return quiz ? quiz : reply.code(404).send({ error: "not_found" });
   });
   app.delete<{ Params: { id: string } }>("/api/v1/quizzes/:id", { onRequest: [app.authenticate] }, async (request, reply) => {
+    // past games go with the quiz (cascade); a game being played right now blocks the delete
+    if (gameService) {
+      try { await gameService.releaseQuiz(request.user.id, request.params.id); } catch (error) {
+        if (error instanceof GameError) return reply.code(409).send({ error: error.code });
+        throw error;
+      }
+    }
     const deleted = await repository.deleteQuiz(request.params.id, request.user.id);
     return deleted ? reply.code(204).send() : reply.code(404).send({ error: "not_found" });
   });

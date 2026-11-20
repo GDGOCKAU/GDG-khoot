@@ -160,6 +160,24 @@ function CreateQuiz({ quiz }) {
     toast('Quiz duplicated as a draft');
   }
   const setQ = (k, v) => change(() => { qq[k] = v; });
+  /* the server owns saved quizzes: delete there first, then drop the local copy */
+  async function removeQuiz() {
+    clearTimeout(saveT.current);
+    if (isUuid(d.id)) {
+      try {
+        await apiRequest(`/api/v1/quizzes/${d.id}`, { method: 'DELETE' });
+      } catch (error) {
+        if (error.status !== 404) {
+          setAskDelete(false);
+          toast(error.body?.error === 'quiz_in_live_game' ? 'This quiz is in a live game right now. End the game first.'
+            : error.status === 401 ? 'Please sign in again.' : 'Could not delete the quiz on the server.');
+          return;
+        }
+      }
+      try { localStorage.removeItem(`kauhoot:host:${d.id}`); } catch { /* ignore */ }
+    }
+    deleteQuiz(d.id); E = null; navigate('/admin'); toast('Quiz deleted');
+  }
 
   function doAddTopic(name) {
     const n = name.trim().replace(/\s+/g, ' ');
@@ -334,10 +352,10 @@ function CreateQuiz({ quiz }) {
       )}
       {askDelete && (
         <Modal id="delT" icon="trash" title="Are you sure you want to delete the quiz?" onClose={() => setAskDelete(false)}>
-          <p>&quot;{d.title || 'Untitled quiz'}&quot; and its {d.questions.length} question{d.questions.length > 1 ? 's' : ''} will be deleted. This can&apos;t be undone.</p>
+          <p>&quot;{d.title || 'Untitled quiz'}&quot; and its {d.questions.length} question{d.questions.length > 1 ? 's' : ''} will be deleted, with the results of its past games. This can&apos;t be undone.</p>
           <div style={css('display:flex;gap:10px;justify-content:flex-end')}>
             <button type="button" className="btn btn-outline" onClick={() => setAskDelete(false)} autoFocus>Cancel</button>
-            <button type="button" className="btn btn-danger-solid" onClick={() => { clearTimeout(saveT.current); deleteQuiz(d.id); E = null; navigate('/admin'); toast('Quiz deleted'); }}>Yes, delete quiz</button>
+            <button type="button" className="btn btn-danger-solid" onClick={removeQuiz}>Yes, delete quiz</button>
           </div>
         </Modal>
       )}

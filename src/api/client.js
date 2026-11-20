@@ -14,7 +14,8 @@ export function getStoredToken() {
 }
 
 export async function apiRequest(path, options = {}) {
-  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  // no JSON content type without a body: Fastify rejects an empty JSON body (DELETE, bodyless POST)
+  const headers = { ...(options.body != null ? { "Content-Type": "application/json" } : {}), ...(options.headers || {}) };
   const token = getStoredToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
