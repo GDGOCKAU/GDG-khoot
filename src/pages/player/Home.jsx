@@ -54,7 +54,7 @@ function Home() {
             <span className="chip" style={css('align-self:flex-start;letter-spacing:.06em;color:var(--muted)')}><i style={css('width:8px;height:8px;border-radius:50%;background:#34a853;box-shadow:0 0 0 3px var(--green-soft)')} />GOOGLE DEVELOPER GROUPS · KAU</span>
             <h1>Play<span style={{ color: '#4285f4' }}>.</span> Think<span style={{ color: '#ea4335' }}>.</span><br />Learn<span style={{ color: '#f9ab00' }}>.</span></h1>
             <p className="lead">Got what it takes? Jump into a live GDG KAU quiz, race your friends, and learn something new.</p>
-            <div className="ticks"><span style={{ '--c': '#4285f4' }}>No account needed</span><span style={{ '--c': '#ea4335' }}>Works on any phone</span><span style={{ '--c': '#34a853' }}>Free for everyone</span></div>
+            <div className="ticks"><span style={{ '--c': '#4285f4' }}>No account needed</span><span style={{ '--c': '#ea4335' }}>Works on any device</span><span style={{ '--c': '#34a853' }}>Free for everyone</span></div>
           </div>
           <form className="join-card" onSubmit={submitPin} noValidate>
             <div><h2>Join a game</h2><p style={css('margin:6px 0 0;color:var(--muted);font-size:14px')}>Enter the PIN shown on the big screen.</p></div>

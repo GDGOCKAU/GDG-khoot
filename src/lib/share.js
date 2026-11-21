@@ -4,11 +4,13 @@ import { LOGO_SRC } from './icons';
 import { G, ranked, rankOf, teamStats } from './engine';
 import { toast, copyText } from './ui';
 
+/* what people post when they share (also used for X / Twitter) */
+const TAGS = 'with @gdgoc_team #GDGoC #KAUHOOT';
 export function shareText(kind) {
   const me = G.me;
-  if (kind === 'me') return `I finished ${ord(rankOf(me))} with ${fmt(me.score)} points in "${G.quiz.title}" on GDG KAUHOOT!`;
+  if (kind === 'me') return `I finished ${ord(rankOf(me))} with ${fmt(me.score)} points in "${G.quiz.title}" on GDG KAUHOOT ${TAGS}`;
   const t = ranked().slice(0, 3).map((p, i) => `${i + 1}. ${p.name}`).join(', ');
-  return `Top 3 in "${G.quiz.title}" on GDG KAUHOOT: ${t}`;
+  return `Top 3 in "${G.quiz.title}" on GDG KAUHOOT: ${t} ${TAGS}`;
 }
 /* the phone's share menu only exists on secure (https) pages */
 export const canNativeShare = () => typeof navigator !== 'undefined' && !!navigator.share && window.isSecureContext !== false;

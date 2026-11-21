@@ -161,7 +161,7 @@ html.dark .toast { background: #e8eaed; color: #1f2328; }
 .m-grid button[aria-pressed="true"] { border: 3px solid var(--c); background: var(--csoft); }
 .m-grid button[aria-pressed="true"]::after { content: '✓'; position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; background: var(--c); color: #fff; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .ring-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
-.ring-wrap svg { transform: rotate(-90deg); }
+.ring-wrap svg { display: block; overflow: visible; background: none; }
 .ring-wrap .n { position: absolute; font-weight: 700; }
 .tiles { flex: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-height: 360px; }
 .tile { border: 0; border-radius: 1.25rem; padding: 18px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; color: #fff; font-size: 20px; font-weight: 600; text-align: left; transition: transform .12s, opacity .2s; background: var(--c); }
@@ -1041,3 +1041,140 @@ html:not(.dark) .alabel .ok { border-color: var(--canvas); box-shadow: 0 1px 3px
 }
 /* answer chart on phones: taller bars, less empty space above them */
 @media (max-width: 700px) { .atrack { height: clamp(170px, 34vh, 320px); } }
+
+/* ================= fit to one screen + always centred (v16) ================= */
+/* only leave room for the floating host pill when it is actually on screen */
+.host-main, .lap-main, .pl-in { padding-bottom: 24px; }
+body:has(.live-pill) :is(.host-main, .lap-main, .pl-in) { padding-bottom: 88px; }
+
+/* --- home: symmetric side space (so it stays centred) that also clears the spider --- */
+.hero-text { padding-left: 0; flex: 999 1 380px; }
+.join-card { flex: 1 1 320px; }
+.hero-in { padding-inline: clamp(32px, calc(140px - (100vw - 80rem) / 2), 128px); gap: clamp(28px, 4vw, 56px); justify-content: center; }
+.hero h1 { font-size: clamp(44px, min(6.4vw, 9.5vh), 88px); }
+.hero .lead { font-size: clamp(16px, min(1.5vw, 2.3vh), 20px); line-height: 1.6; }
+.hero-text { gap: clamp(12px, 2.2vh, 22px); }
+.join-card { padding: clamp(20px, 3.2vh, 32px); gap: clamp(10px, 1.8vh, 18px); }
+.join-card .pin { min-height: clamp(50px, 7vh, 64px); }
+@media (max-width: 860px) {
+  /* stacked: text above the card, both centred */
+  .hero-in { padding-inline: 32px; }
+  .hero-text, .join-card { flex-basis: 100%; max-width: 560px; margin-inline: auto; }
+  .hang-lg .hang { display: none; }
+  .hang-sm .hang { display: block; }
+  .hero h1 { padding-right: 72px; }
+}
+@media (max-width: 560px) {
+  .hero-in { padding-inline: 20px; gap: 18px; padding-top: clamp(10px, 2.5vh, 28px) !important; padding-bottom: clamp(8px, 2vh, 24px) !important; }
+  .hero-text { gap: 10px; }
+  .hero h1 { font-size: clamp(36px, 10.5vw, 50px); }
+  .hero .lead { font-size: 15px; line-height: 1.55; }
+  .ticks { font-size: 12.5px; gap: 4px 14px; }
+  .join-card { padding: 18px; gap: 12px; border-radius: 1.25rem; }
+  .join-card h2 { font-size: 22px; }
+  .join-card .pin { min-height: 52px; font-size: 26px; }
+  .join-card .btn-lg { min-height: 50px; }
+  .hero .gfoot-in.gfoot-row { padding: 4px 20px 14px !important; row-gap: 8px; }
+}
+/* short phones: drop the extras so the join card always fits */
+@media (max-width: 560px) and (max-height: 860px) { .hero .lead { display: none; } }
+@media (max-width: 560px) and (max-height: 760px) { .ticks { display: none; } .hero .chip { display: none !important; } .join-card > p:last-child { display: none; } }
+
+/* --- leaderboards: sizes follow the screen height --- */
+.lb-title { font-size: clamp(28px, 5.4vh, 52px) !important; }
+.lb-rows { gap: clamp(5px, .9vh, 10px); }
+.lb-row { padding-top: clamp(5px, 1vh, 12px); padding-bottom: clamp(5px, 1vh, 12px); }
+.lb-row .avatar { width: clamp(30px, 5vh, 52px); height: clamp(30px, 5vh, 52px); }
+.lb-row .nm { font-size: clamp(15px, 2.5vh, 24px); }
+.lb-row .sc { font-size: clamp(17px, 2.7vh, 26px); }
+.teams-panel { padding: clamp(12px, 2vh, 20px); gap: clamp(8px, 1.4vh, 16px); }
+.trow { gap: 5px; }
+/* phones and short screens: top 5 (plus you, if you're further down) */
+@media (max-width: 700px), (max-height: 760px) {
+  .lb-rows > .lb-row:nth-child(n+6):not(.me), .final-grid > .lb-row:nth-child(n+6):not(.me) { display: none; }
+  .final-grid { grid-template-rows: none; grid-auto-flow: row; }
+}
+@media (max-width: 700px) {
+  /* team standings as a compact 2 x 2 grid */
+  .teams-panel .trows { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .teams-panel .trow .t1 { font-size: 13px; gap: 6px; }
+  .teams-panel .trow .t1 img { width: 22px; height: 22px; }
+  .teams-panel .trow > :not(.t1) { font-size: 11px; }
+}
+
+/* --- answer chart, team results, winners: shrink with the screen height --- */
+.atrack { height: clamp(110px, 30vh, 300px); }
+@media (max-width: 700px) { .atrack { height: clamp(130px, 32vh, 320px); } }
+@media (min-width: 561px) and (max-height: 900px) { .tblk { height: calc(var(--h) * .8); } }
+@media (min-width: 561px) and (max-height: 780px) { .tblk { height: calc(var(--h) * .62); } }
+@media (max-width: 560px) and (max-height: 760px) { .tblk { height: calc(var(--h) * .45); } }
+@media (max-height: 820px) and (min-width: 701px) {
+  .lap-main { padding-top: 16px; gap: 14px; }
+  .host-main { padding-top: 12px; gap: 16px; }
+  .tcol > img.avatar, .pgrid .tcol > img.avatar { width: 64px !important; height: 64px !important; }
+  .pgrid .tcol.win .tblk b { font-size: 56px; } .pgrid .tcol.third .tblk b { font-size: 44px; }
+  .countdown-h1 { font-size: 64px !important; }
+}
+
+/* --- game over: the story card never taller than the screen --- */
+.story-wrap.big { max-width: min(405px, calc((100vh - 150px) * 9 / 16)); }
+@media (max-width: 900px) { .story-wrap.big, .story-wrap { max-width: min(300px, calc((100vh - 330px) * 9 / 16)); } }
+
+/* --- host question on phones --- */
+@media (max-width: 700px) {
+  .htile { min-height: 0; padding-top: 12px; padding-bottom: 12px; }
+  .htiles { gap: 10px; }
+}
+
+/* home bottom row lines up with the content above it (same width and side space) */
+.hero .gfoot-in.gfoot-row { max-width: 80rem; padding-left: clamp(32px, calc(140px - (100vw - 80rem) / 2), 128px); padding-right: clamp(32px, calc(140px - (100vw - 80rem) / 2), 128px); }
+@media (max-width: 860px) { .hero .gfoot-in.gfoot-row { max-width: calc(560px + 64px); padding-left: 32px; padding-right: 32px; } }
+@media (max-width: 560px) { .hero .gfoot-in.gfoot-row { padding-left: 20px; padding-right: 20px; } }
+
+/* player screens on tablets (narrow column): compact leaderboard */
+.pl-in .lb-row .chip, .pl-in .lb-row .plus { display: none; }
+.pl-in .teams-panel .trows { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.pl-in .teams-panel .trow .t1 { font-size: 13px; gap: 6px; }
+.pl-in .teams-panel .trow .t1 img { width: 22px; height: 22px; }
+.pl-in .teams-panel .trow > :not(.t1) { font-size: 11px; }
+@media (max-height: 760px) { .pl-in { padding-top: 10px; gap: 10px; } }
+
+/* host question: answer tiles shrink with the screen height; 2 x 2 on phones too */
+.htile { min-height: clamp(56px, 11vh, 120px); }
+.host-main .qcard { padding-top: clamp(14px, 2.6vh, 32px); padding-bottom: clamp(14px, 2.6vh, 32px); }
+@media (max-width: 700px) {
+  .htiles:not(.code) { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .htiles:not(.code) .htile { flex-direction: column; align-items: flex-start; justify-content: space-between; min-height: clamp(84px, 13vh, 130px); padding: 12px; font-size: 17px; gap: 8px; }
+  .htiles:not(.code) .htile .L { width: 34px; height: 34px; font-size: 16px; }
+}
+
+/* dashboard table: drop the less important columns when space is tight, never cut off the buttons */
+@media (max-width: 1240px) { .tbl-scroll th:nth-child(4), .tbl-scroll td:nth-child(4) { display: none; } }
+@media (max-width: 1100px) {
+  .tbl-scroll th:nth-child(3), .tbl-scroll td:nth-child(3) { display: none; }
+  .row-acts { grid-template-columns: 44px 64px 96px; }
+  .row-acts .csv-btn span { display: none; }
+}
+@media (max-width: 1240px) { .tbl-scroll table { min-width: 0; } }
+@media (max-width: 400px) { .adm-head h1 { font-size: 30px; } .dash-acts { gap: 6px; } .dash-new { padding: 0 14px; } }
+/* final leaderboard on tablets: top 7 (plus you) */
+.pl-in .final-grid > .lb-row:nth-child(n+8):not(.me) { display: none; }
+/* short screens: smaller chart, countdown and story card */
+@media (max-height: 800px) { .atrack { height: clamp(100px, 25vh, 260px); } .countdown-h1 { font-size: clamp(48px, 9vh, 72px) !important; } }
+@media (max-width: 900px) and (max-height: 760px) { .story-wrap.big, .story-wrap { max-width: min(260px, calc((100vh - 360px) * 9 / 16)); } }
+/* host countdown ("Are you ready?" / "Next question!") scales with the screen height */
+.countdown-h1 + div .ring-wrap { width: clamp(110px, 24vh, 220px) !important; height: clamp(110px, 24vh, 220px) !important; }
+.countdown-h1 + div .ring-wrap svg { width: 100%; height: 100%; }
+.countdown-h1 + div .ring-wrap .n { font-size: clamp(44px, 10vh, 96px) !important; }
+@media (max-width: 700px) { .countdown-h1 { font-size: clamp(36px, 11vw, 52px) !important; } }
+@media (max-height: 760px) { .countdown-p ~ * { display: none; } }
+@media (max-width: 900px) and (max-height: 760px) { .story-wrap.big, .story-wrap { max-width: min(250px, calc((100vh - 400px) * 9 / 16)); } }
+@media (max-height: 760px) {
+  .pl-in, .host-main, .lap-main { padding-bottom: 14px; }
+  body:has(.live-pill) :is(.host-main, .lap-main, .pl-in) { padding-bottom: 76px; }
+}
+@media (max-width: 900px) {
+  .host-main .teams-panel .trows { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .host-main .teams-panel .trow .t1 { font-size: 14px; gap: 6px; }
+  .host-main .teams-panel .trow .t1 img { width: 24px; height: 24px; }
+}

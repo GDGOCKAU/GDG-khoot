@@ -38,9 +38,12 @@ export function Ring({ size, stroke, frac, color, children }) {
   const f = Math.max(0, Math.min(1, frac));
   return (
     <span className="ring-wrap" style={{ width: size, height: size }}>
-      <svg width={size} height={size} aria-hidden="true">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--surface-2)" strokeWidth={stroke} />
-        <circle className="ring-fg" cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - f)} />
+      {/* the circles are turned inside the SVG (not the SVG itself with CSS): iPad Safari drew a box around a CSS-rotated SVG */}
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true" focusable="false">
+        <g transform={`rotate(-90 ${size / 2} ${size / 2})`}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--surface-2)" strokeWidth={stroke} />
+          <circle className="ring-fg" cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - f)} />
+        </g>
       </svg>
       <span className="n num">{children}</span>
     </span>

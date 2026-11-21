@@ -47,7 +47,7 @@ function HostGame() {
         <div><div className="eyebrow">GDG KAUHOOT · Lobby</div><h1 style={{ fontSize: 48, marginTop: 6 }}>{G.quiz.title}</h1></div>
         <div className="lobby">
           <div className="card pinbox">
-            <div style={css('display:flex;flex-direction:column;gap:6px')}><span style={css('font-size:14px;color:var(--muted)')}>Join on your phone at</span><span className="joinat">{window.location.host}</span></div>
+            <div style={css('display:flex;flex-direction:column;gap:6px')}><span style={css('font-size:14px;color:var(--muted)')}>Join on your device at</span><span className="joinat">{window.location.host}</span></div>
             <div style={css('display:flex;flex-direction:column;gap:4px')}><span style={css('font-size:14px;font-weight:500;color:var(--muted)')}>Game PIN</span><span className="pinbig num">{pinFmt(G.pin)}</span></div>
             <ColorBar gaps />
             <div className="qr">

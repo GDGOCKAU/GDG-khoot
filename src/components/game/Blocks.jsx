@@ -97,7 +97,7 @@ export function HostAnswerArea({ qq }) {
     <div style={css('width:100%;display:flex;flex-direction:column;align-items:center;gap:22px;flex:1;justify-content:center')}>
       <PicsRow qq={qq} size={230} />
       <div className="boxes hbig" style={{ width: '100%' }}><Boxes word={qq.word} mode="empty" /></div>
-      <p style={{ margin: 0, textAlign: 'center', color: 'var(--muted)' }}>{norm(qq.word).length} letters · type the word on your phone</p>
+      <p style={{ margin: 0, textAlign: 'center', color: 'var(--muted)' }}>{norm(qq.word).length} letters · type the word on your device</p>
     </div>
   );
   const idx = t === 'tf' ? [0, 1] : [0, 1, 2, 3];
