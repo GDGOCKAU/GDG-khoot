@@ -5,7 +5,7 @@
 import { apiRequest, getStoredToken } from '../api/client';
 import { connectSocket } from '../api/socket';
 import { mascot } from './constants';
-import { G, applyStandings, exitGame, live, liveFinal, livePhaseEvent, liveQuestion, liveResult, liveReveal, newLiveGame, stopGame } from './engine';
+import { G, applyStandings, exitGame, live, liveFinal, livePhaseEvent, liveQuestion, liveResult, liveReveal, newGame, newLiveGame, stopGame } from './engine';
 import { notify } from './store';
 import { toast } from './ui';
 
@@ -186,4 +186,77 @@ export function resumeLiveHost(quizId) {
       resolve(true);
     });
   });
+}
+
+/* ---------- audience screen (/screen): read-only, no login ---------- */
+/* It joins the public "screen" room and follows the newest open session. The engine's host
+   screens draw it, so it looks like the host view without any controls. */
+let screenSocket = null;
+
+/* the server sends only counts to the screen (never who picked what), so rebuild anonymous answers for the charts */
+function screenAnswers(r) {
+  if (!G || !r) return;
+  const qq = G.qs[r.index];
+  if (!qq) return;
+  G.answers = {};
+  if (Array.isArray(r.counts)) {
+    r.counts.forEach((n, i) => { for (let k = 0; k < n; k += 1) G.answers[`a${i}:${k}`] = { choice: i, t: 0 }; });
+  } else if (r.counts) {
+    for (let k = 0; k < r.counts.right; k += 1) G.answers[`r${k}`] = { choice: qq.word, t: 0 };
+    for (let k = 0; k < r.counts.wrong; k += 1) G.answers[`w${k}`] = { choice: '~', t: 0 };
+  }
+}
+
+/* null state = no open quiz: show the waiting screen */
+function loadScreen(state) {
+  if (!state) { if (G) stopGame(); return; }
+  newGame({ id: state.quizId, title: state.quizTitle, topic: state.topic || 'Other', live: true, questions: [] }, 'host', null, { live: true });
+  G.mode = 'screen'; // not a host: no "host screen" pill, no practice bots
+  G.pin = state.pin;
+  G.backendSessionId = state.sessionId;
+  G.qs = Array.from({ length: state.questionCount || 0 }, () => null);
+  applyStandings(state.standings || []);
+  G.liveAnswered = state.answeredCount || 0;
+  applyState(state);
+  screenAnswers(state.reveal);
+  notify();
+}
+
+export function connectScreen() {
+  if (screenSocket) return;
+  const socket = connectSocket();
+  screenSocket = socket;
+  const watch = () => socket.emit('screen:watch', (res) => { if (res && res.ok) loadScreen(res.state); });
+  socket.on('connect', watch);
+  socket.on('screen:event', ({ sessionId, event, payload }) => {
+    /* a new quiz opened: pick it up from its snapshot */
+    if (event === 'session_started') { if (!G || G.backendSessionId !== sessionId) watch(); return; }
+    if (!G || G.mode !== 'screen' || G.backendSessionId !== sessionId) return;
+    switch (event) {
+      case 'closed': case 'screen_closed': stopGame(); break;
+      case 'player_joined':
+        if (G.players.some((p) => p.id === payload.participant.id)) break;
+        G.players.push({
+          id: payload.participant.id, name: payload.participant.name, team: payload.participant.team,
+          img: mascot(payload.participant.team, mascotIdx(payload.participant.mascot)),
+          bot: false, score: 0, streak: 0, correct: 0, last: null, prevRank: 0,
+        });
+        notify();
+        break;
+      case 'player_left': G.players = G.players.filter((p) => p.id !== payload.participantId); notify(); break;
+      case 'phase': livePhaseEvent(payload); break;
+      case 'question': liveQuestion(payload); break;
+      case 'answer_count': if (G.phase === 'question') { G.liveAnswered = Math.max(G.liveAnswered || 0, payload.count); notify(); } break;
+      case 'reveal': liveReveal(payload, null); screenAnswers(payload); notify(); break;
+      case 'reveal_host': liveReveal(payload, payload); screenAnswers(payload); notify(); break;
+      case 'final': liveFinal(payload); break;
+      default: break;
+    }
+  });
+}
+
+export function disconnectScreen() {
+  if (screenSocket) screenSocket.disconnect();
+  screenSocket = null;
+  if (G && G.mode === 'screen') stopGame();
 }

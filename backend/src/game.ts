@@ -215,6 +215,8 @@ export function scoreAnswer(input: { correct: boolean; elapsedMs: number; limitM
 
 export class GameService {
   private readonly live = new Map<string, Live>();
+  /** The session the big audience screen follows: the newest one that has not been closed. */
+  private screenSessionId: string | null = null;
   private readonly timings: Timings;
 
   constructor(
@@ -304,10 +306,28 @@ export class GameService {
     };
   }
 
+  /** Read-only view for the audience screen: what the players already see, plus names and scores. No host rights. */
+  async screenState() {
+    const sessionId = this.screenSessionId;
+    const session = sessionId ? await this.gameRepository.findById(sessionId) : null;
+    if (!session || session.status === "CANCELLED") { this.screenSessionId = null; return null; }
+    const live = await this.ensureLive(session);
+    const current = live.phase === "question" ? live.questions[live.index] : null;
+    const reveal = live.phase === "reveal" || live.phase === "leaderboard" ? live.hostReveal as { choices?: unknown } | null : null;
+    const { choices: _choices, ...hostReveal } = reveal ?? {};
+    return {
+      ...this.common(session, live),
+      answeredCount: current ? await this.gameRepository.countAnswers(session.id, current.id) : 0,
+      standings: (await this.standings(session.id, null)).standings,
+      hostReveal: reveal ? hostReveal : null,
+    };
+  }
+
   private common(session: GameSession, live: Live) {
     const current = live.questions[live.index];
     return {
       sessionId: session.id,
+      quizId: session.quizId,
       pin: session.pin,
       quizTitle: live.quiz.title,
       topic: live.quiz.topic || "Other",
@@ -331,6 +351,9 @@ export class GameService {
     const live = this.newLive(quiz);
     live.powerUps = !!options.powerUps;
     this.live.set(session.id, live);
+    this.screenSessionId = session.id;
+    // the audience screen is waiting for a quiz: tell it this one just opened
+    this.emit(session.id, "session_started", { sessionId: session.id }, "host");
     return { ...session, powerUps: live.powerUps, locked: live.locked };
   }
 
@@ -375,7 +398,11 @@ export class GameService {
       session.closesAt = this.clock();
       await this.gameRepository.save(session);
       this.emit(sessionId, "closed", { sessionId, reason: "host_ended" });
+    } else if (this.screenSessionId === sessionId) {
+      // a finished game the host dismisses: players keep their results, the audience screen goes back to waiting
+      this.emit(sessionId, "screen_closed", { sessionId }, "host");
     }
+    if (this.screenSessionId === sessionId) this.screenSessionId = null;
     return { sessionId, status: session.status };
   }
 

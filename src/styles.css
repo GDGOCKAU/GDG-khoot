@@ -1178,3 +1178,7 @@ body:has(.live-pill) :is(.host-main, .lap-main, .pl-in) { padding-bottom: 88px; 
   .host-main .teams-panel .trow .t1 { font-size: 14px; gap: 6px; }
   .host-main .teams-panel .trow .t1 img { width: 24px; height: 24px; }
 }
+
+/* ---------- audience screen (/screen): view only, so the shared blocks' buttons are hidden ---------- */
+.screen-main .btn { display: none; }
+.screen-mode .lobby .qr .code { width: min(30vh, 200px); height: min(30vh, 200px); }

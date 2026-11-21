@@ -10,6 +10,7 @@ import { Answered, ColorBar, Count, Ico, LiveRing, Modal, Secs } from '../../com
 import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
 import { HostShell } from '../../components/layout/Shells';
 import { setSettings } from '../../lib/live';
+import ScreenLinkButton from '../../components/common/ScreenLinkButton';
 
 function PChip({ p }) {
   const t = TEAMS[p.team];
@@ -54,7 +55,7 @@ function HostGame() {
   switch (G.phase) {
     case 'lobby': {
       const cnt = G.players.length;
-      view = shell(<span className="chip"><i style={css('width:8px;height:8px;border-radius:50%;background:#34a853')} />Host view</span>, <>
+      view = shell(<><span className="chip"><i style={css('width:8px;height:8px;border-radius:50%;background:#34a853')} />Host view</span><ScreenLinkButton className="btn btn-outline btn-sm" /></>, <>
         <div><div className="eyebrow">GDG KAUHOOT · Lobby</div><h1 style={{ fontSize: 48, marginTop: 6 }}>{G.quiz.title}</h1></div>
         <div className="lobby">
           <div className="card pinbox">

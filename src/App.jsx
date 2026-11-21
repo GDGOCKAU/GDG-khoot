@@ -18,6 +18,7 @@ import AdminLogin from './pages/admin/AdminLogin';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import CreateQuiz from './pages/admin/CreateQuiz';
 import HostGame from './pages/admin/HostGame';
+import ScreenPage from './pages/screen/ScreenPage';
 import { apiRequest } from './api/client';
 import { syncLiveQuiz } from './lib/liveQuiz';
 import { ensureQuiz } from './lib/serverQuizzes';
@@ -164,6 +165,9 @@ function App() {
       <Route path="/live" element={<LiveRoute />} />
       <Route path="/lobby" element={<PlayerLobby />} />
       <Route path="/play" element={<PlayerGame />} />
+
+      {/* Audience screen: public, read-only, follows the live game */}
+      <Route path="/screen" element={<ScreenPage />} />
 
       {/* Host + admin routes */}
       <Route path="/host/:quizId" element={<HostRoute />} />

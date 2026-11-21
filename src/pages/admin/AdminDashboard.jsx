@@ -5,6 +5,7 @@ import { EmptyState, Ico, TopicChip } from '../../components/common/UI';
 import { AdminShell } from '../../components/layout/Shells';
 import { loadQuizzes } from '../../lib/serverQuizzes';
 import ImportCsv from '../../components/admin/ImportCsv';
+import ScreenLinkButton from '../../components/common/ScreenLinkButton';
 import { quizToCSV, downloadText, csvName } from '../../lib/csvQuiz';
 
 /* download one quiz as a CSV file (same layout the importer reads) */
@@ -40,6 +41,7 @@ function AdminDashboard() {
       <div className="adm-head">
         <div><h1>Dashboard<span style={{ color: '#ea4335' }}>.</span></h1><p style={{ margin: '6px 0 0', color: 'var(--muted)' }}>Create quizzes and host live games for GDG KAU events.</p></div>
         <div className="dash-acts">
+          <ScreenLinkButton className="btn btn-outline dash-imp" />
           <button type="button" className="btn btn-outline dash-imp" onClick={() => setImporting(true)} aria-label="Import quiz from CSV"><Ico n="down" s={18} /><span className="imp-t">Import CSV</span></button>
           <Link className="btn btn-primary dash-new" to="/admin/new"><Ico n="plus" /><span className="full">Create quiz</span><span className="short">New quiz</span></Link>
         </div>
