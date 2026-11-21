@@ -1,7 +1,12 @@
 /* CSV import / export for quizzes.
    Import reads our template, Kahoot's spreadsheet layout and most hand-made sheets:
    one question per row, columns found by their header names. */
-import { blankQ, qProblem, LANGS } from './questions';
+import { blankQ, norm, qProblem, LANGS } from './questions';
+
+/* the server's save rules (backend/src/validation.ts): a file that breaks them is reported row by row */
+export const LIMITS = { file: 1024 * 1024, questions: 100, title: 60, desc: 90, topic: 20, text: 160, answer: 80, word: 20, code: 10000, url: 500 };
+const TIMES = [5, 10, 15, 20, 30, 60];
+const nearestTime = (t) => TIMES.reduce((a, b) => (Math.abs(b - t) < Math.abs(a - t) ? b : a));
 
 /* ---------- CSV text <-> rows ---------- */
 function detectDelimiter(text) {
@@ -81,9 +86,10 @@ function rowToQuestion(cells, cols) {
 
   /* time and points */
   const t = parseInt(get('time'), 10);
-  q.time = Number.isFinite(t) ? Math.max(5, Math.min(240, t)) : (type === 'code' || type === 'pic' ? 30 : type === 'tf' ? 15 : 20);
-  const p = get('points').toLowerCase();
-  q.points = p === '2' || p === 'x2' || p === 'double' || p === 'yes' ? 2 : 1;
+  q.time = Number.isFinite(t) ? nearestTime(t) : (type === 'code' || type === 'pic' ? 30 : type === 'tf' ? 15 : 20);
+  if (Number.isFinite(t) && t !== q.time) notes.push(`time ${t} s changed to ${q.time} s (allowed: ${TIMES.join(', ')})`);
+  const p = get('points').toLowerCase().replace(/\s+/g, '');
+  q.points = p === '2' || p === 'x2' || p === 'double' || p === 'yes' ? 2 : p === '0' || p === 'none' || p === 'nopoints' ? 0 : 1;
 
   if (type === 'pic') {
     q.word = get('word') || correctRaw;
@@ -112,13 +118,29 @@ function rowToQuestion(cells, cols) {
     if (c && idx < 0) notes.push(`correct answer "${c}" doesn't match any answer`);
   }
   if (type === 'code') {
-    q.code = get('code').replace(/\\n/g, '\n');
+    /* a hand-typed "\n" means a new line, unless the cell already has real line breaks (then it is code text) */
+    const code = get('code');
+    q.code = /\n/.test(code) ? code : code.replace(/\\n/g, '\n');
     const lang = get('lang');
     q.lang = LANGS.find((l) => l.toLowerCase() === lang.toLowerCase()) || (lang ? lang : 'Dart');
   }
   const img = get('image');
   if (/^(https?:|data:image)/.test(img)) q.img = img;
   return { q, notes };
+}
+
+/* what the server would refuse; '' when the question fits */
+export function limitProblem(q) {
+  if (q.text.length > LIMITS.text) return `question is ${q.text.length} characters (max ${LIMITS.text})`;
+  if (q.type !== 'pic' && q.type !== 'tf') {
+    const k = q.answers.findIndex((a) => a.length > LIMITS.answer);
+    if (k >= 0) return `answer ${'ABCD'[k]} is ${q.answers[k].length} characters (max ${LIMITS.answer})`;
+  }
+  if (q.type === 'pic' && norm(q.word).length > LIMITS.word) return `word is ${norm(q.word).length} letters (max ${LIMITS.word})`;
+  if (q.type === 'code' && q.code.length > LIMITS.code) return `code is longer than ${LIMITS.code} characters`;
+  const urls = [q.img, ...(q.pics || [])].filter(Boolean);
+  if (urls.some((u) => !u.startsWith('data:') && u.length > LIMITS.url)) return `an image link is longer than ${LIMITS.url} characters`;
+  return '';
 }
 
 /* ---------- whole file ---------- */
@@ -145,7 +167,7 @@ export function importQuizCSV(text, fileName = '') {
     const { q, notes } = rowToQuestion(r, cols);
     if (!q.text && !q.answers.some(Boolean)) return;
     const problem = qProblem(q);
-    items.push({ row: rowNo, q, notes, problem: problem === 'needs 2 pictures' ? '' : problem });
+    items.push({ row: rowNo, q, notes, problem: problem === 'needs 2 pictures' ? '' : problem, limit: limitProblem(q) });
   });
   if (!meta.title && fileName) meta.title = fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
   return { meta, items, headerFound: headerAt >= 0 };
@@ -159,7 +181,7 @@ export function quizToCSV(quiz) {
     const t = x.type || 'mc';
     const correct = t === 'pic' ? '' : t === 'tf' ? (x.correct === 0 ? 'True' : x.correct === 1 ? 'False' : '') : x.correct >= 0 ? 'ABCD'[x.correct] : '';
     const images = t === 'pic' ? (x.pics || []).filter((s) => !s.startsWith('data:')).join(' | ') : x.img && !x.img.startsWith('data:') ? x.img : '';
-    rows.push([x.text, t, ...(t === 'tf' || t === 'pic' ? ['', '', '', ''] : x.answers.slice(0, 4)), correct, x.time, x.points === 2 ? 2 : 1, t === 'code' ? x.code : '', t === 'code' ? x.lang : '', t === 'pic' ? x.word : '', images]);
+    rows.push([x.text, t, ...(t === 'tf' || t === 'pic' ? ['', '', '', ''] : x.answers.slice(0, 4)), correct, x.time, x.points === 2 ? 2 : x.points === 0 ? 0 : 1, t === 'code' ? x.code : '', t === 'code' ? x.lang : '', t === 'pic' ? x.word : '', images]);
   });
   return toCSV(rows);
 }

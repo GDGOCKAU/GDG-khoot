@@ -2,11 +2,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { NICK_A, NICK_B, TEAMS, css, mascot, pick, pinFmt, rnd } from '../../lib/constants';
-import { G, UI, joinGame } from '../../lib/engine';
+import { G, UI, joinGame, newLiveGame } from '../../lib/engine';
+import { connectLivePlayer } from '../../lib/live';
 import { toast, useWide } from '../../lib/ui';
 import { Ico } from '../../components/common/UI';
 import { MascotGrid, TeamTabs } from '../../components/player/AvatarPicker';
 import { LapShell } from '../../components/layout/Shells';
+import { apiRequest } from '../../api/client';
 
 function JoinQuiz({ quiz, live }) {
   const navigate = useNavigate();
@@ -18,13 +20,45 @@ function JoinQuiz({ quiz, live }) {
   });
   const setLook = (patch) => { const n = { ...look, ...patch }; UI.look = n; setLookState(n); };
   const T = TEAMS[look.team];
-  const pin = live ? G.pin : quiz.pin;
+  const pin = live ? (UI.look?.pin || G?.pin || quiz.pin) : quiz.pin;
 
-  const join = (e) => {
+  const join = async (e) => {
     if (e) e.preventDefault();
-    const err = joinGame(look, quiz);
-    if (err) { toast(err); if (err.startsWith('Pick')) document.getElementById('nickIn')?.focus(); return; }
-    navigate('/play');
+    if (!live) {
+      const err = joinGame(look, quiz);
+      if (err) { toast(err); if (err.startsWith('Pick')) document.getElementById('nickIn')?.focus(); return; }
+      navigate('/play');
+      return;
+    }
+    const name = (look.name || '').trim();
+    if (!name) { toast('Pick a nickname first.'); document.getElementById('nickIn')?.focus(); return; }
+    try {
+      const participant = await apiRequest('/api/v1/sessions/join', {
+        method: 'POST',
+        body: JSON.stringify({
+          pin,
+          name,
+          mascot: `${look.team}-${look.idx}`,
+          team: look.team,
+        }),
+      });
+      localStorage.setItem('gdgParticipantId', participant.id);
+      localStorage.setItem('gdgSessionId', participant.sessionId);
+      UI.look = { ...look, participantId: participant.id, sessionId: participant.sessionId };
+      /* in: wait in the lobby. /play only opens when the server sends the first question */
+      newLiveGame(quiz, { name, team: look.team, img: mascot(look.team, look.idx) }, { sessionId: participant.sessionId, participantId: participant.id });
+      connectLivePlayer(participant.sessionId, participant.id);
+    } catch (error) {
+      toast(error.body?.error === 'game_locked' ? 'The host has locked this game.' : error.status === 409
+        ? 'That nickname is already in this session. Choose another.'
+        : error.status === 404
+          ? 'This live session no longer exists.'
+          : error.status === 400
+            ? 'This game has already started.'
+            : 'Could not join the live session.');
+      return;
+    }
+    navigate('/lobby');
   };
 
   const nick = (

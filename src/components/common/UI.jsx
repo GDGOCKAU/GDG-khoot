@@ -53,7 +53,7 @@ export function Ring({ size, stroke, frac, color, children }) {
 /* live timer widgets: they re-render 10× a second, nothing else does */
 export function Secs() { useTick(); return <>{liveTime().secs}</>; }
 export function Count() { useTick(); return <>{Math.max(1, liveTime().secs)}</>; }
-export function Answered() { useTick(); return <>{G ? Object.keys(G.answers).length : 0}</>; }
+export function Answered() { useTick(); return <>{!G ? 0 : G.liveHost && G.phase === 'question' ? (G.liveAnswered || 0) : Object.keys(G.answers).length}</>; }
 export function LiveBar({ style }) { useTick(); return <i style={{ ...style, width: (100 * liveTime().frac) + '%' }} />; }
 export function LiveRing(props) { useTick(); return <Ring {...props} frac={liveTime().frac} />; }
 
@@ -102,15 +102,28 @@ export function LivePill() {
   let label, btn;
   if (r === 'host') {
     label = <b>You&apos;re the host</b>;
-    btn = G.me ? <Link className="btn btn-primary btn-sm" to="/play">My player screen <Ico n="arrow" /></Link> : (G.phase === 'final' ? null : <Link className="btn btn-primary btn-sm" to="/live">Join as a player <Ico n="arrow" /></Link>);
+    /* live host: players join from their own phones; joining here would end the hosted game */
+    btn = G.me ? <Link className="btn btn-primary btn-sm" to="/play">My player screen <Ico n="arrow" /></Link> : (G.phase === 'final' || G.liveHost ? null : <Link className="btn btn-primary btn-sm" to="/live">Join as a player <Ico n="arrow" /></Link>);
   } else if (r === 'play' && G.me) {
     label = <b>Playing as {G.me.name}</b>;
     btn = <Link className="btn btn-primary btn-sm" to={`/host/${G.quiz.id}`}>Host screen <Ico n="arrow" /></Link>;
   } else {
     label = <><b>Live game</b> · PIN {pinFmt(G.pin)} · <span>{PHASE_LABEL[G.phase] || ''}</span></>;
-    btn = <><Link className="btn btn-outline btn-sm" to={`/host/${G.quiz.id}`}>Host screen</Link>{G.me ? <Link className="btn btn-primary btn-sm" to="/play">My player screen</Link> : <Link className="btn btn-primary btn-sm" to="/live">Join</Link>}</>;
+    btn = <><Link className="btn btn-outline btn-sm" to={`/host/${G.quiz.id}`}>Host screen</Link>{G.me ? <Link className="btn btn-primary btn-sm" to="/play">My player screen</Link> : G.liveHost ? null : <Link className="btn btn-primary btn-sm" to="/live">Join</Link>}</>;
   }
   return <div className="live-pill" role="region" aria-label="Live game"><span className="live-dot" aria-hidden="true" /><span>{label}</span>{btn}</div>;
+}
+
+/* nothing to list yet: icon, title, one line and an optional action, inside the dashed .empty box */
+export function EmptyState({ icon = 'grid', tone = 'blue', title, text, children }) {
+  return (
+    <div className="empty" style={css('display:flex;flex-direction:column;align-items:center;gap:12px;padding:48px 24px')}>
+      <span className="big-ring" style={css(`width:72px;height:72px;background:var(--${tone}-soft);color:var(--${tone}-txt)`)}><Ico n={icon} s={32} /></span>
+      <h3 style={css('margin:4px 0 0;font-size:22px;color:var(--ink)')}>{title}</h3>
+      {text && <p style={css('margin:0;max-width:30rem;font-size:15px')}>{text}</p>}
+      {children}
+    </div>
+  );
 }
 
 /* confirm dialog shell */

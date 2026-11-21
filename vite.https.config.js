@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import fs from 'node:fs'
 import { execSync } from 'node:child_process'
+/* same proxy as vite.config.js, so phones on https reach the API and the live game */
+import { proxy, allowedHosts } from './vite.config.js'
 
 const key = '.cert/key.pem', cert = '.cert/cert.pem'
 if (!fs.existsSync(key) || !fs.existsSync(cert)) {
@@ -13,5 +15,5 @@ if (!fs.existsSync(key) || !fs.existsSync(cert)) {
 
 export default defineConfig({
   plugins: [react()],
-  server: { host: true, https: { key: fs.readFileSync(key), cert: fs.readFileSync(cert) } },
+  server: { host: true, proxy, allowedHosts, https: { key: fs.readFileSync(key), cert: fs.readFileSync(cert) } },
 })

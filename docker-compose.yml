@@ -1,0 +1,53 @@
+# Production stack, deployed by Dokploy (Docker Compose service). Dokploy writes the
+# environment variables from its Environment tab into a .env next to this file, and its
+# Traefik routes the domain to the "web" service on port 80, so no host port is bound here.
+# Locally:  docker compose --env-file my.env up --build   (then open the web container IP,
+# or add  ports: ["8080:80"]  under web temporarily)
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: kahoot
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d kahoot"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/kahoot?schema=public
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@gdg-kauhoot.local}
+    volumes:
+      - uploads:/app/uploads
+    networks:
+      default:
+        # unique name: the server's shared dokploy-network may hold other "api" services
+        aliases: [kauhoot-api]
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    expose:
+      - "80"
+
+volumes:
+  pgdata:
+  uploads:

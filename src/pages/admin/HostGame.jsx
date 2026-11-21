@@ -1,14 +1,15 @@
 /* The big screen the host shows at the event: /host/:quizId */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LETTERS, TEAMS, ansCls, css, pinFmt } from '../../lib/constants';
 import { qType } from '../../lib/questions';
-import { G, curQ, endGame, exitGame, skip, startGame, toggleLock } from '../../lib/engine';
+import { G, curQ, endGame, exitGame, skip, hostNext, startGame, toggleLock, waitsForHost } from '../../lib/engine';
 import { toast, useAnims } from '../../lib/ui';
 import { Answered, ColorBar, Count, Ico, LiveRing, Modal, Secs } from '../../components/common/UI';
 import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
 import { HostShell } from '../../components/layout/Shells';
+import { setSettings } from '../../lib/live';
 
 function PChip({ p }) {
   const t = TEAMS[p.team];
@@ -22,12 +23,22 @@ const bigRing = <LiveRing size={220} stroke={17} color="#1a73e8"><span style={{ 
 function HostGame() {
   const navigate = useNavigate();
   const [askExit, setAskExit] = useState(false);
-  useAnims(`${G.phase}:${G.qi}`);
+  useAnims(`${G.phase}:${G.qi}:${G.liveHost && G.hostRevealIdx === G.qi ? 'counts' : ''}`);
+  /* auto-advance off: → or PageDown (what presentation clickers send) works like the Next button */
+  useEffect(() => {
+    const onKey = (e) => {
+      if (askExit || !G || !G.liveHost || !waitsForHost() || e.repeat) return;
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); hostNext(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [askExit]);
 
   const n = G.qs.length, qq = curQ();
   const pinChip = <span className="chip chip-blue">Game PIN {pinFmt(G.pin)}</span>;
   const over = <span className="chip">Game over · {n} of {n} questions</span>;
   const shell = (right, children, main) => <HostShell right={right} main={main} onExit={() => setAskExit(true)}>{children}</HostShell>;
+  const joinUrl = `${window.location.origin}/join/${G.quiz.id}?pin=${encodeURIComponent(G.pin)}${G.backendSessionId ? `&session=${encodeURIComponent(G.backendSessionId)}` : ''}`;
 
   const exitModal = askExit && (
     <Modal id="exitT" icon="door" title="Are you sure you want to exit the game?" onClose={() => setAskExit(false)}>
@@ -51,10 +62,10 @@ function HostGame() {
             <div style={css('display:flex;flex-direction:column;gap:4px')}><span style={css('font-size:14px;font-weight:500;color:var(--muted)')}>Game PIN</span><span className="pinbig num">{pinFmt(G.pin)}</span></div>
             <ColorBar gaps />
             <div className="qr">
-              <span className="code" role="img" aria-label="QR code to join this game"><QRCodeSVG value={`${window.location.origin}/?pin=${G.pin}`} size={124} level="M" /></span>
+              <span className="code" role="img" aria-label="QR code to join this game"><QRCodeSVG value={joinUrl} size={124} level="M" /></span>
               <span style={css('font-size:14px;line-height:1.6;color:var(--muted)')}>Scan to join instantly, then pick a nickname.</span>
             </div>
-            {G.me ? <p style={css('margin:0;font-size:14px;color:var(--green-txt);font-weight:600')}>You joined as {G.me.name}.</p> : <Link className="btn btn-tonal" to="/live">Join as a player on this device</Link>}
+            {G.liveHost ? null : G.me ? <p style={css('margin:0;font-size:14px;color:var(--green-txt);font-weight:600')}>You joined as {G.me.name}.</p> : <Link className="btn btn-tonal" to="/live">Join as a player on this device</Link>}
           </div>
           <div className="card players">
             <div style={css('display:flex;justify-content:space-between;align-items:center')}><h2 style={{ margin: 0 }}>Players</h2><span className="chip chip-blue"><Ico n="users" />{cnt} joined</span></div>
@@ -63,6 +74,7 @@ function HostGame() {
               <span style={css('color:var(--muted);font-size:14px;flex:1')}>{G.locked ? 'Game locked. No one else can join.' : cnt ? 'Start when everyone is in.' : 'Waiting for players to join…'}</span>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAskExit(true)}>Cancel game</button>
               <button type="button" className="btn btn-outline btn-sm" onClick={toggleLock} aria-pressed={G.locked}><Ico n="lock" />{G.locked ? 'Unlock game' : 'Lock game'}</button>
+              {G.liveHost && <button type="button" className="btn btn-outline btn-sm" onClick={() => setSettings({ powerUps: !G.powerUps })} aria-pressed={!!G.powerUps}><Ico n="star" />{G.powerUps ? 'Power-ups on' : 'Power-ups off'}</button>}
               <button type="button" className="btn btn-primary" onClick={startGame} disabled={!cnt}>Start game <Ico n="arrow" /></button>
             </div>
           </div>

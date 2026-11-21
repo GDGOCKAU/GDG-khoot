@@ -1,0 +1,71 @@
+name: CI / CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# one deploy at a time; a newer push waits for the running one
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: Lint, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Frontend - install
+        run: npm ci
+      - name: Frontend - lint
+        run: npm run lint
+      - name: Frontend - build
+        run: npm run build
+
+      - name: Backend - install
+        working-directory: backend
+        run: npm ci
+      - name: Backend - prisma generate
+        working-directory: backend
+        run: npx prisma generate
+      - name: Backend - test
+        working-directory: backend
+        run: npm test
+      - name: Backend - build
+        working-directory: backend
+        run: npm run build
+
+  # CI passed on main: ask Dokploy to pull main, rebuild and restart the compose service
+  deploy:
+    name: Deploy (Dokploy)
+    needs: ci
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Dokploy deploy
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+          DOKPLOY_COMPOSE_ID: ${{ secrets.DOKPLOY_COMPOSE_ID }}
+        run: |
+          if [ -z "$DOKPLOY_URL" ] || [ -z "$DOKPLOY_API_KEY" ] || [ -z "$DOKPLOY_COMPOSE_ID" ]; then
+            echo "::warning::DOKPLOY_URL / DOKPLOY_API_KEY / DOKPLOY_COMPOSE_ID secrets are not set; skipping deploy"
+            exit 0
+          fi
+          curl -fsS -X POST "${DOKPLOY_URL%/}/api/compose.deploy" \
+            -H "x-api-key: $DOKPLOY_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"composeId\":\"$DOKPLOY_COMPOSE_ID\"}"
+          echo
+          echo "Deploy queued. Build progress: Dokploy -> project GDG khoot -> Deployments."

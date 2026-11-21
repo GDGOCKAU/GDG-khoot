@@ -1,10 +1,12 @@
-import { useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { css } from '../../lib/constants';
-import { DB, ready, useAppState } from '../../lib/store';
-import { G, UI, hosted } from '../../lib/engine';
+import { useAppState } from '../../lib/store';
+import { UI } from '../../lib/engine';
 import { ColorBar, Hang, Ico, Logo, ThemeButton } from '../../components/common/UI';
 import SiteFooter from '../../components/common/SiteFooter';
+import { apiRequest } from '../../api/client';
+import { syncLiveQuiz } from '../../lib/liveQuiz';
 
 function Home() {
   useAppState();
@@ -15,6 +17,14 @@ function Home() {
   });
   const [pinError, setPinError] = useState('');
   const pinRef = useRef(null);
+  const location = useLocation();
+
+  /* back from a wrong-PIN page: straight to the PIN box */
+  useEffect(() => {
+    if (!location.state?.focusPin) return;
+    document.getElementById('join')?.scrollIntoView();
+    pinRef.current?.focus();
+  }, [location.state]);
 
   const goJoin = (e) => {
     e.preventDefault();
@@ -23,14 +33,26 @@ function Home() {
   };
 
   const onPin = (e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 6); setPin(d.length > 3 ? d.slice(0, 3) + ' ' + d.slice(3) : d); };
-  const submitPin = (e) => {
+  const submitPin = async (e) => {
     e.preventDefault();
     const p = pin.replace(/\D/g, '');
-    const qz = DB.quizzes.find((x) => x.pin === p && ready(x));
-    if (hosted() && p === G.pin) { setPinError(''); UI.look = null; navigate('/live'); return; }
-    if (p.length !== 6) setPinError('Enter the 6-digit PIN.');
-    else if (!qz) setPinError('No game with that PIN. Check the number on the big screen.');
-    else { setPinError(''); UI.look = null; navigate('/join/' + qz.id); return; }
+    if (p.length !== 6) { setPinError('Enter the 6-digit PIN.'); if (pinRef.current) pinRef.current.focus(); return; }
+    /* the server says whether a live game with this PIN is open */
+    try {
+      const live = await apiRequest(`/api/v1/sessions/by-pin/${p}`);
+      syncLiveQuiz(live);
+      setPinError('');
+      UI.look = { key: 'live:' + live.quiz.id, quizId: live.quiz.id, live: true, sessionId: live.sessionId, pin: p, name: UI.look ? UI.look.name : '', team: 'blue', idx: 0 };
+      navigate('/join/' + live.quiz.id);
+    } catch (error) {
+      setPinError(error.body?.error === 'game_locked' ? 'The host has locked this game.' : error.status === 409
+        ? 'This game has already started.'
+        : error.status === 410
+          ? 'This game has ended.'
+          : error.status === 404
+            ? 'No game with that PIN. Check the number on the big screen.'
+            : 'This game is not accepting players yet.');
+    }
     if (pinRef.current) pinRef.current.focus();
   };
 
