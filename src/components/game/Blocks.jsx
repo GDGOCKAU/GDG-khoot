@@ -1,7 +1,7 @@
 /* Screens and pieces shared by the host and the player views */
 import { TEAMS, TEAM_KEYS, LETTERS, ansCls, mascot, fmt, ord, css } from '../../lib/constants';
 import { qType, norm, isCorrect, correctLabel, highlight } from '../../lib/questions';
-import { G, curQ, ranked, rankOf, teamStats, hosted } from '../../lib/engine';
+import { G, curQ, ranked, rankOf, teamStats, hosted, hostNext, waitsForHost } from '../../lib/engine';
 import { isWide } from '../../lib/ui';
 import { Ico, Logo, Dots, TopicChip, Avatar, You, Secs } from '../common/UI';
 
@@ -116,7 +116,17 @@ function closedLine(answered, total) {
     ? (G.revealInfo && G.revealInfo.index === G.qi ? G.revealInfo.closedBy : null)
     : (total > 0 && answered >= total ? 'all_answered' : 'time');
   const why = by === 'all_answered' ? 'Everyone answered' : by === 'skip' ? 'Skipped' : by === 'time' ? 'Time’s up' : '';
+  if (waitsForHost()) {
+    return <span style={css('display:flex;align-items:center;gap:12px;flex-wrap:wrap')}>
+      {why && <span style={{ color: 'var(--muted)', fontSize: 15 }}>{why}</span>}
+      {G.liveHost && <NextButton label="Show leaderboard" />}
+    </span>;
+  }
   return <span style={{ color: 'var(--muted)', fontSize: 15 }}>{why ? `${why} · ` : ''}Leaderboard in <Secs />s</span>;
+}
+/* auto-advance off: the host moves the game on (the server's Skip ends the waiting phase) */
+function NextButton({ label }) {
+  return <button type="button" className="btn btn-primary" onClick={hostNext}>{label} <Ico n="arrow" /></button>;
 }
 /* the little label on a question card: the question type for true/false, code and picture questions, otherwise the topic */
 export function QKindChip({ qq }) {
@@ -229,7 +239,12 @@ export function LbBlock({ forPlayer }) {
     <div style={{ textAlign: 'center' }}>
       <div className="eyebrow">Correct answer · {correctLabel(qq)}</div>
       <h1 className="lb-title" style={{ marginTop: 6 }}>Leaderboard</h1>
-      <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 14 }}>After question {G.qi + 1} of {G.qs.length} · {last ? 'Team results' : 'Next question'} in <Secs />s</p>
+      {waitsForHost()
+        ? <>
+            <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 14 }}>After question {G.qi + 1} of {G.qs.length}</p>
+            {G.liveHost && !forPlayer && <div style={{ marginTop: 14 }}><NextButton label={last ? 'Show team results' : 'Next question'} /></div>}
+          </>
+        : <p style={{ margin: '6px 0 0', color: 'var(--muted)', fontSize: 14 }}>After question {G.qi + 1} of {G.qs.length} · {last ? 'Team results' : 'Next question'} in <Secs />s</p>}
     </div>
     <div className="lb">
       <div className="lb-rows" data-flipgroup="" data-delay="1000">

@@ -22,6 +22,8 @@ export type Quiz = {
   description?: string | null;
   topic?: string | null;
   isPublished: boolean;
+  /** false: the host presses Next after the results and the leaderboard; undefined = true */
+  autoAdvance?: boolean;
   hostId: string;
   questions: Question[];
 };
@@ -53,6 +55,7 @@ export interface Repository {
     description?: string;
     topic?: string;
     isPublished: boolean;
+    autoAdvance?: boolean;
     questions: SaveQuestionInput[];
   }): Promise<Quiz>;
 }

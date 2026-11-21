@@ -92,6 +92,7 @@ export class PrismaRepository implements Repository {
     title: string;
     description?: string;
     isPublished: boolean;
+    autoAdvance?: boolean;
     topic?: string;
     questions: SaveQuestionInput[];
   }) {
@@ -104,10 +105,11 @@ export class PrismaRepository implements Repository {
       const saved = quiz
         ? await tx.quiz.update({
             where: { id: quiz.id },
-            data: { title: input.title, description: input.description ?? null, topic: input.topic ?? null, isPublished: input.isPublished },
+            // left out (undefined) keeps the stored value
+            data: { title: input.title, description: input.description ?? null, topic: input.topic ?? null, isPublished: input.isPublished, autoAdvance: input.autoAdvance },
           })
         : await tx.quiz.create({
-            data: { title: input.title, description: input.description ?? null, topic: input.topic ?? null, isPublished: input.isPublished, hostId: input.hostId },
+            data: { title: input.title, description: input.description ?? null, topic: input.topic ?? null, isPublished: input.isPublished, autoAdvance: input.autoAdvance ?? true, hostId: input.hostId },
           });
 
       await tx.question.deleteMany({ where: { quizId: saved.id } });

@@ -124,6 +124,33 @@ describe("server-owned game flow", () => {
     await expect(service.lookupByPin(session.pin)).rejects.toMatchObject({ code: "game_closed" });
   });
 
+  it("with auto-advance off, Reveal and Leaderboard wait for the host's Next", async () => {
+    const manual: Quiz = { ...quiz, autoAdvance: false };
+    const events: Ev[] = [];
+    const service = new GameService({ getQuiz: async () => manual }, new MemoryGameRepository(), (_s, event, payload, audience) => events.push({ event, payload, audience }), undefined, FAST);
+    const session = await service.createSession(quiz.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "blue-0", team: "blue" });
+    await service.start(HOST, session.id);
+    const q1 = (await until(events, question(0))).payload;
+    await service.answer(session.id, a.id, q1.questionId, { optionId: q1.options[0].id });
+
+    const reveal = (await until(events, phase("reveal", 0))).payload;
+    expect(reveal).toMatchObject({ endsAt: null, autoAdvance: false });
+    await new Promise((r) => setTimeout(r, 60)); // far past the 5 ms timings
+    expect(events.some(phase("leaderboard", 0))).toBe(false);
+
+    await service.skip(HOST, session.id);
+    expect((await until(events, phase("leaderboard", 0))).payload.endsAt).toBeNull();
+    await new Promise((r) => setTimeout(r, 60));
+    expect(events.some(phase("next", 0))).toBe(false);
+
+    await service.skip(HOST, session.id); // Next question: the short countdown still runs by itself
+    await until(events, phase("next", 0));
+    await until(events, question(1));
+    await expect(service.skip(HOST, session.id)).resolves.toBeTruthy(); // closes Q2
+    await until(events, phase("reveal", 1));
+  });
+
   it("refuses late joins, Start without players, and locked rooms", async () => {
     const { service } = setup();
     const session = await service.createSession(quiz.id, HOST);

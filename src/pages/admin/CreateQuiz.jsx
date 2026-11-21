@@ -17,7 +17,7 @@ let E = null;
 function openEditor(quiz) {
   const forId = quiz ? quiz.id : 'new';
   if (!E || E.forId !== forId) {
-    E = { forId, cur: 0, saved: !!quiz, draft: quiz ? normalizeDraft(JSON.parse(JSON.stringify(quiz))) : { id: uid(), title: '', topic: 'Mobile', desc: '', status: 'draft', pin: newPin(), lastHosted: null, questions: [blankQ()] } };
+    E = { forId, cur: 0, saved: !!quiz, draft: quiz ? normalizeDraft(JSON.parse(JSON.stringify(quiz))) : { id: uid(), title: '', topic: 'Mobile', desc: '', status: 'draft', autoAdvance: true, pin: newPin(), lastHosted: null, questions: [blankQ()] } };
   }
   return E;
 }
@@ -268,7 +268,20 @@ function CreateQuiz({ quiz }) {
               <button type="button" className="topic-add" onClick={() => setAddingTopic(true)} aria-label="Add a topic" title="Add a topic"><Ico n="plus" /></button>
             </div></div>}
         <label className="field"><span>Description</span><input className="input" value={d.desc} placeholder="One line about the quiz" maxLength={90} onChange={(e) => change(() => { d.desc = e.target.value; })} /></label>
-      </div></section>
+      </div>
+        <div style={css('display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;border-top:1px solid var(--border);margin-top:20px;padding-top:20px')}>
+          <div style={css('display:flex;flex-direction:column;gap:4px;flex:1;min-width:220px')}>
+            <span style={css('font-weight:600')} id="autoAdvT">Auto-advance to the next question</span>
+            <span style={css('font-size:13px;color:var(--muted)')}>{d.autoAdvance !== false
+              ? 'After each question the results and leaderboard show for a few seconds, then the next question starts by itself.'
+              : 'After each question the results and leaderboard stay on screen until you press Next on the host screen.'}</span>
+          </div>
+          <span className="seg" role="radiogroup" aria-labelledby="autoAdvT">
+            <button type="button" role="radio" aria-checked={d.autoAdvance !== false} aria-selected={d.autoAdvance !== false} onClick={() => change(() => { d.autoAdvance = true; })}>On</button>
+            <button type="button" role="radio" aria-checked={d.autoAdvance === false} aria-selected={d.autoAdvance === false} onClick={() => change(() => { d.autoAdvance = false; })}>Off</button>
+          </span>
+        </div>
+      </section>
       <nav className="card qnav" aria-label="Questions">
         {d.questions.map((x, i) => (
           <button key={i} type="button" className={`qn${i === ed.cur ? ' on' : ''}${qProblem(x) ? ' bad' : ''}`} onClick={() => { ed.cur = i; rerender(); }} aria-label={`Question ${i + 1}${qProblem(x) ? ', ' + qProblem(x) : ''}`} aria-current={i === ed.cur}>{i + 1}</button>

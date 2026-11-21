@@ -171,6 +171,16 @@ export function exitGame() {
   return hadMe;
 }
 
+/* the quiz has auto-advance off: Reveal / Leaderboard stay until the host presses Next (no timer) */
+export const waitsForHost = () => !!G && G.autoAdvance === false && !G.phaseEnd && (G.phase === 'reveal' || G.phase === 'leaderboard');
+/* the host's Next; a quick double click must not skip the leaderboard too */
+let lastNext = 0;
+export function hostNext() {
+  if (!waitsForHost() || Date.now() - lastNext < 800) return;
+  lastNext = Date.now();
+  skip();
+}
+
 /* timer values for the live widgets */
 export function liveTime() {
   if (!G) return { secs: 0, frac: 0 };
@@ -246,6 +256,7 @@ export function livePhaseEvent(p) {
   if (p.index >= 0) G.qi = p.index;
   G.locked = !!p.locked;
   G.powerUps = !!p.powerUps;
+  G.autoAdvance = p.autoAdvance !== false;
   /* players stay on their result while the host shows the leaderboard */
   const phase = G.live && p.phase === 'leaderboard' ? 'reveal' : p.phase;
   if (phase === 'cancelled') { exitGame(); return; }

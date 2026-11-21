@@ -23,6 +23,8 @@ model Quiz {
   description String?
   topic       String?
   isPublished Boolean    @default(false)
+  /// false: after each question the host moves on with a Next button instead of timers
+  autoAdvance Boolean    @default(true)
   hostId      String
   host        Admin      @relation(fields: [hostId], references: [id], onDelete: Cascade)
   questions   Question[]

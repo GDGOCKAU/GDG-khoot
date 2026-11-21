@@ -86,6 +86,7 @@ export class MemoryRepository implements Repository {
     description?: string;
     topic?: string;
     isPublished: boolean;
+    autoAdvance?: boolean;
     questions: SaveQuestionInput[];
   }) {
     let quiz = input.quizId ? await this.getQuiz(input.quizId, input.hostId) : null;
@@ -95,6 +96,7 @@ export class MemoryRepository implements Repository {
       Object.assign(quiz, { title: input.title, description: input.description, isPublished: input.isPublished });
     }
     quiz.isPublished = input.isPublished;
+    if (input.autoAdvance !== undefined) quiz.autoAdvance = input.autoAdvance;
     quiz.topic = input.topic ?? null;
     quiz.questions = input.questions.map((question) => ({
       id: randomUUID(),

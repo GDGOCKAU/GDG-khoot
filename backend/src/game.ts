@@ -508,7 +508,7 @@ export class GameService {
     } else if (session.status === "ACTIVE") {
       this.setPhase(session.id, live, "ready", this.timings.ready, () => this.openQuestion(session.id, 0));
     } else if (session.status === "REVEAL") {
-      this.setPhase(session.id, live, "leaderboard", this.timings.leaderboard, () => this.afterLeaderboard(session.id));
+      this.setPhase(session.id, live, "leaderboard", this.hold(live, this.timings.leaderboard), () => this.afterLeaderboard(session.id));
     } else if (session.status === "FINISHED") {
       live.phase = "final";
       live.final = await this.finalPayload(session.id);
@@ -538,7 +538,14 @@ export class GameService {
       upcoming: upcoming ? { index: upcomingIndex, type: upcoming.type ?? "mc", points: pointsOf(upcoming) } : null,
       locked: live.locked,
       powerUps: live.powerUps,
+      // false: Reveal and Leaderboard wait for the host's Next (POST /skip) instead of a timer
+      autoAdvance: live.quiz.autoAdvance !== false,
     };
+  }
+
+  /** How long Reveal / Leaderboard stay up: their timing, or no timer when the host moves on by hand. */
+  private hold(live: Live, ms: number) {
+    return live.quiz.autoAdvance === false ? null : ms;
   }
 
   private emitPhase(sessionId: string, live: Live) {
@@ -653,8 +660,8 @@ export class GameService {
       choices[answer.participantId] = question.type === "pic" ? answer.isCorrect : question.options.findIndex((option) => option.id === answer.optionId);
     }
     live.hostReveal = { ...live.reveal, choices, standings };
-    this.setPhase(sessionId, live, "reveal", this.timings.reveal, async () => {
-      this.setPhase(sessionId, live, "leaderboard", this.timings.leaderboard, () => this.afterLeaderboard(sessionId));
+    this.setPhase(sessionId, live, "reveal", this.hold(live, this.timings.reveal), async () => {
+      this.setPhase(sessionId, live, "leaderboard", this.hold(live, this.timings.leaderboard), () => this.afterLeaderboard(sessionId));
     });
     this.emit(sessionId, "reveal", live.reveal);
     this.emit(sessionId, "reveal_host", live.hostReveal, "host");

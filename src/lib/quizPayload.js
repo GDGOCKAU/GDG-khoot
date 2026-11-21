@@ -68,6 +68,7 @@ export async function saveQuizToServer(d) {
       description: d.desc || '',
       topic: d.topic || undefined,
       isPublished: d.status === 'ready',
+      autoAdvance: d.autoAdvance !== false,
       questions: backendQuestions(d),
     }),
   });

@@ -20,6 +20,7 @@ export function fromServer(quiz, lastHosted = null) {
     topic: knownTopic(quiz.topic),
     desc: quiz.description || '',
     status: quiz.isPublished ? 'ready' : 'draft',
+    autoAdvance: quiz.autoAdvance !== false,
     pin: String(100000 + Math.floor(Math.random() * 900000)),
     lastHosted: lastHosted ? Date.parse(lastHosted) : null,
     questions: (quiz.questions || []).map((question) => {

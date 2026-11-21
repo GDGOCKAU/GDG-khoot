@@ -32,6 +32,7 @@ export const saveQuizSchema = z.object({
   description: z.string().trim().max(90).optional(),
   topic: z.string().trim().min(1).max(20).optional(),
   isPublished: z.boolean(),
+  autoAdvance: z.boolean().optional(),
   questions: z.array(questionSchema).min(1).max(MAX_QUESTIONS),
 });
 export type SaveQuizBody = z.infer<typeof saveQuizSchema>;

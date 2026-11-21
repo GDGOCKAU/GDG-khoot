@@ -1,10 +1,10 @@
 /* The big screen the host shows at the event: /host/:quizId */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LETTERS, TEAMS, ansCls, css, pinFmt } from '../../lib/constants';
 import { qType } from '../../lib/questions';
-import { G, curQ, endGame, exitGame, skip, startGame, toggleLock } from '../../lib/engine';
+import { G, curQ, endGame, exitGame, skip, hostNext, startGame, toggleLock, waitsForHost } from '../../lib/engine';
 import { toast, useAnims } from '../../lib/ui';
 import { Answered, ColorBar, Count, Ico, LiveRing, Modal, Secs } from '../../components/common/UI';
 import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
@@ -24,6 +24,15 @@ function HostGame() {
   const navigate = useNavigate();
   const [askExit, setAskExit] = useState(false);
   useAnims(`${G.phase}:${G.qi}:${G.liveHost && G.hostRevealIdx === G.qi ? 'counts' : ''}`);
+  /* auto-advance off: → or PageDown (what presentation clickers send) works like the Next button */
+  useEffect(() => {
+    const onKey = (e) => {
+      if (askExit || !G || !G.liveHost || !waitsForHost() || e.repeat) return;
+      if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); hostNext(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [askExit]);
 
   const n = G.qs.length, qq = curQ();
   const pinChip = <span className="chip chip-blue">Game PIN {pinFmt(G.pin)}</span>;
