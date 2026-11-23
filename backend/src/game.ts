@@ -42,6 +42,8 @@ export interface GameRepository {
   save(session: GameSession): Promise<GameSession>;
   join(sessionId: string, input: { name: string; mascot: string; team: string }): Promise<Participant | "duplicate">;
   leave(sessionId: string, participantId: string): Promise<boolean>;
+  /** Kick: the player and their answers are removed from the session. */
+  removeParticipant(sessionId: string, participantId: string): Promise<boolean>;
   findParticipant(sessionId: string, participantId: string): Promise<Participant | null>;
   findAnswer(participantId: string, questionId: string): Promise<Answer | null>;
   createAnswer(answer: Omit<Answer, "id">): Promise<Answer>;
@@ -94,6 +96,14 @@ export class MemoryGameRepository implements GameRepository {
     participant.leftAt = new Date();
     return true;
   }
+  async removeParticipant(sessionId: string, participantId: string) {
+    const session = this.sessions.get(sessionId);
+    const index = session ? session.participants.findIndex((item) => item.id === participantId) : -1;
+    if (!session || index < 0) return false;
+    session.participants.splice(index, 1);
+    for (const [id, answer] of this.answers) if (answer.participantId === participantId) this.answers.delete(id);
+    return true;
+  }
   async findParticipant(sessionId: string, participantId: string) {
     return this.sessions.get(sessionId)?.participants.find((participant) => participant.id === participantId) ?? null;
   }
@@ -125,7 +135,7 @@ export type GameErrorCode =
   | "session_not_found" | "quiz_not_found" | "invalid_phase" | "duplicate_participant"
   | "participant_not_found" | "question_not_found" | "answer_closed" | "answer_already_submitted"
   | "invalid_option" | "game_started" | "game_closed" | "game_locked" | "no_players"
-  | "power_ups_off" | "power_up_used" | "power_up_not_allowed" | "quiz_in_live_game";
+  | "power_ups_off" | "power_up_used" | "power_up_not_allowed" | "quiz_in_live_game" | "kicked";
 
 export class GameError extends Error {
   constructor(public readonly code: GameErrorCode, message = code) { super(message); }
@@ -159,6 +169,10 @@ type Live = {
   results: Map<string, unknown>;
   hostReveal: unknown;
   final: unknown;
+  /** kicked players (and the devices they joined from) may not come back to this session */
+  kicked: Set<string>;
+  kickedDevices: Set<string>;
+  devices: Map<string, string>;
 };
 
 export const normWord = (value: unknown) => String(value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -260,16 +274,19 @@ export class GameService {
     };
   }
 
-  async joinByPin(pin: string, input: { name: string; mascot: string; team: string }) {
+  async joinByPin(pin: string, input: { name: string; mascot: string; team: string; deviceId?: string }) {
     const session = await this.gameRepository.findByPin(pin);
     if (!session) throw new GameError("session_not_found");
     if (session.status !== "LOBBY") throw new GameError("invalid_phase");
     const live = await this.ensureLive(session);
     if (live.phase !== "lobby") throw new GameError("invalid_phase");
     if (live.locked) throw new GameError("game_locked");
+    // a device the host kicked from this session cannot join it again
+    if (input.deviceId && live.kickedDevices.has(input.deviceId)) throw new GameError("kicked");
     // only these three fields are stored (callers may pass a whole request body)
     const participant = await this.gameRepository.join(session.id, { name: input.name, mascot: input.mascot, team: input.team });
     if (participant === "duplicate") throw new GameError("duplicate_participant");
+    if (input.deviceId) live.devices.set(participant.id, input.deviceId);
     this.emit(session.id, "player_joined", { participant }, "host");
     return participant;
   }
@@ -278,9 +295,10 @@ export class GameService {
   async participantState(sessionId: string, participantId: string) {
     const session = await this.gameRepository.findById(sessionId);
     if (!session) throw new GameError("session_not_found");
+    const live = await this.ensureLive(session);
+    if (live.kicked.has(participantId)) throw new GameError("kicked");
     const participant = session.participants.find((item) => item.id === participantId);
     if (!participant || participant.leftAt) throw new GameError("participant_not_found");
-    const live = await this.ensureLive(session);
     const current = live.phase === "question" ? live.questions[live.index] : null;
     const answered = current ? !!(await this.gameRepository.findAnswer(participant.id, current.id)) : false;
     return {
@@ -422,6 +440,32 @@ export class GameService {
     if (live?.phase === "question") await this.maybeCloseEarly(sessionId, live);
   }
 
+  /** Host removes a player (lobby or during the game). Their answers go too, so counts, teams and the
+      leaderboard no longer include them; their phone is told, and neither it nor the player can return. */
+  async kick(hostId: string, sessionId: string, participantId: string) {
+    const { session, live } = await this.hostSession(hostId, sessionId);
+    if (!session.participants.some((item) => item.id === participantId)) throw new GameError("participant_not_found");
+    await this.gameRepository.removeParticipant(session.id, participantId);
+    live.kicked.add(participantId);
+    const device = live.devices.get(participantId);
+    if (device) live.kickedDevices.add(device);
+    live.power.delete(participantId);
+    live.results.delete(participantId);
+    this.emit(session.id, "kicked", { sessionId: session.id }, { participantId });
+    this.emit(session.id, "player_left", { participantId, kicked: true }, "host");
+    const current = live.questions[live.index];
+    if (live.phase === "question" && current) {
+      const fresh = await this.gameRepository.findById(session.id);
+      const count = await this.gameRepository.countAnswers(session.id, current.id);
+      this.emit(session.id, "answer_count", { questionId: current.id, count, total: fresh ? fresh.participants.filter((item) => !item.leftAt).length : 0 }, "host");
+      // the others may all have answered already
+      await this.maybeCloseEarly(session.id, live, count);
+    } else if (live.reveal && current && ["reveal", "leaderboard", "suspense"].includes(live.phase)) {
+      await this.refreshReveal(session.id, live, current);
+    }
+    return { participantId };
+  }
+
   leaderboard(sessionId: string) {
     return this.buildLeaderboard(sessionId);
   }
@@ -517,7 +561,7 @@ export class GameService {
 
   private newLive(quiz: Quiz): Live {
     const questions = quiz.questions.slice().sort((a, b) => a.order - b.order).filter(playable);
-    return { quiz, questions, phase: "lobby", index: -1, endsAt: null, durationMs: 0, timer: null, next: null, locked: false, powerUps: false, power: new Map(), reveal: null, results: new Map(), hostReveal: null, final: null };
+    return { quiz, questions, phase: "lobby", index: -1, endsAt: null, durationMs: 0, timer: null, next: null, locked: false, powerUps: false, power: new Map(), reveal: null, results: new Map(), hostReveal: null, final: null, kicked: new Set(), kickedDevices: new Set(), devices: new Map() };
   }
 
   /** Live state is in memory; after a server restart it is rebuilt from the stored session. */
@@ -690,6 +734,19 @@ export class GameService {
     this.setPhase(sessionId, live, "reveal", this.hold(live, this.timings.reveal), async () => {
       this.setPhase(sessionId, live, "leaderboard", this.hold(live, this.timings.leaderboard), () => this.afterLeaderboard(sessionId));
     });
+    this.emit(sessionId, "reveal", live.reveal);
+    this.emit(sessionId, "reveal_host", live.hostReveal, "host");
+  }
+
+  /** Kick during Reveal / Leaderboard: recount this question without the removed player. */
+  private async refreshReveal(sessionId: string, live: Live, question: QuizQuestion) {
+    const { standings, answers } = await this.standings(sessionId, question.id);
+    live.reveal = { ...this.revealPayload(question, live.index, answers, standings.length), closedBy: live.reveal?.closedBy };
+    const choices: Record<string, number | boolean> = {};
+    for (const answer of answers) {
+      choices[answer.participantId] = question.type === "pic" ? answer.isCorrect : question.options.findIndex((option) => option.id === answer.optionId);
+    }
+    live.hostReveal = { ...live.reveal, choices, standings };
     this.emit(sessionId, "reveal", live.reveal);
     this.emit(sessionId, "reveal_host", live.hostReveal, "host");
   }

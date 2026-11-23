@@ -274,6 +274,75 @@ describe("host reveal: counts and why the question closed", () => {
   });
 });
 
+describe("kick", () => {
+  it("in the lobby: removed for the host, told on their phone, cannot come back from the same device", async () => {
+    const { service, events } = setup();
+    const session = await service.createSession(quiz.id, HOST);
+    const bad = await service.joinByPin(session.pin, { name: "Troll", mascot: "red-0", team: "red", deviceId: "device-A" });
+    const good = await service.joinByPin(session.pin, { name: "Noura", mascot: "blue-0", team: "blue", deviceId: "device-B" });
+    await service.kick(HOST, session.id, bad.id);
+    expect(events.find((e) => e.event === "kicked")?.audience).toEqual({ participantId: bad.id });
+    expect(events.find((e) => e.event === "player_left")).toMatchObject({ payload: { participantId: bad.id, kicked: true }, audience: "host" });
+    await expect(service.participantState(session.id, bad.id)).rejects.toMatchObject({ code: "kicked" });
+    // same device, new name: refused; another device: fine
+    await expect(service.joinByPin(session.pin, { name: "Troll2", mascot: "red-1", team: "red", deviceId: "device-A" })).rejects.toMatchObject({ code: "kicked" });
+    await service.joinByPin(session.pin, { name: "Sara", mascot: "green-0", team: "green", deviceId: "device-C" });
+    const host = await service.hostState(session.id, HOST);
+    expect(host.standings.map((p: { name: string }) => p.name).sort()).toEqual(["Noura", "Sara"]);
+    expect((await service.participantState(session.id, good.id)).participant.name).toBe("Noura");
+  });
+
+  it("during a question: their answer, the answer count, got-it-right, teams and the ranking no longer include them", async () => {
+    const { service, events } = setup();
+    const session = await service.createSession(quiz.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "blue-0", team: "blue" });
+    const b = await service.joinByPin(session.pin, { name: "Ali", mascot: "red-0", team: "red" });
+    const c = await service.joinByPin(session.pin, { name: "Kicked", mascot: "blue-1", team: "blue" });
+    await service.start(HOST, session.id);
+    const q1 = (await until(events, question(0))).payload;
+    await service.answer(session.id, c.id, q1.questionId, { optionId: q1.options[0].id }); // right, then kicked
+    await service.answer(session.id, a.id, q1.questionId, { optionId: q1.options[0].id });
+    await service.kick(HOST, session.id, c.id);
+    const counts = events.filter((e) => e.event === "answer_count").map((e) => e.payload);
+    expect(counts.at(-1)).toMatchObject({ count: 1, total: 2 });
+    // Ali answers: the two remaining players are in, so the question closes early
+    await service.answer(session.id, b.id, q1.questionId, { optionId: q1.options[1].id });
+    const host = (await until(events, (e) => e.event === "reveal_host" && e.payload.index === 0)).payload;
+    expect(host.counts).toEqual([1, 1, 0, 0]);
+    expect(host.total).toBe(2);
+    expect(Object.keys(host.choices).sort()).toEqual([a.id, b.id].sort());
+    expect(host.standings.map((p: { name: string }) => p.name)).toEqual(["Noura", "Ali"]);
+    await expect(service.answer(session.id, c.id, q1.questionId, { optionId: q1.options[0].id })).rejects.toMatchObject({ code: "invalid_phase" });
+    const board = await service.buildLeaderboard(session.id, false);
+    expect(board.players.map((p) => p.name)).toEqual(["Noura", "Ali"]);
+    expect(board.teams.find((t) => t.team === "blue")).toMatchObject({ members: 1 }); // Noura only
+  });
+
+  it("during Reveal: the results on screen are recounted without them", async () => {
+    const { service, events } = setup({ ...FAST, reveal: 5000 });
+    const session = await service.createSession(quiz.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "blue-0", team: "blue" });
+    const b = await service.joinByPin(session.pin, { name: "Ali", mascot: "red-0", team: "red" });
+    await service.start(HOST, session.id);
+    const q1 = (await until(events, question(0))).payload;
+    await service.answer(session.id, a.id, q1.questionId, { optionId: q1.options[0].id });
+    await service.answer(session.id, b.id, q1.questionId, { optionId: q1.options[1].id });
+    await until(events, phase("reveal", 0));
+    await service.kick(HOST, session.id, b.id);
+    const last = events.filter((e) => e.event === "reveal_host").at(-1)!.payload;
+    expect(last).toMatchObject({ counts: [1, 0, 0, 0], total: 1 });
+    expect(last.standings.map((p: { name: string }) => p.name)).toEqual(["Noura"]);
+  });
+
+  it("only the host can kick", async () => {
+    const { service } = setup();
+    const session = await service.createSession(quiz.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "blue-0", team: "blue" });
+    await expect(service.kick("someone-else", session.id, a.id)).rejects.toMatchObject({ code: "session_not_found" });
+    await expect(service.kick(HOST, session.id, "00000000-0000-4000-8000-000000000000")).rejects.toMatchObject({ code: "participant_not_found" });
+  });
+});
+
 describe("power-ups", () => {
   async function inQuestion(powerUps: boolean, index = 0) {
     const ctx = setup({ ...FAST, earlyClose: 10_000 });

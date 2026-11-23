@@ -11,6 +11,7 @@ const COPY = {
   started: { title: 'This game has already started', text: 'New players can only join while the host is still in the lobby.', chip: 'Game started', tone: 'red', icon: 'clock' },
   ended: { title: 'This game has ended', text: 'Ask the host for the PIN of the next game.', chip: 'Game over', tone: 'red', icon: 'door' },
   locked: { title: 'The host has locked this game', text: 'No one else can join right now. Ask the host to unlock it.', chip: 'Locked', tone: 'red', icon: 'lock' },
+  kicked: { title: 'You were removed from the game', text: 'The host removed you from this game, so you can’t rejoin it. You can still join the next game with its PIN.', chip: 'Removed', tone: 'red', icon: 'door' },
   mismatch: { title: 'This link is for another game', text: 'Enter the PIN shown on the big screen instead.', chip: 'Wrong link', tone: 'yellow', icon: 'x' },
 };
 

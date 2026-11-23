@@ -1182,3 +1182,10 @@ body:has(.live-pill) :is(.host-main, .lap-main, .pl-in) { padding-bottom: 88px; 
 /* ---------- audience screen (/screen): view only, so the shared blocks' buttons are hidden ---------- */
 .screen-main .btn { display: none; }
 .screen-mode .lobby .qr .code { width: min(30vh, 200px); height: min(30vh, 200px); }
+
+/* host: remove a player (lobby chip × and the in-game player list) */
+.pchip-x { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: 0 -6px 0 2px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; opacity: .6; cursor: pointer; }
+.pchip-x:hover, .pchip-x:focus-visible { opacity: 1; background: var(--red-soft); color: var(--red-txt); }
+.kick-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.kick-list li { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 1rem; }
+.kick-list .kick-name { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

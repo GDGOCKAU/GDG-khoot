@@ -5,12 +5,38 @@
 import { apiRequest, getStoredToken } from '../api/client';
 import { connectSocket } from '../api/socket';
 import { mascot } from './constants';
-import { G, applyStandings, exitGame, live, liveFinal, livePhaseEvent, liveQuestion, liveResult, liveReveal, newGame, newLiveGame, stopGame } from './engine';
+import { G, UI, applyStandings, exitGame, live, liveFinal, livePhaseEvent, liveQuestion, liveResult, liveReveal, newGame, newLiveGame, stopGame } from './engine';
 import { notify } from './store';
 import { toast } from './ui';
 
 const mascotIdx = (m) => { const n = Number(String(m || '').split('-')[1]); return Number.isInteger(n) ? n : 0; };
 const forgetPlayer = () => { localStorage.removeItem('gdgParticipantId'); localStorage.removeItem('gdgSessionId'); };
+
+/* this browser's id, sent when joining: a device the host kicked cannot join that session again */
+export function deviceId() {
+  try {
+    let id = localStorage.getItem('kauhoot.device');
+    if (!id) { id = (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`).slice(0, 64); localStorage.setItem('kauhoot.device', id); }
+    return id;
+  } catch { return undefined; }
+}
+/* sessions this device was kicked from (kept short) */
+const KICKED = 'kauhoot.kicked';
+export function isKicked(sessionId) {
+  try { return !!sessionId && JSON.parse(localStorage.getItem(KICKED) || '[]').includes(sessionId); } catch { return false; }
+}
+function markKicked(sessionId) {
+  try { const list = JSON.parse(localStorage.getItem(KICKED) || '[]').filter((id) => id !== sessionId); localStorage.setItem(KICKED, JSON.stringify([...list, sessionId].slice(-20))); } catch { /* storage blocked */ }
+}
+/* the host removed this player: leave the game and show the "removed" page */
+function kickedOut(sessionId) {
+  markKicked(sessionId);
+  forgetPlayer();
+  if (G && G.socket) G.socket.disconnect();
+  stopGame(false);
+  UI.kicked = true;
+  notify();
+}
 
 /* everything a screen needs to pick up where the server is (first join, reconnect, refresh) */
 function applyState(state) {
@@ -36,6 +62,7 @@ export function connectLivePlayer(sessionId, participantId) {
   socket.on('connect', () => {
     socket.emit('game:join', sessionId, participantId, (res) => {
       if (!G) return;
+      if (res && res.error === 'kicked') { kickedOut(sessionId); return; }
       if (!res || !res.ok || (G.resuming && ['FINISHED', 'CANCELLED'].includes(res.state.status))) {
         if (G.resuming) { forgetPlayer(); stopGame(); return; }
         toast('You are no longer in this game.'); exitGame(); return;
@@ -55,6 +82,7 @@ export function connectLivePlayer(sessionId, participantId) {
   socket.on('result', liveResult);
   socket.on('final', liveFinal);
   socket.on('closed', () => { if (G && G.live) { forgetPlayer(); exitGame(); } });
+  socket.on('kicked', () => kickedOut(sessionId));
   live.answer = (qq, choice) => {
     const pic = qq.type === 'pic';
     const optionId = !pic && qq.optionIds ? qq.optionIds[choice] : undefined;
@@ -140,6 +168,10 @@ export function connectLiveHost(sessionId, onFirstState) {
   live.start = () => post('start').catch((error) => toast(error.body?.error === 'no_players' ? 'Wait for at least one player.' : 'The server did not start the game.'));
   live.skip = () => post('skip').catch(() => {});
   live.cancel = () => post('cancel').catch(() => {});
+  /* resolves true when the server removed the player */
+  live.kick = (participantId) => post('kick', { participantId })
+    .then(() => { if (G) { G.players = G.players.filter((p) => p.id !== participantId); notify(); } return true; })
+    .catch(() => { toast('Could not remove that player.'); return false; });
   live.lock = (locked) => setSettings({ locked });
   return socket;
 }

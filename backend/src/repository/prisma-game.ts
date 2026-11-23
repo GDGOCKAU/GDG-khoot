@@ -60,6 +60,11 @@ export class PrismaGameRepository implements GameRepository {
     });
     return result.count === 1;
   }
+  async removeParticipant(sessionId: string, participantId: string) {
+    // answers go with the participant (onDelete: Cascade)
+    const result = await this.prisma.participant.deleteMany({ where: { id: participantId, sessionId } });
+    return result.count === 1;
+  }
   async findParticipant(sessionId: string, participantId: string) {
     const participant = await this.prisma.participant.findFirst({ where: { id: participantId, sessionId } });
     return participant ? this.mapParticipant(participant) : null;

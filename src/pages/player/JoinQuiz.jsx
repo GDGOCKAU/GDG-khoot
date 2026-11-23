@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { NICK_A, NICK_B, TEAMS, css, mascot, pick, pinFmt, rnd } from '../../lib/constants';
 import { G, UI, joinGame, newLiveGame } from '../../lib/engine';
-import { connectLivePlayer } from '../../lib/live';
+import { connectLivePlayer, deviceId } from '../../lib/live';
 import { toast, useWide } from '../../lib/ui';
 import { Ico } from '../../components/common/UI';
 import { MascotGrid, TeamTabs } from '../../components/player/AvatarPicker';
@@ -40,6 +40,7 @@ function JoinQuiz({ quiz, live }) {
           name,
           mascot: `${look.team}-${look.idx}`,
           team: look.team,
+          deviceId: deviceId(),
         }),
       });
       localStorage.setItem('gdgParticipantId', participant.id);
@@ -49,7 +50,7 @@ function JoinQuiz({ quiz, live }) {
       newLiveGame(quiz, { name, team: look.team, img: mascot(look.team, look.idx) }, { sessionId: participant.sessionId, participantId: participant.id });
       connectLivePlayer(participant.sessionId, participant.id);
     } catch (error) {
-      toast(error.body?.error === 'game_locked' ? 'The host has locked this game.' : error.status === 409
+      toast(error.body?.error === 'kicked' ? 'The host removed you from this game.' : error.body?.error === 'game_locked' ? 'The host has locked this game.' : error.status === 409
         ? 'That nickname is already in this session. Choose another.'
         : error.status === 404
           ? 'This live session no longer exists.'

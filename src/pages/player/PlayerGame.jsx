@@ -12,6 +12,7 @@ import { LapShell, PShell } from '../../components/layout/Shells';
 import { CodeSnack, PokeDevu } from '../../components/player/WaitFun';
 import GameOver from './GameOver';
 import GameClosed from './GameClosed';
+import JoinError from './JoinError';
 import { activatePowerUp } from '../../lib/live';
 
 function PlayerGame() {
@@ -19,6 +20,7 @@ function PlayerGame() {
   /* live game: nothing to play until the server has sent a question */
   if (G && G.live && G.me && G.phase === 'lobby') return <Navigate to="/lobby" replace />;
   if (G && G.me) return <PlayerView />;
+  if (UI.kicked) return <JoinError kind="kicked" />;
   if (UI.closed) return <GameClosed />;
   return <Navigate to="/" replace />;
 }
@@ -185,7 +187,7 @@ export function PlayerLobby() {
   useAppState();
   const wide = useWide();
   useAnims('lobby');
-  if (!G || !G.live || !G.me) return UI.closed ? <GameClosed /> : <Navigate to="/" replace />;
+  if (!G || !G.live || !G.me) return UI.kicked ? <JoinError kind="kicked" /> : UI.closed ? <GameClosed /> : <Navigate to="/" replace />;
   if (G.phase !== 'lobby') return <Navigate to="/play" replace />;
   const me = G.me, T = TEAMS[me.team];
   return (

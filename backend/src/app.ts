@@ -188,7 +188,8 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
       if (error instanceof GameError) {
         const status = error.code === "session_not_found" || error.code === "quiz_not_found" || error.code === "participant_not_found" ? 404
           : ["answer_already_submitted", "duplicate_participant", "game_started", "game_locked", "power_up_used"].includes(error.code) ? 409
-          : error.code === "game_closed" ? 410 : 400;
+          : error.code === "game_closed" ? 410
+          : error.code === "kicked" ? 403 : 400;
         return reply.code(status).send({ error: error.code });
       }
       throw error;
@@ -208,7 +209,7 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
     });
     app.post("/api/v1/sessions/join", async (request, reply) => {
       try {
-        const body = z.object({ pin: z.string().regex(/^\d{6}$/), name: z.string().trim().min(1).max(40), mascot: z.string().trim().min(1).max(40), team: z.enum(["blue", "red", "yellow", "green"]) }).parse(request.body);
+        const body = z.object({ pin: z.string().regex(/^\d{6}$/), name: z.string().trim().min(1).max(40), mascot: z.string().trim().min(1).max(40), team: z.enum(["blue", "red", "yellow", "green"]), deviceId: z.string().trim().max(64).optional() }).parse(request.body);
         return reply.code(201).send(await gameService.joinByPin(body.pin, body));
       } catch (error) { return gameError(reply, error); }
     });
@@ -248,6 +249,13 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
       try {
         const body = z.object({ participantId: uuid, kind: z.enum(["double", "fifty"]) }).parse(request.body);
         return reply.send(await gameService.usePowerUp(request.params.id, body.participantId, body.kind));
+      } catch (error) { return gameError(reply, error); }
+    });
+    // host only: remove a player from the lobby or the running game
+    app.post<Id>("/api/v1/sessions/:id/kick", host, async (request, reply) => {
+      try {
+        const body = z.object({ participantId: uuid }).parse(request.body);
+        return reply.send(await gameService.kick(request.user.id, request.params.id, body.participantId));
       } catch (error) { return gameError(reply, error); }
     });
     app.post<Id>("/api/v1/sessions/:id/leave", async (request, reply) => {

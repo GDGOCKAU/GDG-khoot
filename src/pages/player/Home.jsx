@@ -7,6 +7,7 @@ import { ColorBar, Hang, Ico, Logo, ThemeButton } from '../../components/common/
 import SiteFooter from '../../components/common/SiteFooter';
 import { apiRequest } from '../../api/client';
 import { syncLiveQuiz } from '../../lib/liveQuiz';
+import { isKicked } from '../../lib/live';
 
 function Home() {
   useAppState();
@@ -40,6 +41,7 @@ function Home() {
     /* the server says whether a live game with this PIN is open */
     try {
       const live = await apiRequest(`/api/v1/sessions/by-pin/${p}`);
+      if (isKicked(live.sessionId)) { setPinError('The host removed you from this game.'); if (pinRef.current) pinRef.current.focus(); return; }
       syncLiveQuiz(live);
       setPinError('');
       UI.look = { key: 'live:' + live.quiz.id, quizId: live.quiz.id, live: true, sessionId: live.sessionId, pin: p, name: UI.look ? UI.look.name : '', team: 'blue', idx: 0 };

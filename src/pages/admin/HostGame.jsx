@@ -4,7 +4,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LETTERS, TEAMS, ansCls, css, pinFmt } from '../../lib/constants';
 import { qType } from '../../lib/questions';
-import { G, curQ, endGame, exitGame, skip, hostNext, startGame, toggleLock, waitsForHost } from '../../lib/engine';
+import { G, curQ, endGame, exitGame, skip, hostNext, startGame, toggleLock, waitsForHost, live } from '../../lib/engine';
 import { toast, useAnims } from '../../lib/ui';
 import { Answered, ColorBar, Count, Ico, LiveRing, Modal, Secs } from '../../components/common/UI';
 import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
@@ -12,9 +12,32 @@ import { HostShell } from '../../components/layout/Shells';
 import { setSettings } from '../../lib/live';
 import ScreenLinkButton from '../../components/common/ScreenLinkButton';
 
-function PChip({ p }) {
+function PChip({ p, onRemove }) {
   const t = TEAMS[p.team];
-  return <span className="pchip" style={{ '--soft': t.soft, '--txt': t.txt }}><img className="avatar" src={p.img} alt="" style={{ '--team': t.solid, borderWidth: 2 }} />{p.name}{p.id === 'me' ? ' (you)' : ''}</span>;
+  return <span className="pchip" style={{ '--soft': t.soft, '--txt': t.txt }}><img className="avatar" src={p.img} alt="" style={{ '--team': t.solid, borderWidth: 2 }} />{p.name}{p.id === 'me' ? ' (you)' : ''}
+    {onRemove && <button type="button" className="pchip-x" onClick={onRemove} aria-label={`Remove ${p.name}`} title={`Remove ${p.name}`}><Ico n="x" s={14} /></button>}</span>;
+}
+/* during the game: everyone in it, each with Remove */
+function PlayersPanel({ onRemove, onClose }) {
+  useEffect(() => {
+    const k = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', k);
+    return () => document.removeEventListener('keydown', k);
+  }, [onClose]);
+  const list = G.players.filter((p) => p.id !== 'me');
+  return (
+    <div className="modal-bg" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="plT" style={{ width: 'min(520px, 100%)', maxHeight: '80vh' }}>
+        <div className="imp-head"><h2 id="plT" style={{ margin: 0 }}>Players <span className="chip chip-blue" style={{ verticalAlign: 'middle' }}>{list.length}</span></h2><button type="button" className="icon-btn" onClick={onClose} aria-label="Close"><Ico n="x" /></button></div>
+        <ul className="kick-list">
+          {list.length ? list.map((p) => {
+            const t = TEAMS[p.team];
+            return <li key={p.id}><img className="avatar" src={p.img} alt="" width="36" height="36" style={{ '--team': t.solid, borderWidth: 2 }} /><span className="kick-name">{p.name}</span><span className={`chip chip-${p.team}`}>Team {t.name}</span><button type="button" className="btn btn-danger btn-sm" onClick={() => onRemove(p)}>Remove</button></li>;
+          }) : <li style={{ color: 'var(--muted)' }}>No players in the game.</li>}
+        </ul>
+      </div>
+    </div>
+  );
 }
 function Swatches({ labels }) {
   return <div className="swatches" aria-hidden="true">{labels.map((l, i) => <span key={i} className={ansCls(i)}>{l}</span>)}</div>;
@@ -24,6 +47,8 @@ const bigRing = <LiveRing size={220} stroke={17} color="#1a73e8"><span style={{ 
 function HostGame() {
   const navigate = useNavigate();
   const [askExit, setAskExit] = useState(false);
+  const [kickTarget, setKickTarget] = useState(null);
+  const [showPlayers, setShowPlayers] = useState(false);
   useAnims(`${G.phase}:${G.qi}:${G.liveHost && G.hostRevealIdx === G.qi ? 'counts' : ''}`);
   /* auto-advance off: → or PageDown (what presentation clickers send) works like the Next button */
   useEffect(() => {
@@ -38,7 +63,19 @@ function HostGame() {
   const n = G.qs.length, qq = curQ();
   const pinChip = <span className="chip chip-blue">Game PIN {pinFmt(G.pin)}</span>;
   const over = <span className="chip">Game over · {n} of {n} questions</span>;
-  const shell = (right, children, main) => <HostShell right={right} main={main} onExit={() => setAskExit(true)}>{children}</HostShell>;
+  /* in a live game the host can open the player list (to remove someone) from any in-game screen */
+  const inGame = G.liveHost && !['lobby', 'teams', 'podium', 'final'].includes(G.phase);
+  const playersBtn = inGame && <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowPlayers(true)}><Ico n="users" s={16} />Players</button>;
+  const shell = (right, children, main) => <HostShell right={<>{right}{playersBtn}</>} main={main} onExit={() => setAskExit(true)}>{children}</HostShell>;
+  const kickModal = kickTarget && (
+    <Modal id="kickT" icon="door" title={`Remove ${kickTarget.name} from the game?`} onClose={() => setKickTarget(null)}>
+      <p>{kickTarget.name} leaves right away and can&apos;t rejoin this game from the same device. Their answers and points are removed from the results.</p>
+      <div style={css('display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap')}>
+        <button type="button" className="btn btn-outline" onClick={() => setKickTarget(null)} autoFocus>Cancel</button>
+        <button type="button" className="btn btn-danger-solid" onClick={() => { const p = kickTarget; setKickTarget(null); if (live.kick) live.kick(p.id).then((ok) => { if (ok) toast(`${p.name} was removed from the game.`); }); }}>Remove player</button>
+      </div>
+    </Modal>
+  );
   const joinUrl = `${window.location.origin}/join/${G.quiz.id}?pin=${encodeURIComponent(G.pin)}${G.backendSessionId ? `&session=${encodeURIComponent(G.backendSessionId)}` : ''}`;
 
   const exitModal = askExit && (
@@ -70,7 +107,7 @@ function HostGame() {
           </div>
           <div className="card players">
             <div style={css('display:flex;justify-content:space-between;align-items:center')}><h2 style={{ margin: 0 }}>Players</h2><span className="chip chip-blue"><Ico n="users" />{cnt} joined</span></div>
-            <div className="pchips" aria-live="polite">{cnt ? G.players.map((p) => <PChip key={p.id} p={p} />) : <span style={{ color: 'var(--muted)' }}>Waiting for players to join…</span>}</div>
+            <div className="pchips" aria-live="polite">{cnt ? G.players.map((p) => <PChip key={p.id} p={p} onRemove={G.liveHost && p.id !== 'me' ? () => setKickTarget(p) : null} />) : <span style={{ color: 'var(--muted)' }}>Waiting for players to join…</span>}</div>
             <div className="lobby-actions" style={css('display:flex;flex-wrap:wrap;gap:12px;align-items:center;border-top:1px solid var(--border);padding-top:16px')}>
               <span style={css('color:var(--muted);font-size:14px;flex:1')}>{G.locked ? 'Game locked. No one else can join.' : cnt ? 'Start when everyone is in.' : 'Waiting for players to join…'}</span>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAskExit(true)}>Cancel game</button>
@@ -128,7 +165,7 @@ function HostGame() {
     case 'final': view = shell(over, <FinalBlock action={<button type="button" className="btn btn-primary" onClick={() => { endGame(); navigate('/admin'); }}>End game</button>} />); break;
     default: view = null;
   }
-  return <>{view}{exitModal}</>;
+  return <>{view}{exitModal}{showPlayers && !kickTarget && <PlayersPanel onRemove={(p) => setKickTarget(p)} onClose={() => setShowPlayers(false)} />}{kickModal}</>;
 }
 
 export default HostGame;

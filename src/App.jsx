@@ -22,7 +22,7 @@ import ScreenPage from './pages/screen/ScreenPage';
 import { apiRequest } from './api/client';
 import { syncLiveQuiz } from './lib/liveQuiz';
 import { ensureQuiz } from './lib/serverQuizzes';
-import { connectLiveHost, leaveLive, rememberHostSession, resumeLiveHost, resumeLivePlayer } from './lib/live';
+import { connectLiveHost, isKicked, leaveLive, rememberHostSession, resumeLiveHost, resumeLivePlayer } from './lib/live';
 
 function Loading() {
   return <main className="loading" aria-busy="true"><h1>Loading<Bounce /></h1></main>;
@@ -44,6 +44,7 @@ function JoinRoute() {
         if (cancelled) return;
         if (live.quiz.id !== quizId) { setLiveError('mismatch'); return; }
         if (sessionId && live.sessionId !== sessionId) { setLiveError('mismatch'); return; }
+        if (isKicked(live.sessionId)) { setLiveError('kicked'); return; }
         setLiveQuiz(syncLiveQuiz(live));
       })
       .catch((error) => {
@@ -56,6 +57,7 @@ function JoinRoute() {
     return () => { cancelled = true; };
   }, [pin, sessionId, quizId]);
   if (pin) {
+    if (isKicked(sessionId)) return <JoinError kind="kicked" />;
     if (liveError) return <JoinError kind={liveError} />;
     if (!liveQuiz) return <main className="loading" aria-busy="true"><h1>Joining live session<Bounce /></h1></main>;
     return <JoinQuiz key={quizId} quiz={liveQuiz} live />;

@@ -323,4 +323,19 @@ describe("backend API foundation", () => {
     expect((await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: { title: "Max", isPublished: false, questions: many.slice(0, 100) } })).statusCode).toBe(201);
     await app.close();
   });
+  it("kick is a host-only route; a kicked phone cannot join again from the same device", async () => {
+    const { app } = setup();
+    const token = (await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "admin@example.com", password: "secret" } })).json().token;
+    const auth = { authorization: `Bearer ${token}` };
+    const quiz = (await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: { title: "Kick", isPublished: true, questions: [{
+      text: "Q", order: 0, timeLimitSecs: 20, options: [{ text: "A", isCorrect: true }, { text: "B", isCorrect: false }] }] } })).json();
+    const session = (await app.inject({ method: "POST", url: "/api/v1/sessions", headers: auth, payload: { quizId: quiz.id } })).json();
+    const player = (await app.inject({ method: "POST", url: "/api/v1/sessions/join", payload: { pin: session.pin, name: "Troll", mascot: "red-0", team: "red", deviceId: "dev-1" } })).json();
+    expect((await app.inject({ method: "POST", url: `/api/v1/sessions/${session.id}/kick`, payload: { participantId: player.id } })).statusCode).toBe(401);
+    expect((await app.inject({ method: "POST", url: `/api/v1/sessions/${session.id}/kick`, headers: auth, payload: { participantId: player.id } })).statusCode).toBe(200);
+    const again = await app.inject({ method: "POST", url: "/api/v1/sessions/join", payload: { pin: session.pin, name: "Other", mascot: "red-1", team: "red", deviceId: "dev-1" } });
+    expect(again.statusCode).toBe(403);
+    expect(again.json().error).toBe("kicked");
+    await app.close();
+  });
 });

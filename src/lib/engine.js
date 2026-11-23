@@ -9,7 +9,7 @@ import { assetUrl } from '../api/client';
 /* the live game (or null) */
 export let G = null;
 /* screen state that has to survive moving between pages */
-export const UI = { closed: null, showOver: false, overTab: null, look: null, homeFilter: 'All' };
+export const UI = { closed: null, kicked: false, showOver: false, overTab: null, look: null, homeFilter: 'All' };
 
 /* 10× a second, for timers and answer counts */
 let tickN = 0;
@@ -35,7 +35,7 @@ export function newGame(quiz, mode, me, opts = {}) {
     ? quiz.questions.filter((x) => (x.text || '').trim() && (x.time > 0))
     : quiz.questions.filter((x) => !qProblem(x));
   G = { quiz, qs, mode, pin: mode === 'host' ? newPin() : (quiz.livePin || quiz.pin), backendSessionId: quiz.liveSessionId || null, players: [], qi: -1, phase: mode === 'host' ? 'lobby' : 'ready', phaseStart: Date.now(), phaseEnd: 0, answers: {}, locked: false, me: null, timer: null, joinTimer: null, recorded: false };
-  UI.showOver = false; UI.closed = null;
+  UI.showOver = false; UI.closed = null; UI.kicked = false;
   if (me) addMe(me);
   const names = shuffle(BOT_NAMES);
   const free = () => names.filter((n) => !G.players.some((p) => p.name.toLowerCase() === n.toLowerCase()));
@@ -219,7 +219,7 @@ export function joinGame(look, quiz) {
 /* ---------- LIVE GAME (server-driven) ----------
    Host and phones show whatever phase the server pushes. live.js wires the socket and
    fills these hooks; the engine never moves a live game by itself. */
-export const live = { answer: null, start: null, skip: null, lock: null, cancel: null };
+export const live = { answer: null, start: null, skip: null, lock: null, cancel: null, kick: null };
 const mascotIdx = (m) => { const n = Number(String(m || '').split('-')[1]); return Number.isInteger(n) ? n : 0; };
 let clockOffset = 0; // server clock minus this device's clock
 
@@ -227,7 +227,7 @@ let clockOffset = 0; // server clock minus this device's clock
 export function newLiveGame(quiz, me, { sessionId, participantId }) {
   stopGame(false);
   G = { quiz, qs: Array.from({ length: quiz.questionCount || 0 }, () => null), mode: 'player', live: true, pin: quiz.livePin, backendSessionId: sessionId, participantId, players: [], qi: -1, phase: 'lobby', phaseStart: Date.now(), phaseEnd: 0, answers: {}, locked: false, me: null, timer: null, joinTimer: null, recorded: false, socket: null, power: null };
-  UI.showOver = false; UI.closed = null;
+  UI.showOver = false; UI.closed = null; UI.kicked = false;
   addMe(me);
   G.timer = setInterval(tick, 100);
   notify();
