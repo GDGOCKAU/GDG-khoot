@@ -1,9 +1,9 @@
 /* Screens and pieces shared by the host and the player views */
 import { TEAMS, TEAM_KEYS, LETTERS, ansCls, mascot, fmt, ord, css } from '../../lib/constants';
-import { qType, norm, isCorrect, correctLabel, highlight } from '../../lib/questions';
+import { qType, norm, isCorrect, correctLabel, highlight, qSize, fitClass } from '../../lib/questions';
 import { G, curQ, ranked, rankOf, teamStats, hosted, hostNext, waitsForHost } from '../../lib/engine';
 import { isWide } from '../../lib/ui';
-import { Ico, Logo, Dots, TopicChip, Avatar, You, Secs } from '../common/UI';
+import { Ico, Logo, Dots, Bounce, TopicChip, Avatar, You, Secs } from '../common/UI';
 
 const tfIco = (i, s) => <Ico n={i === 0 ? 'check' : 'x'} s={s} />;
 const CROWN = <svg aria-hidden="true" width="48" height="34" viewBox="0 0 56 40" fill="#f9ab00" stroke="#1f2328" strokeWidth="2.5" strokeLinejoin="round"><path d="M4 12l12 10L28 4l12 18 12-10-4 24H8z" /></svg>;
@@ -75,8 +75,8 @@ export function PlayerAnswerArea({ qq, wide, typed, onType, onSubmitPic, onAnswe
   }
   const idx = t === 'tf' ? [0, 1] : [0, 1, 2, 3];
   const tiles = idx.map((i) => ((qq.answers[i] || '').trim() ? (
-    <button key={i} type="button" className={`tile ${ansCls(i)}${t === 'code' ? ' mono' : ''}`} onClick={() => onAnswer(i)}>
-      <span className="L">{t === 'tf' ? tfIco(i, 26) : LETTERS[i]}</span><span>{qq.answers[i]}</span>{wide ? <span className="k" aria-hidden="true">{i + 1}</span> : null}
+    <button key={i} type="button" className={`tile ${ansCls(i)}${t === 'code' ? ' mono' : ''}${t === 'tf' ? '' : fitClass(qq.answers[i], t === 'code')}`} onClick={() => onAnswer(i)}>
+      <span className="L">{t === 'tf' ? tfIco(i, 26) : LETTERS[i]}</span><span dir="auto">{qq.answers[i]}</span>{wide ? <span className="k" aria-hidden="true">{i + 1}</span> : null}
     </button>
   ) : null));
   return <>
@@ -119,10 +119,24 @@ function closedLine(answered, total) {
   if (waitsForHost()) {
     return <span style={css('display:flex;align-items:center;gap:12px;flex-wrap:wrap')}>
       {why && <span style={{ color: 'var(--muted)', fontSize: 15 }}>{why}</span>}
-      {G.liveHost && <NextButton label="Show leaderboard" />}
+      {G.liveHost && <NextButton label={G.rankHidden ? 'Continue' : 'Show leaderboard'} />}
     </span>;
   }
+  if (G.rankHidden) return <span style={{ color: 'var(--muted)', fontSize: 15 }}>{why ? `${why} · ` : ''}Leaderboard hidden until the end</span>;
   return <span style={{ color: 'var(--muted)', fontSize: 15 }}>{why ? `${why} · ` : ''}Leaderboard in <Secs />s</span>;
+}
+/* instead of the leaderboard after the last two questions: keep everyone guessing until the end screens */
+export function SuspenseBlock() {
+  const last = G.qi + 1 >= G.qs.length;
+  return (
+    <div style={css('flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;text-align:center')}>
+      <span className="chip chip-yellow">{last ? 'That was the last question' : 'Final questions'}</span>
+      <h1 className="countdown-h1">Who&apos;s in the lead<span style={{ color: '#ea4335' }}>?</span></h1>
+      <Bounce />
+      <p className="countdown-p" style={css('margin:0;color:var(--muted);max-width:36rem')}>{last ? 'The scores are in. Team results, the top 3 and the final ranking are next!' : 'The leaderboard stays hidden for the final questions. Every point still counts!'}</p>
+      {waitsForHost() ? (G.liveHost && <NextButton label={last ? 'Show the results' : 'Next question'} />) : <span style={{ color: 'var(--muted)', fontSize: 15 }}>{last ? 'Results' : 'Next question'} in <Secs />s</span>}
+    </div>
+  );
 }
 /* auto-advance off: the host moves the game on (the server's Skip ends the waiting phase) */
 function NextButton({ label }) {
@@ -137,7 +151,7 @@ export function QKindChip({ qq }) {
   return <TopicChip t={G.quiz.topic} />;
 }
 function QHead({ qq }) {
-  return <div className="card qcard res"><QKindChip qq={qq} /><h1>{qq.text}</h1></div>;
+  return <div className="card qcard res"><QKindChip qq={qq} /><h1 className={qSize(qq.text)} dir="auto">{qq.text}</h1></div>;
 }
 function PicAnswersBlock() {
   const qq = curQ(), total = G.players.length, vals = Object.values(G.answers);
@@ -156,7 +170,7 @@ function PicAnswersBlock() {
         <div key={label} className={`acol ${ansCls(ci)} ${ok ? 'right' : 'wrong'}`} style={{ '--d': `${k * 150}ms` }}>
           <Num className="acount num" to={n} delay={200 + k * 150} dur={1100} />
           <div className="atrack"><div className="abar" style={{ '--h': `${Math.max(4, 100 * n / max)}%` }} /></div>
-          <div className="alabel"><span className="L"><Ico n={ic} s={18} /></span><span className="t">{label}</span></div>
+          <div className="alabel"><span className="L"><Ico n={ic} s={18} /></span><span className="t" dir="auto">{label}</span></div>
         </div>
       ))}
     </div>
@@ -180,7 +194,7 @@ export function AnswersBlock() {
         <div key={i} className={`acol ${ansCls(i)} ${i === qq.correct ? 'right' : 'wrong'}`} style={{ '--d': `${i * 150}ms` }}>
           <Num className="acount num" to={counts[i]} delay={200 + i * 150} dur={1100} />
           <div className="atrack"><div className="abar" style={{ '--h': `${Math.max(4, 100 * counts[i] / max)}%` }} /></div>
-          <div className={`alabel${mono}${tf ? ' tf' : ''}`}><span className="L">{tf ? tfIco(i, 18) : LETTERS[i]}</span><span className="t">{a}</span></div>
+          <div className={`alabel${mono}${tf ? ' tf' : ''}`}><span className="L">{tf ? tfIco(i, 18) : LETTERS[i]}</span><span className="t" dir="auto">{a}</span></div>
         </div>
       ) : null))}
     </div>

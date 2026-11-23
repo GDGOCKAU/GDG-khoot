@@ -9,6 +9,7 @@
   --shadow-sm: 0 1px 2px rgb(16 24 40 / .06), 0 1px 3px rgb(16 24 40 / .08);
   --shadow-lg: 0 12px 24px -6px rgb(16 24 40 / .12), 0 4px 8px -4px rgb(16 24 40 / .06);
   --ease: cubic-bezier(.22, 1, .36, 1);
+  --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235f6570' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   color-scheme: light;
 }
 html.dark {
@@ -17,6 +18,7 @@ html.dark {
   --bg: #1c1d21; --canvas: #0f1012; --surface: #1c1d21; --surface-2: #24262b;
   --border: #2e3137; --border-strong: #3c4048; --ink: #e8eaed; --muted: #a0a6b0;
   --thread: #5f6570;
+  --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a0a6b0' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   --shadow-sm: 0 1px 2px rgb(0 0 0 / .4); --shadow-lg: 0 12px 24px -6px rgb(0 0 0 / .5);
   color-scheme: dark;
 }
@@ -46,6 +48,9 @@ a { color: var(--blue-txt); }
 .btn-tonal { background: var(--blue-soft); color: var(--blue-txt); }
 .btn-danger { background: var(--red-soft); color: var(--red-txt); }
 .btn-danger-solid { background: #d93025; color: #fff; }
+/* outlined like "Lock game", red like "Exit game" (lobby: Cancel game) */
+.btn-outline.btn-outline-red { color: var(--red-txt); border-color: color-mix(in srgb, var(--red-txt) 35%, var(--border)); }
+.btn-outline.btn-outline-red:hover { background: var(--red-soft); border-color: var(--red-txt); }
 .btn-ghost { background: transparent; color: var(--muted); }
 .btn-sm { min-height: 34px; padding: 6px 14px; font-size: 13px; }
 .btn-lg { min-height: 56px; font-size: 17px; padding: 14px 28px; }
@@ -62,6 +67,10 @@ a { color: var(--blue-txt); }
 .input { width: 100%; min-height: 48px; padding: 12px 14px; border-radius: .875rem; border: 1px solid var(--border); background: var(--surface); font-size: 16px; }
 textarea.input { resize: vertical; min-height: 80px; font-weight: 500; font-size: 18px; }
 .input:focus { outline: none; border-color: var(--blue-b); box-shadow: 0 0 0 4px rgb(66 133 244 / .16); }
+/* dropdowns: the site's own look in every browser, light and dark (Safari draws its gray control otherwise) */
+select { -webkit-appearance: none; appearance: none; }
+select.input { background: var(--surface) var(--chev) no-repeat right 14px center / 16px 16px; color: var(--ink); padding-right: 42px; cursor: pointer; text-overflow: ellipsis; }
+select option { background: var(--surface); color: var(--ink); }
 .colorbar { display: flex; height: 4px; }
 .colorbar span { flex: 1; }
 .dots-g { display: inline-flex; gap: 6px; }
@@ -292,13 +301,27 @@ tr:last-child td { border-bottom: 0; }
 .qnav .qn.on.bad { background: #1a73e8; color: #fff; }
 .qnav .add { width: 44px; height: 44px; border-radius: 50%; border: 1px dashed var(--border-strong); background: transparent; color: var(--blue-txt); font-size: 20px; }
 .qnav .info { margin-left: auto; font-size: 13px; color: var(--muted); }
-.ans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.ans-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 12px; }
+/* phones: one answer per row, each as tall as its own text */
+@media (max-width: 640px) { .ans-grid { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; } }
+/* answers keep their text inside the box */
+.ans { min-width: 0; }
 .ans { display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 10px; border-radius: 1rem; border: 1px solid var(--border); background: var(--surface); }
 .ans.right { border: 2px solid var(--green); background: var(--green-soft); }
 .ans .L { width: 40px; height: 40px; border-radius: .7rem; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; background: var(--c); flex-shrink: 0; }
 .ans.yel .L { color: #1f2328; }
 .ans input[type=text] { flex: 1; min-width: 0; border: 0; background: transparent; font-size: 16px; font-weight: 500; padding: 8px 4px; }
 .ans input[type=text]:focus { outline: none; }
+/* answers in the editor: a growing text box (wraps between words, direction from the text) + a small counter */
+.ans .ans-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ans textarea { width: 100%; border: 0; background: transparent; font-size: 16px; font-weight: 500; line-height: 1.4; padding: 8px 4px 2px; resize: none; overflow: hidden; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; }
+.ans textarea:focus { outline: none; }
+.char-count { align-self: flex-end; font-size: 11px; font-weight: 500; line-height: 1.2; color: var(--muted); font-variant-numeric: tabular-nums; }
+.char-count.near { color: var(--yellow-txt); }
+.char-count.full { color: var(--red-txt); }
+.ans .char-count { padding: 0 4px 2px; }
+.field .q-text { resize: none; overflow: hidden; overflow-wrap: break-word; }
+.field .char-count { margin-top: -2px; }
 .ans input[type=radio] { width: 22px; height: 22px; accent-color: #188038; flex-shrink: 0; }
 .img-drop { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 120px; border-radius: 1rem; border: 1px dashed var(--border-strong); background: var(--canvas); color: var(--muted); cursor: pointer; position: relative; }
 .img-drop img { max-height: 200px; max-width: 100%; border-radius: .75rem; }
@@ -438,7 +461,8 @@ html, body { overflow-x: hidden; }
 .mono, .mono input[type=text] { font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace; }
 .codebox { border-radius: 1rem; overflow: hidden; border: 1px solid #34363d; background: #1e1f24; color: #e8eaed; text-align: left; flex-shrink: 0; }
 .codebar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; background: #2a2b31; border-bottom: 1px solid #34363d; font-size: 12px; font-weight: 600; letter-spacing: .08em; color: #a0a6b0; }
-.codebar select { height: 32px; border-radius: 8px; border: 1px solid #3c4048; background: #1e1f24; color: #e8eaed; font: inherit; font-size: 13px; letter-spacing: 0; padding: 0 8px; }
+.codebar select { height: 32px; border-radius: 8px; border: 1px solid #3c4048; background: #1e1f24 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a0a6b0' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center / 14px 14px; color: #e8eaed; font: inherit; font-size: 13px; letter-spacing: 0; padding: 0 28px 0 10px; cursor: pointer; }
+.codebar select option { background: #1e1f24; color: #e8eaed; }
 .codebody { display: flex; align-items: stretch; font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs, 15px); line-height: 1.6; max-height: 46vh; overflow: auto; }
 .codebody pre { margin: 0; font: inherit; }
 .codebody .ln { padding: 12px 8px 12px 12px; color: #6b7078; text-align: right; user-select: none; border-right: 1px solid #2a2b31; flex-shrink: 0; }
@@ -491,6 +515,13 @@ html, body { overflow-x: hidden; }
 body:has(.spider-fly) { cursor: grabbing; user-select: none; }
 /* collapsible admin sidebar */
 .adm-side .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* the open sidebar is as wide as the logo + toggle need (274px with the design font). The old 280px cap
+   made a wider font (Safari, Google Sans) push the toggle onto "HOOT"; now the sidebar grows instead. */
+@media (min-width: 901px) {
+  /* as wide as its content in every browser (Safari kept it at 240px and the toggle stuck out of the edge) */
+  .adm-side:not(.closed) { flex: 0 0 auto; width: max-content; min-width: 240px; max-width: 360px; }
+  .adm-side .top > a, .adm-side .top .side-tog { flex: 0 0 auto; }
+}
 .side-tog { width: 36px; height: 36px; border: 0; background: transparent; color: var(--muted); }
 .side-tog:hover { background: var(--surface-2); color: var(--ink); }
 .adm-side { transition: flex-basis .25s var(--ease), max-width .25s var(--ease); }
@@ -1182,3 +1213,79 @@ body:has(.live-pill) :is(.host-main, .lap-main, .pl-in) { padding-bottom: 88px; 
 /* ---------- audience screen (/screen): view only, so the shared blocks' buttons are hidden ---------- */
 .screen-main .btn { display: none; }
 .screen-mode .lobby .qr .code { width: min(30vh, 200px); height: min(30vh, 200px); }
+
+/* host: remove a player (lobby chip × and the in-game player list) */
+.pchip-x { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: 0 -6px 0 2px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; opacity: .6; cursor: pointer; }
+.pchip-x:hover, .pchip-x:focus-visible { opacity: 1; background: var(--red-soft); color: var(--red-txt); }
+.kick-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.kick-list li { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 1rem; }
+.kick-list .kick-name { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- lobby (host + audience screen): one screen, never scrolls ---------- */
+/* the page is exactly the screen's height; the players card takes what is left, and PlayerChips
+   shows as many players as fit (newest first) with "+N" for the rest */
+.host:has(.host-main.lobby-main) { height: 100vh; height: 100dvh; min-height: 0; }
+.host-main.lobby-main { min-height: 0; overflow: hidden; }
+.lobby-main .lobby { flex: 1; min-height: 0; align-items: stretch; flex-wrap: nowrap; }
+.lobby-main .lobby .pinbox { min-height: 0; overflow: hidden; }
+.lobby-main .lobby .players { min-height: 0; overflow: hidden; }
+.lobby-main .pchips { position: relative; flex: 1; min-height: 0; overflow: hidden; align-content: flex-start; }
+.pchip.pchip-more { padding: 5px 16px; background: var(--surface-2); color: var(--ink); animation: none; }
+/* when the two cards stack (narrow screens) the players card still gets the rest of the height */
+@media (max-width: 1150px) { .lobby-main .lobby { flex-direction: column; flex-wrap: nowrap; } .lobby-main .lobby .pinbox { flex: 0 0 auto; max-width: none; } .lobby-main .lobby .players { flex: 1 1 0; } }
+
+/* ---------- answer results: the full answer under each bar, never "…" ---------- */
+.alabel .t { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; line-height: 1.25; }
+/* the labels in a row share the tallest one's height, so the bars still stand on one line */
+@supports (grid-template-rows: subgrid) {
+  .achart { grid-template-rows: auto minmax(0, 1fr) auto; align-items: stretch; row-gap: 10px; }
+  .acol { grid-row: span 3; display: grid; grid-template-rows: subgrid; row-gap: normal; }
+  .acol > .atrack { align-self: end; }
+}
+
+/* ---------- host + audience screen: question and results fit one screen ---------- */
+/* laptops, projectors and iPads (phone-width screens keep scrolling as before) */
+@media (min-width: 701px) {
+  .host:has(.host-main.fit) { height: 100vh; height: 100dvh; min-height: 0; }
+  .host-main.fit { min-height: 0; overflow: hidden; gap: clamp(14px, 2.2vh, 28px); }
+  .host-main.fit > * { flex-shrink: 0; }
+  .qcard h1.long { font-size: clamp(26px, 4.4vh, 42px); }
+  .qcard h1.xlong { font-size: clamp(22px, 3.6vh, 34px); }
+  /* a question picture gives up its height first, so the answers always keep theirs */
+  .host-main.fit > .qcard { flex: 0 1 auto; min-height: 0; }
+  .host-main.fit > .qcard > * { flex-shrink: 0; }
+  .host-main.fit > .qcard img.qimg { flex: 0 1 auto; min-height: 0; object-fit: contain; }
+  /* the code box takes the space that is left and scrolls inside itself; the answers stay on screen */
+  .host-main.fit > .codebox { flex: 0 1 auto; min-height: 120px; display: flex; flex-direction: column; }
+  .host-main.fit > .codebox .codebody { flex: 1 1 auto; min-height: 0; max-height: none; }
+  /* answer tiles are never shorter than their text; any room left over goes to them */
+  .host-main.fit > .htiles:not(.code) { flex: 1 0 auto; }
+  /* results: the chart takes what is left (bars shrink, labels keep their text) */
+  .host-main.fit > .achart { flex: 1 0 auto; }
+  .host-main.fit .acol > .atrack { height: 100%; min-height: 40px; }
+}
+/* wide screens: answer text and spacing follow the screen height (narrower screens keep their own sizes) */
+@media (min-width: 901px) {
+  .host-main.fit > .htiles:not(.code) .htile:not(.big) { font-size: clamp(20px, 2.9vh, 30px); padding-top: clamp(14px, 2.2vh, 24px); padding-bottom: clamp(14px, 2.2vh, 24px); min-height: clamp(72px, 11vh, 120px); }
+  /* code answers one size smaller, so the code keeps more lines */
+  .host-main.fit > .htiles.code .htile { font-size: clamp(18px, 2.4vh, 24px); min-height: 64px; padding-top: 12px; padding-bottom: 12px; }
+}
+
+/* ---------- phone question: every answer on the screen (long question + code) ---------- */
+.pq:has(.tiles.code) { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+.pq:has(.tiles.code) .pq-main { min-height: 0; }
+.pq-main > .codebox { flex: 0 1 auto; min-height: 72px; display: flex; flex-direction: column; }
+.pq-main > .codebox .codebody { flex: 1 1 auto; min-height: 0; max-height: none; }
+.pq .tiles.code { flex: 0 0 auto; grid-auto-rows: auto; }
+.pq .tiles.code .tile { min-height: 64px; padding: 12px 14px; gap: 8px; }
+.pq .tiles.code .tile .L { width: 34px; height: 34px; font-size: 17px; }
+.pq-text.long { font-size: 16px; padding-bottom: 12px; }
+.pq-text.xlong { font-size: 15px; padding-bottom: 10px; }
+
+/* ---------- phone answer tiles: whole words move to the next line; long text one size smaller ---------- */
+.tile { min-width: 0; }
+.tile > span:not(.L):not(.k) { overflow-wrap: break-word; word-break: normal; hyphens: manual; }
+.tiles:not(.wide) .tile.fs-s { font-size: 16px; }
+.tiles:not(.wide) .tile.fs-xs { font-size: 14px; }
+.tiles:not(.wide) .tile.mono.fs-s { font-size: 14px; }
+.tiles:not(.wide) .tile.mono.fs-xs { font-size: 12px; }

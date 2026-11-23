@@ -1,29 +1,46 @@
-/* "Choose your look": nickname + mascot, then join. Used for /join/:quizId and /live (the hosted game). */
+/* "Choose your look": nickname + mascot, then join. Used for /join/:quizId and /live (the hosted game),
+   and with `edit` for /lobby/edit: a live player changes name or mascot before the host starts. */
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { NICK_A, NICK_B, TEAMS, css, mascot, pick, pinFmt, rnd } from '../../lib/constants';
 import { G, UI, joinGame, newLiveGame } from '../../lib/engine';
-import { connectLivePlayer } from '../../lib/live';
+import { connectLivePlayer, deviceId, saveSeat, updateLook } from '../../lib/live';
 import { toast, useWide } from '../../lib/ui';
 import { Ico } from '../../components/common/UI';
 import { MascotGrid, TeamTabs } from '../../components/player/AvatarPicker';
 import { LapShell } from '../../components/layout/Shells';
 import { apiRequest } from '../../api/client';
 
-function JoinQuiz({ quiz, live }) {
+const mascotIdx = (m) => { const n = Number(String(m || '').split('-')[1]); return Number.isInteger(n) ? n : 0; };
+
+function JoinQuiz({ quiz, live, edit }) {
   const navigate = useNavigate();
   const wide = useWide();
   const key = (live ? 'live:' : '') + quiz.id;
   const [look, setLookState] = useState(() => {
+    if (edit) return { key: 'edit', name: G.me.name, team: G.me.team, idx: mascotIdx(G.me.mascot) };
     if (!UI.look || UI.look.key !== key) UI.look = { key, quizId: quiz.id, live, name: UI.look ? UI.look.name : '', team: 'blue', idx: 0 };
     return UI.look;
   });
-  const setLook = (patch) => { const n = { ...look, ...patch }; UI.look = n; setLookState(n); };
+  const [saving, setSaving] = useState(false);
+  const setLook = (patch) => { const n = { ...look, ...patch }; if (!edit) UI.look = n; setLookState(n); };
   const T = TEAMS[look.team];
-  const pin = live ? (UI.look?.pin || G?.pin || quiz.pin) : quiz.pin;
+  const pin = edit ? G.pin : live ? (UI.look?.pin || G?.pin || quiz.pin) : quiz.pin;
 
   const join = async (e) => {
     if (e) e.preventDefault();
+    if (edit) {
+      const name = (look.name || '').trim();
+      if (!name) { toast('Pick a nickname first.'); document.getElementById('nickIn')?.focus(); return; }
+      if (saving) return;
+      setSaving(true);
+      const err = await updateLook({ name, team: look.team, idx: look.idx });
+      setSaving(false);
+      if (err) { toast(err); if (err.includes('locked')) navigate('/play'); return; }
+      toast('Saved. The host screen shows your new look.');
+      navigate('/lobby');
+      return;
+    }
     if (!live) {
       const err = joinGame(look, quiz);
       if (err) { toast(err); if (err.startsWith('Pick')) document.getElementById('nickIn')?.focus(); return; }
@@ -40,16 +57,16 @@ function JoinQuiz({ quiz, live }) {
           name,
           mascot: `${look.team}-${look.idx}`,
           team: look.team,
+          deviceId: deviceId(),
         }),
       });
-      localStorage.setItem('gdgParticipantId', participant.id);
-      localStorage.setItem('gdgSessionId', participant.sessionId);
+      saveSeat({ sessionId: participant.sessionId, participantId: participant.id, pin: String(pin).replace(/\D/g, '') });
       UI.look = { ...look, participantId: participant.id, sessionId: participant.sessionId };
       /* in: wait in the lobby. /play only opens when the server sends the first question */
-      newLiveGame(quiz, { name, team: look.team, img: mascot(look.team, look.idx) }, { sessionId: participant.sessionId, participantId: participant.id });
+      newLiveGame(quiz, { name, team: look.team, img: mascot(look.team, look.idx), mascot: `${look.team}-${look.idx}` }, { sessionId: participant.sessionId, participantId: participant.id });
       connectLivePlayer(participant.sessionId, participant.id);
     } catch (error) {
-      toast(error.body?.error === 'game_locked' ? 'The host has locked this game.' : error.status === 409
+      toast(error.body?.error === 'kicked' ? 'The host removed you from this game.' : error.body?.error === 'game_locked' ? 'The host has locked this game.' : error.status === 409
         ? 'That nickname is already in this session. Choose another.'
         : error.status === 404
           ? 'This live session no longer exists.'
@@ -75,13 +92,14 @@ function JoinQuiz({ quiz, live }) {
   if (wide) {
     return (
       <LapShell right={<span className="chip chip-blue" style={{ fontSize: 13, padding: '6px 14px' }}>PIN {pinFmt(pin)}</span>} main="look">
-        <div><div className="eyebrow">You&apos;re almost in</div><h1 style={{ fontSize: 44, marginTop: 6 }}>Choose your look</h1><p style={css('margin:8px 0 0;color:var(--muted);font-size:16px')}>{quiz.title} · Your mascot shows in the lobby, on the leaderboard and on the podium. Its color is your color.</p></div>
+        <div><div className="eyebrow">{edit ? 'Before the game starts' : <>You&apos;re almost in</>}</div><h1 style={{ fontSize: 44, marginTop: 6 }}>{edit ? 'Change your look' : 'Choose your look'}</h1><p style={css('margin:8px 0 0;color:var(--muted);font-size:16px')}>{quiz.title} · Your mascot shows in the lobby, on the leaderboard and on the podium. Its color is your color.</p></div>
         <form className="look-grid" onSubmit={join} noValidate>
           <div className="card" style={css('padding:28px;display:flex;flex-direction:column;gap:18px;align-items:stretch')}>
             <img className="avatar look-prev" src={mascot(look.team, look.idx)} alt="Your mascot preview" width="180" height="180" style={{ '--team': T.solid, borderWidth: 7, alignSelf: 'center' }} />
             <span className={`chip chip-${look.team}`} style={{ alignSelf: 'center', fontSize: 13 }}>{T.name} player</span>
             <div style={{ width: '100%' }}>{nick}</div>
-            <button type="submit" className="btn btn-primary btn-lg" style={{ width: '100%', minHeight: 54, fontSize: 16 }}>Join game <Ico n="arrow" /></button>
+            <button type="submit" className="btn btn-primary btn-lg" style={{ width: '100%', minHeight: 54, fontSize: 16 }} disabled={saving}>{edit ? 'Save changes' : 'Join game'} <Ico n="arrow" /></button>
+            {edit && <Link className="btn btn-ghost" to="/lobby" style={{ width: '100%' }}>Cancel</Link>}
           </div>
           <div className="card" style={css('padding:28px;display:flex;flex-direction:column;gap:18px')}>
             <div style={css('display:flex;justify-content:space-between;align-items:center')}><h2 style={css('margin:0;font-size:20px;font-weight:600')}>Pick a mascot</h2><span style={{ fontSize: 13, color: 'var(--muted)' }}>48 mascots</span></div>
@@ -95,20 +113,20 @@ function JoinQuiz({ quiz, live }) {
   return (
     <div className="pl">
       <main className="pl-in">
-        <div className="pl-top"><Link className="icon-btn" to="/" aria-label="Back"><Ico n="back" /></Link><span className="chip chip-blue">PIN {pinFmt(pin)}</span></div>
-        <div><div className="eyebrow">You&apos;re almost in</div><h1 style={{ fontSize: 30, marginTop: 6 }}>Choose your look</h1><p style={css('margin:6px 0 0;color:var(--muted)')}>{quiz.title}</p></div>
+        <div className="pl-top"><Link className="icon-btn" to={edit ? '/lobby' : '/'} aria-label="Back"><Ico n="back" /></Link><span className="chip chip-blue">PIN {pinFmt(pin)}</span></div>
+        <div><div className="eyebrow">{edit ? 'Before the game starts' : <>You&apos;re almost in</>}</div><h1 style={{ fontSize: 30, marginTop: 6 }}>{edit ? 'Change your look' : 'Choose your look'}</h1><p style={css('margin:6px 0 0;color:var(--muted)')}>{quiz.title}</p></div>
         <form onSubmit={join} style={css('display:flex;flex-direction:column;gap:18px')} noValidate>
           {nick}
           <div style={css('display:flex;justify-content:space-between;align-items:baseline')}><span className="label">Pick a mascot</span><span style={{ fontSize: 13, color: 'var(--muted)' }}>48 mascots</span></div>
           <TeamTabs team={look.team} onTeam={onTeam} />
           <p style={css('margin:-8px 0 0;font-size:13px;color:var(--muted)')}>Your mascot&apos;s color is your team on the leaderboard.</p>
           <MascotGrid team={look.team} idx={look.idx} onPick={onPick} />
-          <button type="submit" className="sr">Join game</button>
+          <button type="submit" className="sr">{edit ? 'Save changes' : 'Join game'}</button>
         </form>
       </main>
       <footer className="pl-foot"><div className="in">
         <img className="avatar" src={mascot(look.team, look.idx)} alt="" width="52" height="52" style={{ '--team': T.solid }} />
-        <button type="button" className="btn btn-primary btn-lg" style={{ flex: 1 }} onClick={() => join()}>Join game</button>
+        <button type="button" className="btn btn-primary btn-lg" style={{ flex: 1 }} onClick={() => join()} disabled={saving}>{edit ? 'Save changes' : 'Join game'}</button>
       </div></footer>
     </div>
   );

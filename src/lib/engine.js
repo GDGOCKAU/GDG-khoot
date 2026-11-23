@@ -9,7 +9,7 @@ import { assetUrl } from '../api/client';
 /* the live game (or null) */
 export let G = null;
 /* screen state that has to survive moving between pages */
-export const UI = { closed: null, showOver: false, overTab: null, look: null, homeFilter: 'All' };
+export const UI = { closed: null, kicked: false, showOver: false, overTab: null, look: null, homeFilter: 'All' };
 
 /* 10× a second, for timers and answer counts */
 let tickN = 0;
@@ -25,7 +25,7 @@ function makeBot(name) {
   return { id: uid(), name, team, img: mascot(team, Math.floor(Math.random() * 12)), bot: true, skill: rnd(.4, .92), speed: rnd(.25, .8), score: 0, streak: 0, correct: 0, last: null, prevRank: 0 };
 }
 export function addMe(me) {
-  G.me = { id: 'me', name: me.name, team: me.team, img: me.img, bot: false, score: 0, streak: 0, correct: 0, last: null, prevRank: 0 };
+  G.me = { id: 'me', name: me.name, team: me.team, img: me.img, mascot: me.mascot, bot: false, score: 0, streak: 0, correct: 0, last: null, prevRank: 0 };
   G.players.push(G.me);
   UI.showOver = false;
 }
@@ -35,7 +35,7 @@ export function newGame(quiz, mode, me, opts = {}) {
     ? quiz.questions.filter((x) => (x.text || '').trim() && (x.time > 0))
     : quiz.questions.filter((x) => !qProblem(x));
   G = { quiz, qs, mode, pin: mode === 'host' ? newPin() : (quiz.livePin || quiz.pin), backendSessionId: quiz.liveSessionId || null, players: [], qi: -1, phase: mode === 'host' ? 'lobby' : 'ready', phaseStart: Date.now(), phaseEnd: 0, answers: {}, locked: false, me: null, timer: null, joinTimer: null, recorded: false };
-  UI.showOver = false; UI.closed = null;
+  UI.showOver = false; UI.closed = null; UI.kicked = false;
   if (me) addMe(me);
   const names = shuffle(BOT_NAMES);
   const free = () => names.filter((n) => !G.players.some((p) => p.name.toLowerCase() === n.toLowerCase()));
@@ -172,7 +172,7 @@ export function exitGame() {
 }
 
 /* the quiz has auto-advance off: Reveal / Leaderboard stay until the host presses Next (no timer) */
-export const waitsForHost = () => !!G && G.autoAdvance === false && !G.phaseEnd && (G.phase === 'reveal' || G.phase === 'leaderboard');
+export const waitsForHost = () => !!G && G.autoAdvance === false && !G.phaseEnd && (G.phase === 'reveal' || G.phase === 'leaderboard' || G.phase === 'suspense');
 /* the host's Next; a quick double click must not skip the leaderboard too */
 let lastNext = 0;
 export function hostNext() {
@@ -219,7 +219,7 @@ export function joinGame(look, quiz) {
 /* ---------- LIVE GAME (server-driven) ----------
    Host and phones show whatever phase the server pushes. live.js wires the socket and
    fills these hooks; the engine never moves a live game by itself. */
-export const live = { answer: null, start: null, skip: null, lock: null, cancel: null };
+export const live = { answer: null, start: null, skip: null, lock: null, cancel: null, kick: null };
 const mascotIdx = (m) => { const n = Number(String(m || '').split('-')[1]); return Number.isInteger(n) ? n : 0; };
 let clockOffset = 0; // server clock minus this device's clock
 
@@ -227,7 +227,7 @@ let clockOffset = 0; // server clock minus this device's clock
 export function newLiveGame(quiz, me, { sessionId, participantId }) {
   stopGame(false);
   G = { quiz, qs: Array.from({ length: quiz.questionCount || 0 }, () => null), mode: 'player', live: true, pin: quiz.livePin, backendSessionId: sessionId, participantId, players: [], qi: -1, phase: 'lobby', phaseStart: Date.now(), phaseEnd: 0, answers: {}, locked: false, me: null, timer: null, joinTimer: null, recorded: false, socket: null, power: null };
-  UI.showOver = false; UI.closed = null;
+  UI.showOver = false; UI.closed = null; UI.kicked = false;
   addMe(me);
   G.timer = setInterval(tick, 100);
   notify();
@@ -257,8 +257,10 @@ export function livePhaseEvent(p) {
   G.locked = !!p.locked;
   G.powerUps = !!p.powerUps;
   G.autoAdvance = p.autoAdvance !== false;
-  /* players stay on their result while the host shows the leaderboard */
-  const phase = G.live && p.phase === 'leaderboard' ? 'reveal' : p.phase;
+  /* the last two questions: the server sends no ranking, and the screens show none */
+  G.rankHidden = !!p.rankHidden;
+  /* players stay on their result while the host shows the leaderboard (or the suspense screen) */
+  const phase = G.live && (p.phase === 'leaderboard' || p.phase === 'suspense') ? 'reveal' : p.phase;
   if (phase === 'cancelled') { exitGame(); return; }
   if (phase === 'question' && G.phase !== 'question') G.answers = {};
   G.phase = phase;
@@ -313,6 +315,14 @@ export function liveFinal(f) {
 /* standings -> the players the shared screens rank and animate */
 export function applyStandings(standings, choices, qq) {
   if (!G) return;
+  /* no standings (the ranking is hidden): only who picked what changes */
+  if (!standings) {
+    if (choices && qq) {
+      G.answers = {};
+      Object.entries(choices).forEach(([pid, c]) => { G.answers[pid] = { choice: typeof c === 'boolean' ? (c ? qq.word : '') : c, t: 0 }; });
+    }
+    return;
+  }
   G.prevIdx = {}; G.prevTeams = {};
   ranked().forEach((p, i) => { p.prevRank = i + 1; G.prevIdx[p.id] = i; p.prevScore = p.score; });
   teamStats().forEach((t, i) => { G.prevTeams[t.key] = { idx: i, avg: t.avg }; });
@@ -325,7 +335,8 @@ export function applyStandings(standings, choices, qq) {
     const id = G.live && st.id === G.participantId ? 'me' : st.id;
     const p = byId.get(id) || { id, bot: false, prevRank: 0, img: mascot(st.team, mascotIdx(st.mascot)) };
     const choice = G.answers[id === 'me' ? 'me' : st.id] ? G.answers[id === 'me' ? 'me' : st.id].choice : null;
-    Object.assign(p, { name: st.name, team: st.team, score: st.score, streak: st.streak, correct: st.correct,
+    /* a names-only list (hidden ranking) keeps the scores this screen already had */
+    Object.assign(p, { name: st.name, team: st.team, score: st.score ?? p.score ?? 0, streak: st.streak ?? p.streak ?? 0, correct: st.correct ?? p.correct ?? 0,
       last: choices ? { choice: st.answered ? choice : null, ok: st.lastOk, pts: st.lastPts } : p.last });
     return p;
   });

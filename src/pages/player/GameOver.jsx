@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { css, fmt, ord } from '../../lib/constants';
-import { G, UI, hosted, rankOf } from '../../lib/engine';
+import { G, UI, rankOf } from '../../lib/engine';
 import { notify } from '../../lib/store';
 import { doShare } from '../../lib/share';
 import { useWide } from '../../lib/ui';
@@ -15,7 +15,6 @@ function GameOver() {
   const wide = useWide();
   const me = G.me, rk = rankOf(me);
   const tab = UI.overTab || (rk <= 3 ? 'top' : 'me');
-  const again = hosted() ? '/' : `/join/${G.quiz.id}`;
   const setTab = (v) => { UI.overTab = v; notify(); };
   const [sheet, setSheet] = useState(false);
   /* the phone's share menu when it's available, otherwise our own share menu */
@@ -31,7 +30,6 @@ function GameOver() {
   const links = (
     <div className="over-links">
       <button type="button" onClick={() => { UI.showOver = false; notify(); }}>Leaderboard</button><span aria-hidden="true">·</span>
-      <Link to={again} onClick={() => { UI.look = null; }}>Play again</Link><span aria-hidden="true">·</span>
       <Link to="/">Home</Link>
     </div>
   );

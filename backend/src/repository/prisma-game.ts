@@ -6,11 +6,11 @@ export class PrismaGameRepository implements GameRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findByPin(pin: string) {
-    const session = await this.prisma.gameSession.findUnique({ where: { pin }, include: { participants: true } });
+    const session = await this.prisma.gameSession.findUnique({ where: { pin }, include: { participants: { orderBy: { createdAt: "asc" } } } });
     return session ? this.mapSession(session) : null;
   }
   async findById(id: string) {
-    const session = await this.prisma.gameSession.findUnique({ where: { id }, include: { participants: true } });
+    const session = await this.prisma.gameSession.findUnique({ where: { id }, include: { participants: { orderBy: { createdAt: "asc" } } } });
     return session ? this.mapSession(session) : null;
   }
   async create(input: { quizId: string; hostId: string }) {
@@ -22,7 +22,7 @@ export class PrismaGameRepository implements GameRepository {
     }
     const session = await this.prisma.gameSession.create({
       data: { quizId: input.quizId, hostId: input.hostId, pin },
-      include: { participants: true },
+      include: { participants: { orderBy: { createdAt: "asc" } } },
     });
     return this.mapSession(session);
   }
@@ -35,7 +35,7 @@ export class PrismaGameRepository implements GameRepository {
         questionStartedAt: session.questionStartedAt,
         closesAt: session.closesAt,
       },
-      include: { participants: true },
+      include: { participants: { orderBy: { createdAt: "asc" } } },
     });
     return this.mapSession(saved);
   }
@@ -58,6 +58,29 @@ export class PrismaGameRepository implements GameRepository {
       where: { id: participantId, sessionId, leftAt: null },
       data: { leftAt: new Date() },
     });
+    return result.count === 1;
+  }
+  async updateParticipant(sessionId: string, participantId: string, input: { name: string; mascot: string; team: string }) {
+    const clash = await this.prisma.participant.findFirst({
+      where: { sessionId, id: { not: participantId }, leftAt: null, name: { equals: input.name, mode: "insensitive" } },
+    });
+    if (clash) return "duplicate";
+    try {
+      const updated = await this.prisma.participant.update({ where: { id: participantId }, data: { name: input.name, mascot: input.mascot, team: input.team } });
+      return updated.sessionId === sessionId ? this.mapParticipant(updated) : null;
+    } catch (error) {
+      if ((error as { code?: string }).code === "P2002") return "duplicate";
+      if ((error as { code?: string }).code === "P2025") return null;
+      throw error;
+    }
+  }
+  async rejoin(sessionId: string, participantId: string) {
+    const result = await this.prisma.participant.updateMany({ where: { id: participantId, sessionId }, data: { leftAt: null } });
+    return result.count === 1;
+  }
+  async removeParticipant(sessionId: string, participantId: string) {
+    // answers go with the participant (onDelete: Cascade)
+    const result = await this.prisma.participant.deleteMany({ where: { id: participantId, sessionId } });
     return result.count === 1;
   }
   async findParticipant(sessionId: string, participantId: string) {
@@ -85,7 +108,7 @@ export class PrismaGameRepository implements GameRepository {
     return this.prisma.answer.count({ where: { sessionId, questionId } });
   }
   async listSessions(hostId: string) {
-    const sessions = await this.prisma.gameSession.findMany({ where: { hostId }, include: { participants: true } });
+    const sessions = await this.prisma.gameSession.findMany({ where: { hostId }, include: { participants: { orderBy: { createdAt: "asc" } } } });
     return sessions.map((session) => this.mapSession(session));
   }
   async listAnswers(sessionId: string) {

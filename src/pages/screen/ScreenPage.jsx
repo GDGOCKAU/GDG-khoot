@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { LETTERS, TEAMS, ansCls, css, pinFmt } from '../../lib/constants';
-import { qType } from '../../lib/questions';
+import { qType, qSize } from '../../lib/questions';
 import { G, curQ } from '../../lib/engine';
 import { connectScreen, disconnectScreen } from '../../lib/live';
 import { useAppState } from '../../lib/store';
 import { useAnims } from '../../lib/ui';
+import PlayerChips from '../../components/game/PlayerChips';
 import { Answered, Bounce, Brand, ColorBar, Count, Ico, LiveRing, Secs, ThemeButton } from '../../components/common/UI';
-import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
+import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, SuspenseBlock, TeamsBlock } from '../../components/game/Blocks';
 
 const bigRing = <LiveRing size={220} stroke={17} color="#1a73e8"><span style={{ fontSize: 112, color: '#1a73e8' }}><Count /></span></LiveRing>;
 
@@ -80,7 +81,7 @@ function Game() {
   switch (G.phase) {
     case 'lobby': {
       const cnt = G.players.length;
-      return <Shell right={<span className="chip"><i style={css('width:8px;height:8px;border-radius:50%;background:#34a853')} />Live</span>}>
+      return <Shell main="lobby-main" right={<span className="chip"><i style={css('width:8px;height:8px;border-radius:50%;background:#34a853')} />Live</span>}>
         <div><div className="eyebrow">GDG KAUHOOT · Lobby</div><h1 style={{ fontSize: 48, marginTop: 6 }}>{G.quiz.title}</h1></div>
         <div className="lobby">
           <div className="card pinbox">
@@ -94,7 +95,7 @@ function Game() {
           </div>
           <div className="card players">
             <div style={css('display:flex;justify-content:space-between;align-items:center')}><h2 style={{ margin: 0 }}>Players</h2><span className="chip chip-blue"><Ico n="users" />{cnt} joined</span></div>
-            <div className="pchips" aria-live="polite">{cnt ? G.players.map((p) => <PChip key={p.id} p={p} />) : <span style={{ color: 'var(--muted)' }}>Waiting for players to join…</span>}</div>
+            <PlayerChips players={G.players} renderChip={(p) => <PChip key={p.id} p={p} />} empty={<span style={{ color: 'var(--muted)' }}>Waiting for players to join…</span>} />
             <span style={css('color:var(--muted);font-size:14px')}>{G.locked ? 'Game locked. No one else can join.' : cnt ? 'The host starts the game when everyone is in.' : 'Waiting for players to join…'}</span>
           </div>
         </div>
@@ -112,8 +113,8 @@ function Game() {
       </Shell>;
     case 'question':
       if (!qq) return null;
-      return <Shell right={<><span className="chip">Question {G.qi + 1} of {n}</span>{pinChip}</>}>
-        <div className="card qcard"><QKindChip qq={qq} />{qq.points === 2 && <span className="chip chip-red">Double points</span>}<h1>{qq.text}</h1>{qq.img && ['mc', 'tf'].includes(qType(qq)) && <img className="qimg" src={qq.img} alt="" />}</div>
+      return <Shell main="fit" right={<><span className="chip">Question {G.qi + 1} of {n}</span>{pinChip}</>}>
+        <div className="card qcard"><QKindChip qq={qq} />{qq.points === 2 && <span className="chip chip-red">Double points</span>}<h1 className={qSize(qq.text)} dir="auto">{qq.text}</h1>{qq.img && ['mc', 'tf'].includes(qType(qq)) && <img className="qimg" src={qq.img} alt="" />}</div>
         <div className="qbar">
           <div className="tring" style={css('display:flex;align-items:center;gap:16px')}><LiveRing size={104} stroke={10} color="#1a73e8"><span style={{ fontSize: 38 }}><Secs /></span></LiveRing><span className="tlabel" style={{ color: 'var(--muted)', fontSize: 15 }}>seconds left{qType(qq) === 'pic' ? ` · ${qq.word.replace(/[^A-Za-z0-9]/g, '').length} letters` : ''}</span></div>
           <div className="qbar-r" style={css('display:flex;align-items:center;gap:14px')}>
@@ -123,8 +124,9 @@ function Game() {
         <HostAnswerArea qq={qq} />
       </Shell>;
     case 'reveal':
-      return <Shell right={<><span className="chip">Question {G.qi + 1} of {n}</span>{pinChip}</>}><AnswersBlock /></Shell>;
+      return <Shell main="fit" right={<><span className="chip">Question {G.qi + 1} of {n}</span>{pinChip}</>}><AnswersBlock /></Shell>;
     case 'leaderboard': return <Shell right={<span className="chip">After question {G.qi + 1} of {n}</span>} main="wide"><LbBlock /></Shell>;
+    case 'suspense': return <Shell right={<span className="chip">After question {G.qi + 1} of {n}</span>}><SuspenseBlock /></Shell>;
     case 'teams': return <Shell right={over} main="mid"><TeamsBlock /></Shell>;
     case 'podium': return <Shell right={over} main="narrow"><PodiumBlock /></Shell>;
     case 'final': return <Shell right={over}><FinalBlock /></Shell>;

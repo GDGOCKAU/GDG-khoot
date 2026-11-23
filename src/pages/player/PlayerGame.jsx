@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { TEAMS, css, fmt, ord } from '../../lib/constants';
-import { qType, norm } from '../../lib/questions';
+import { qType, norm, qSize } from '../../lib/questions';
 import { G, UI, answer, curQ, hosted, rankOf, waitsForHost } from '../../lib/engine';
 import { notify, useAppState } from '../../lib/store';
 import { toast, useAnims, useWide } from '../../lib/ui';
@@ -12,6 +12,8 @@ import { LapShell, PShell } from '../../components/layout/Shells';
 import { CodeSnack, PokeDevu } from '../../components/player/WaitFun';
 import GameOver from './GameOver';
 import GameClosed from './GameClosed';
+import JoinError from './JoinError';
+import JoinQuiz from './JoinQuiz';
 import { activatePowerUp } from '../../lib/live';
 
 function PlayerGame() {
@@ -19,6 +21,7 @@ function PlayerGame() {
   /* live game: nothing to play until the server has sent a question */
   if (G && G.live && G.me && G.phase === 'lobby') return <Navigate to="/lobby" replace />;
   if (G && G.me) return <PlayerView />;
+  if (UI.kicked) return <JoinError kind="kicked" />;
   if (UI.closed) return <GameClosed />;
   return <Navigate to="/" replace />;
 }
@@ -116,7 +119,7 @@ function PlayerView() {
         return (
           <div className="pq">
             <div className="pq-top"><span className="chip" style={css('font-size:13px;padding:6px 14px')}>Q{G.qi + 1} of {n}</span><span className="chip chip-blue" style={css('font-size:13px;padding:6px 14px')}><Ico n="clock" s={14} /><span><Secs />s</span></span></div>
-            <p className="pq-text">{qq.text}</p>
+            <p className={`pq-text ${qSize(qq.text)}`} dir="auto">{qq.text}</p>
             <main className="pq-main">
               {qimg && <img src={qq.img} alt="" style={css('max-height:160px;max-width:100%;border-radius:1rem;align-self:center')} />}
               {powers}
@@ -152,8 +155,11 @@ function PlayerView() {
           {ok
             ? <div style={css('display:flex;flex-wrap:wrap;gap:10px;justify-content:center')}><span className="pts-pill num">+{fmt(L.pts)} points</span>{L.doubled && <span className="pts-pill" style={css('font-size:16px;display:flex;align-items:center;gap:6px;color:var(--blue-txt)')}><Ico n="star" />Double points</span>}{me.streak > 1 && <span className="pts-pill" style={css('font-size:16px;display:flex;align-items:center;gap:6px;color:var(--green-txt)')}><Ico n="flame" />Streak: {me.streak}</span>}</div>
             : <><span style={{ color: 'var(--muted)' }}>The answer was</span>{qType(qq) === 'pic' ? <div className="boxes reveal"><Boxes word={qq.word} mode="reveal" /></div> : <ChosenPill qq={qq} choice={qq.correct} />}</>}
-          <div className={`stat-card${wide ? ' big' : ''}`} style={{ width: 'min(380px,100%)', ...(wide ? { width: '100%' } : {}) }}><div style={{ textAlign: 'left' }}><small>Your rank</small><strong>{ord(rankOf(me))} place</strong></div><div style={{ textAlign: 'right' }}><small>Total</small><strong className="num">{fmt(me.score)}</strong></div></div>
-          <p style={css('margin:0;font-size:13px;color:var(--muted)')}>{wide ? 'Look at the big screen for the leaderboard.' : waitsForHost() ? 'Answers and leaderboard on the host screen' : <>{hosted() || G.live ? 'Answers on the host screen · leaderboard' : 'Answer results'} in <Secs />s</>}</p>
+          {/* the last two questions: right/wrong and points only, the rank stays secret until the end */}
+          {G.rankHidden
+            ? <div className={`stat-card${wide ? ' big' : ''}`} style={{ width: 'min(380px,100%)', ...(wide ? { width: '100%' } : {}) }}><div style={{ textAlign: 'left' }}><small>Total</small><strong className="num">{fmt(me.score)}</strong></div></div>
+            : <div className={`stat-card${wide ? ' big' : ''}`} style={{ width: 'min(380px,100%)', ...(wide ? { width: '100%' } : {}) }}><div style={{ textAlign: 'left' }}><small>Your rank</small><strong>{ord(rankOf(me))} place</strong></div><div style={{ textAlign: 'right' }}><small>Total</small><strong className="num">{fmt(me.score)}</strong></div></div>}
+          <p style={css('margin:0;font-size:13px;color:var(--muted)')}>{G.rankHidden ? 'The leaderboard stays hidden until the end.' : wide ? 'Look at the big screen for the leaderboard.' : waitsForHost() ? 'Answers and leaderboard on the host screen' : <>{hosted() || G.live ? 'Answers on the host screen · leaderboard' : 'Answer results'} in <Secs />s</>}</p>
         </div>, stateOpts(ok ? '#34a853' : timeUp ? '#f9ab00' : '#ea4335', { bg: ok ? 'var(--green-soft)' : timeUp ? 'var(--yellow-soft)' : 'var(--red-soft)' }));
     }
     case 'answers':
@@ -165,7 +171,7 @@ function PlayerView() {
           {av(wide ? 170 : 100)}
           <h1 style={{ fontSize: wide ? 64 : 40 }}>Next question<span style={{ color: '#ea4335' }}>!</span></h1>
           <div>{ringCount}</div>
-          <p style={css('margin:0;color:var(--muted)')}>You&apos;re {ord(rankOf(me))} with {fmt(me.score)} points. Get ready!</p>
+          <p style={css('margin:0;color:var(--muted)')}>{G.rankHidden ? <>You have {fmt(me.score)} points. Get ready!</> : <>You&apos;re {ord(rankOf(me))} with {fmt(me.score)} points. Get ready!</>}</p>
         </div>, stateOpts('#4285f4'));
     case 'leaderboard':
       return shell(<LbBlock forPlayer />, { phoneRight: <span className="chip">After Q{G.qi + 1} of {n}</span> });
@@ -185,7 +191,7 @@ export function PlayerLobby() {
   useAppState();
   const wide = useWide();
   useAnims('lobby');
-  if (!G || !G.live || !G.me) return UI.closed ? <GameClosed /> : <Navigate to="/" replace />;
+  if (!G || !G.live || !G.me) return UI.kicked ? <JoinError kind="kicked" /> : UI.closed ? <GameClosed /> : <Navigate to="/" replace />;
   if (G.phase !== 'lobby') return <Navigate to="/play" replace />;
   const me = G.me, T = TEAMS[me.team];
   return (
@@ -195,9 +201,18 @@ export function PlayerLobby() {
         <h1 style={{ fontSize: wide ? 60 : 38 }}>You&apos;re in<span style={{ color: '#34a853' }}>!</span></h1>
         <p style={css('margin:0;color:var(--muted);font-size:18px;max-width:30rem')}>Your nickname is on the host screen. Waiting for the host to start the game<Bounce /></p>
         <span className={`chip chip-${me.team}`}>Team {T.name}</span>
+        <Link className="btn btn-outline" to="/lobby/edit">Change name or look</Link>
       </div>
     </PShell>
   );
+}
+
+/* /lobby/edit — change nickname or mascot (team) until the host presses Start */
+export function LobbyEdit() {
+  useAppState();
+  if (!G || !G.live || !G.me) return UI.kicked ? <JoinError kind="kicked" /> : UI.closed ? <GameClosed /> : <Navigate to="/" replace />;
+  if (G.phase !== 'lobby') return <Navigate to="/play" replace />;
+  return <JoinQuiz key="edit" quiz={G.quiz} live edit />;
 }
 
 /* live power-ups (only when the host switched them on): each one once per game, checked on the server */

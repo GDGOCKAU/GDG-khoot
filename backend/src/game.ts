@@ -42,6 +42,12 @@ export interface GameRepository {
   save(session: GameSession): Promise<GameSession>;
   join(sessionId: string, input: { name: string; mascot: string; team: string }): Promise<Participant | "duplicate">;
   leave(sessionId: string, participantId: string): Promise<boolean>;
+  /** Lobby only: a new name and mascot (and so team). "duplicate" when another player has that name. */
+  updateParticipant(sessionId: string, participantId: string, input: { name: string; mascot: string; team: string }): Promise<Participant | "duplicate" | null>;
+  /** A player who left comes back to their seat (same name, score and team). */
+  rejoin(sessionId: string, participantId: string): Promise<boolean>;
+  /** Kick: the player and their answers are removed from the session. */
+  removeParticipant(sessionId: string, participantId: string): Promise<boolean>;
   findParticipant(sessionId: string, participantId: string): Promise<Participant | null>;
   findAnswer(participantId: string, questionId: string): Promise<Answer | null>;
   createAnswer(answer: Omit<Answer, "id">): Promise<Answer>;
@@ -94,6 +100,28 @@ export class MemoryGameRepository implements GameRepository {
     participant.leftAt = new Date();
     return true;
   }
+  async updateParticipant(sessionId: string, participantId: string, input: { name: string; mascot: string; team: string }) {
+    const session = this.sessions.get(sessionId);
+    const participant = session?.participants.find((item) => item.id === participantId);
+    if (!session || !participant) return null;
+    if (session.participants.some((item) => item.id !== participantId && !item.leftAt && item.name.toLowerCase() === input.name.toLowerCase())) return "duplicate";
+    Object.assign(participant, { name: input.name, mascot: input.mascot, team: input.team });
+    return participant;
+  }
+  async rejoin(sessionId: string, participantId: string) {
+    const participant = this.sessions.get(sessionId)?.participants.find((item) => item.id === participantId);
+    if (!participant) return false;
+    participant.leftAt = null;
+    return true;
+  }
+  async removeParticipant(sessionId: string, participantId: string) {
+    const session = this.sessions.get(sessionId);
+    const index = session ? session.participants.findIndex((item) => item.id === participantId) : -1;
+    if (!session || index < 0) return false;
+    session.participants.splice(index, 1);
+    for (const [id, answer] of this.answers) if (answer.participantId === participantId) this.answers.delete(id);
+    return true;
+  }
   async findParticipant(sessionId: string, participantId: string) {
     return this.sessions.get(sessionId)?.participants.find((participant) => participant.id === participantId) ?? null;
   }
@@ -125,7 +153,7 @@ export type GameErrorCode =
   | "session_not_found" | "quiz_not_found" | "invalid_phase" | "duplicate_participant"
   | "participant_not_found" | "question_not_found" | "answer_closed" | "answer_already_submitted"
   | "invalid_option" | "game_started" | "game_closed" | "game_locked" | "no_players"
-  | "power_ups_off" | "power_up_used" | "power_up_not_allowed" | "quiz_in_live_game";
+  | "power_ups_off" | "power_up_used" | "power_up_not_allowed" | "quiz_in_live_game" | "kicked";
 
 export class GameError extends Error {
   constructor(public readonly code: GameErrorCode, message = code) { super(message); }
@@ -137,9 +165,10 @@ export type EventSink = (sessionId: string, event: string, payload: unknown, aud
 type QuizQuestion = Quiz["questions"][number];
 
 /** Phases the server owns (handoff "Game flow"); every screen just shows the current one. */
-export type Phase = "lobby" | "ready" | "question" | "reveal" | "leaderboard" | "next" | "teams" | "podium" | "final" | "cancelled";
-export type Timings = { ready: number; reveal: number; leaderboard: number; next: number; teams: number; podium: number; earlyClose: number };
-export const DEFAULT_TIMINGS: Timings = { ready: 3000, reveal: 5500, leaderboard: 7000, next: 3000, teams: 8000, podium: 9000, earlyClose: 600 };
+/** "suspense" replaces "leaderboard" after the last two questions: the ranking stays secret until the end screens. */
+export type Phase = "lobby" | "ready" | "question" | "reveal" | "leaderboard" | "suspense" | "next" | "teams" | "podium" | "final" | "cancelled";
+export type Timings = { ready: number; reveal: number; leaderboard: number; suspense: number; next: number; teams: number; podium: number; earlyClose: number };
+export const DEFAULT_TIMINGS: Timings = { ready: 3000, reveal: 5500, leaderboard: 7000, suspense: 4000, next: 3000, teams: 8000, podium: 9000, earlyClose: 600 };
 export type PowerUpKind = "double" | "fifty";
 type PowerState = { double: boolean; fifty: boolean; doubleOn: string | null; removed: { questionId: string; optionIds: string[] } | null };
 
@@ -159,6 +188,10 @@ type Live = {
   results: Map<string, unknown>;
   hostReveal: unknown;
   final: unknown;
+  /** kicked players (and the devices they joined from) may not come back to this session */
+  kicked: Set<string>;
+  kickedDevices: Set<string>;
+  devices: Map<string, string>;
 };
 
 export const normWord = (value: unknown) => String(value ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
@@ -260,16 +293,19 @@ export class GameService {
     };
   }
 
-  async joinByPin(pin: string, input: { name: string; mascot: string; team: string }) {
+  async joinByPin(pin: string, input: { name: string; mascot: string; team: string; deviceId?: string }) {
     const session = await this.gameRepository.findByPin(pin);
     if (!session) throw new GameError("session_not_found");
     if (session.status !== "LOBBY") throw new GameError("invalid_phase");
     const live = await this.ensureLive(session);
     if (live.phase !== "lobby") throw new GameError("invalid_phase");
     if (live.locked) throw new GameError("game_locked");
+    // a device the host kicked from this session cannot join it again
+    if (input.deviceId && live.kickedDevices.has(input.deviceId)) throw new GameError("kicked");
     // only these three fields are stored (callers may pass a whole request body)
     const participant = await this.gameRepository.join(session.id, { name: input.name, mascot: input.mascot, team: input.team });
     if (participant === "duplicate") throw new GameError("duplicate_participant");
+    if (input.deviceId) live.devices.set(participant.id, input.deviceId);
     this.emit(session.id, "player_joined", { participant }, "host");
     return participant;
   }
@@ -278,16 +314,24 @@ export class GameService {
   async participantState(sessionId: string, participantId: string) {
     const session = await this.gameRepository.findById(sessionId);
     if (!session) throw new GameError("session_not_found");
-    const participant = session.participants.find((item) => item.id === participantId);
-    if (!participant || participant.leftAt) throw new GameError("participant_not_found");
     const live = await this.ensureLive(session);
+    if (live.kicked.has(participantId)) throw new GameError("kicked");
+    const participant = session.participants.find((item) => item.id === participantId);
+    if (!participant) throw new GameError("participant_not_found");
+    if (participant.leftAt) {
+      // their seat is kept: a player who closed the page or left comes back as themselves, even after Start
+      if (session.status === "FINISHED" || session.status === "CANCELLED") throw new GameError("participant_not_found");
+      await this.gameRepository.rejoin(session.id, participant.id);
+      participant.leftAt = null;
+      this.emit(session.id, "player_joined", { participant }, "host");
+    }
     const current = live.phase === "question" ? live.questions[live.index] : null;
     const answered = current ? !!(await this.gameRepository.findAnswer(participant.id, current.id)) : false;
     return {
       ...this.common(session, live),
       answered,
       participant: { id: participant.id, name: participant.name, team: participant.team, mascot: participant.mascot, score: participant.score, streak: participant.streak },
-      result: live.phase === "reveal" || live.phase === "leaderboard" ? live.results.get(participant.id) ?? null : null,
+      result: live.phase === "reveal" || live.phase === "leaderboard" || live.phase === "suspense" ? live.results.get(participant.id) ?? null : null,
       powerUps: this.powerView(live, participant.id),
     };
   }
@@ -301,8 +345,8 @@ export class GameService {
     return {
       ...this.common(session, live),
       answeredCount: current ? await this.gameRepository.countAnswers(sessionId, current.id) : 0,
-      standings: (await this.standings(sessionId, null)).standings,
-      hostReveal: live.phase === "reveal" || live.phase === "leaderboard" ? live.hostReveal : null,
+      standings: this.shownStandings(live, (await this.standings(sessionId, null)).standings, session),
+      hostReveal: live.phase === "reveal" || live.phase === "leaderboard" || live.phase === "suspense" ? live.hostReveal : null,
     };
   }
 
@@ -313,12 +357,12 @@ export class GameService {
     if (!session || session.status === "CANCELLED") { this.screenSessionId = null; return null; }
     const live = await this.ensureLive(session);
     const current = live.phase === "question" ? live.questions[live.index] : null;
-    const reveal = live.phase === "reveal" || live.phase === "leaderboard" ? live.hostReveal as { choices?: unknown } | null : null;
+    const reveal = live.phase === "reveal" || live.phase === "leaderboard" || live.phase === "suspense" ? live.hostReveal as { choices?: unknown } | null : null;
     const { choices: _choices, ...hostReveal } = reveal ?? {};
     return {
       ...this.common(session, live),
       answeredCount: current ? await this.gameRepository.countAnswers(session.id, current.id) : 0,
-      standings: (await this.standings(session.id, null)).standings,
+      standings: this.shownStandings(live, (await this.standings(session.id, null)).standings, session),
       hostReveal: reveal ? hostReveal : null,
     };
   }
@@ -336,7 +380,7 @@ export class GameService {
       phase: this.phasePayload(session.id, live),
       // only an open question is ever exposed, and only in its public shape
       question: live.phase === "question" && current ? publicQuestion(current, live.index, live.questions.length, session.closesAt, live.powerUps) : null,
-      reveal: live.phase === "reveal" || live.phase === "leaderboard" ? live.reveal : null,
+      reveal: live.phase === "reveal" || live.phase === "leaderboard" || live.phase === "suspense" ? live.reveal : null,
       final: live.phase === "teams" || live.phase === "podium" || live.phase === "final" ? live.final : null,
     };
   }
@@ -422,7 +466,53 @@ export class GameService {
     if (live?.phase === "question") await this.maybeCloseEarly(sessionId, live);
   }
 
-  leaderboard(sessionId: string) {
+  /** Before Start a player may change their name and mascot (the mascot's colour is the team). */
+  async updateParticipant(sessionId: string, participantId: string, input: { name: string; mascot: string; team: string }) {
+    const session = await this.gameRepository.findById(sessionId);
+    if (!session) throw new GameError("session_not_found");
+    const live = await this.ensureLive(session);
+    if (live.kicked.has(participantId)) throw new GameError("kicked");
+    const participant = session.participants.find((item) => item.id === participantId);
+    if (!participant || participant.leftAt) throw new GameError("participant_not_found");
+    if (session.status !== "LOBBY" || live.phase !== "lobby") throw new GameError("game_started");
+    const updated = await this.gameRepository.updateParticipant(session.id, participantId, { name: input.name, mascot: input.mascot, team: input.team });
+    if (updated === "duplicate") throw new GameError("duplicate_participant");
+    if (!updated) throw new GameError("participant_not_found");
+    this.emit(session.id, "player_updated", { participant: updated }, "host");
+    return updated;
+  }
+
+  /** Host removes a player (lobby or during the game). Their answers go too, so counts, teams and the
+      leaderboard no longer include them; their phone is told, and neither it nor the player can return. */
+  async kick(hostId: string, sessionId: string, participantId: string) {
+    const { session, live } = await this.hostSession(hostId, sessionId);
+    if (!session.participants.some((item) => item.id === participantId)) throw new GameError("participant_not_found");
+    await this.gameRepository.removeParticipant(session.id, participantId);
+    live.kicked.add(participantId);
+    const device = live.devices.get(participantId);
+    if (device) live.kickedDevices.add(device);
+    live.power.delete(participantId);
+    live.results.delete(participantId);
+    this.emit(session.id, "kicked", { sessionId: session.id }, { participantId });
+    this.emit(session.id, "player_left", { participantId, kicked: true }, "host");
+    const current = live.questions[live.index];
+    if (live.phase === "question" && current) {
+      const fresh = await this.gameRepository.findById(session.id);
+      const count = await this.gameRepository.countAnswers(session.id, current.id);
+      this.emit(session.id, "answer_count", { questionId: current.id, count, total: fresh ? fresh.participants.filter((item) => !item.leftAt).length : 0 }, "host");
+      // the others may all have answered already
+      await this.maybeCloseEarly(session.id, live, count);
+    } else if (live.reveal && current && ["reveal", "leaderboard", "suspense"].includes(live.phase)) {
+      await this.refreshReveal(session.id, live, current);
+    }
+    return { participantId };
+  }
+
+  /** Host's leaderboard on demand; refused while the ranking is hidden (the last two questions). */
+  async leaderboard(sessionId: string) {
+    const session = await this.gameRepository.findById(sessionId);
+    if (!session) throw new GameError("session_not_found");
+    if (this.rankHidden(await this.ensureLive(session))) throw new GameError("invalid_phase");
     return this.buildLeaderboard(sessionId);
   }
 
@@ -517,7 +607,7 @@ export class GameService {
 
   private newLive(quiz: Quiz): Live {
     const questions = quiz.questions.slice().sort((a, b) => a.order - b.order).filter(playable);
-    return { quiz, questions, phase: "lobby", index: -1, endsAt: null, durationMs: 0, timer: null, next: null, locked: false, powerUps: false, power: new Map(), reveal: null, results: new Map(), hostReveal: null, final: null };
+    return { quiz, questions, phase: "lobby", index: -1, endsAt: null, durationMs: 0, timer: null, next: null, locked: false, powerUps: false, power: new Map(), reveal: null, results: new Map(), hostReveal: null, final: null, kicked: new Set(), kickedDevices: new Set(), devices: new Map() };
   }
 
   /** Live state is in memory; after a server restart it is rebuilt from the stored session. */
@@ -535,7 +625,8 @@ export class GameService {
     } else if (session.status === "ACTIVE") {
       this.setPhase(session.id, live, "ready", this.timings.ready, () => this.openQuestion(session.id, 0));
     } else if (session.status === "REVEAL") {
-      this.setPhase(session.id, live, "leaderboard", this.hold(live, this.timings.leaderboard), () => this.afterLeaderboard(session.id));
+      if (this.rankHidden(live)) this.setPhase(session.id, live, "suspense", this.hold(live, this.timings.suspense), () => this.afterLeaderboard(session.id));
+      else this.setPhase(session.id, live, "leaderboard", this.hold(live, this.timings.leaderboard), () => this.afterLeaderboard(session.id));
     } else if (session.status === "FINISHED") {
       live.phase = "final";
       live.final = await this.finalPayload(session.id);
@@ -567,7 +658,26 @@ export class GameService {
       powerUps: live.powerUps,
       // false: Reveal and Leaderboard wait for the host's Next (POST /skip) instead of a timer
       autoAdvance: live.quiz.autoAdvance !== false,
+      // the last two questions: no ranking anywhere until the end screens
+      rankHidden: this.rankHidden(live),
     };
+  }
+
+  /** True from the second-to-last question until the end screens (every question when there are two or fewer). */
+  private rankHidden(live: Live) {
+    if (["lobby", "teams", "podium", "final", "cancelled"].includes(live.phase)) return false;
+    return live.index >= 0 && live.index >= live.questions.length - 2;
+  }
+
+  /** While the ranking is hidden, screens get the player list only (by name, no scores).
+      In the lobby the list keeps the join order, so screens can show the newest players first. */
+  private shownStandings(live: Live, standings: Awaited<ReturnType<GameService["standings"]>>["standings"], session?: GameSession) {
+    if (live.phase === "lobby" && session) {
+      const order = new Map(session.participants.map((participant, i) => [participant.id, i]));
+      return standings.slice().sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+    }
+    if (!this.rankHidden(live)) return standings;
+    return standings.map(({ id, name, team, mascot }) => ({ id, name, team, mascot })).sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /** How long Reveal / Leaderboard stay up: their timing, or no timer when the host moves on by hand. */
@@ -663,7 +773,8 @@ export class GameService {
     const everyone = standings.length > 0 && standings.every((player) => answers.some((answer) => answer.participantId === player.id));
     const closedBy: "all_answered" | "time" | "skip" = everyone ? "all_answered" : elapsedMs < question.timeLimitSecs * 1000 - 250 ? "skip" : "time";
     live.reveal = { ...this.revealPayload(question, index, answers, standings.length), closedBy };
-    // each phone gets only its own result
+    const hidden = this.rankHidden(live);
+    // each phone gets only its own result (no rank in the last two questions)
     standings.forEach((player, i) => {
       const answer = answers.find((item) => item.participantId === player.id);
       const result = {
@@ -674,9 +785,9 @@ export class GameService {
         points: answer?.points ?? 0,
         doubled: !!answer && live.power.get(player.id)?.doubleOn === question.id && answer.points > 0,
         streak: player.streak,
-        rank: i + 1,
+        rank: hidden ? null : i + 1,
         total: player.score,
-        players: standings.length,
+        players: hidden ? null : standings.length,
       };
       live.results.set(player.id, result);
       this.emit(sessionId, "result", result, { participantId: player.id });
@@ -686,10 +797,25 @@ export class GameService {
     for (const answer of answers) {
       choices[answer.participantId] = question.type === "pic" ? answer.isCorrect : question.options.findIndex((option) => option.id === answer.optionId);
     }
-    live.hostReveal = { ...live.reveal, choices, standings };
+    // hidden: the host sees who picked what, but no standings, and a short suspense screen instead of the leaderboard
+    live.hostReveal = hidden ? { ...live.reveal, choices } : { ...live.reveal, choices, standings };
     this.setPhase(sessionId, live, "reveal", this.hold(live, this.timings.reveal), async () => {
-      this.setPhase(sessionId, live, "leaderboard", this.hold(live, this.timings.leaderboard), () => this.afterLeaderboard(sessionId));
+      if (hidden) this.setPhase(sessionId, live, "suspense", this.hold(live, this.timings.suspense), () => this.afterLeaderboard(sessionId));
+      else this.setPhase(sessionId, live, "leaderboard", this.hold(live, this.timings.leaderboard), () => this.afterLeaderboard(sessionId));
     });
+    this.emit(sessionId, "reveal", live.reveal);
+    this.emit(sessionId, "reveal_host", live.hostReveal, "host");
+  }
+
+  /** Kick during Reveal / Leaderboard: recount this question without the removed player. */
+  private async refreshReveal(sessionId: string, live: Live, question: QuizQuestion) {
+    const { standings, answers } = await this.standings(sessionId, question.id);
+    live.reveal = { ...this.revealPayload(question, live.index, answers, standings.length), closedBy: live.reveal?.closedBy };
+    const choices: Record<string, number | boolean> = {};
+    for (const answer of answers) {
+      choices[answer.participantId] = question.type === "pic" ? answer.isCorrect : question.options.findIndex((option) => option.id === answer.optionId);
+    }
+    live.hostReveal = this.rankHidden(live) ? { ...live.reveal, choices } : { ...live.reveal, choices, standings };
     this.emit(sessionId, "reveal", live.reveal);
     this.emit(sessionId, "reveal_host", live.hostReveal, "host");
   }

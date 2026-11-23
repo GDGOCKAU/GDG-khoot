@@ -26,7 +26,7 @@ const quiz: Quiz = {
     { id: ids(5), quizId: ids(1), text: "", order: 3, timeLimitSecs: 10, type: "mc", options: [] },
   ],
 };
-const FAST = { ready: 5, reveal: 5, leaderboard: 5, next: 5, teams: 5, podium: 5, earlyClose: 5 };
+const FAST = { ready: 5, reveal: 5, leaderboard: 5, suspense: 5, next: 5, teams: 5, podium: 5, earlyClose: 5 };
 
 type Ev = { event: string; payload: any; audience?: EventAudience };
 function setup(timings: Partial<typeof FAST> = FAST, gameRepository = new MemoryGameRepository()) {
@@ -244,9 +244,13 @@ describe("host reveal: counts and why the question closed", () => {
       expect(host.counts).toEqual(expected[i].counts);
       expect(host.choices).toEqual(expected[i].choices);
       expect(host.total).toBe(2);
-      // the right player is credited, the wrong one is not
-      expect(host.standings.find((p: { id: string }) => p.id === right.id).lastOk).toBe(true);
-      expect(host.standings.find((p: { id: string }) => p.id === wrong.id).lastOk).toBe(false);
+      if (i === 0) {
+        // the right player is credited, the wrong one is not
+        expect(host.standings.find((p: { id: string }) => p.id === right.id).lastOk).toBe(true);
+        expect(host.standings.find((p: { id: string }) => p.id === wrong.id).lastOk).toBe(false);
+      } else {
+        expect(host.standings).toBeUndefined(); // the last two questions: no ranking sent
+      }
       // phones see the same reason (no host-only data)
       expect(events.find((e) => e.event === "reveal" && e.payload.index === i)!.payload.closedBy).toBe("all_answered");
     }
@@ -271,6 +275,214 @@ describe("host reveal: counts and why the question closed", () => {
     await until(events, question(1), 3000);
     await service.skip(HOST, session.id);
     expect((await until(events, revealHost(1))).payload.closedBy).toBe("skip");
+  });
+});
+
+describe("lobby order", () => {
+  it("host and audience screen get the lobby players in join order (the screens show the newest first)", async () => {
+    const { service } = setup();
+    const session = await service.createSession(quiz.id, HOST);
+    for (const name of ["Zed", "Amal", "Mona", "Bader"]) await service.joinByPin(session.pin, { name, mascot: "blue-0", team: "blue" });
+    expect((await service.hostState(session.id, HOST)).standings.map((p: { name: string }) => p.name)).toEqual(["Zed", "Amal", "Mona", "Bader"]);
+    expect((await service.screenState())!.standings.map((p: { name: string }) => p.name)).toEqual(["Zed", "Amal", "Mona", "Bader"]);
+  });
+});
+
+describe("kick", () => {
+  it("in the lobby: removed for the host, told on their phone, cannot come back from the same device", async () => {
+    const { service, events } = setup();
+    const session = await service.createSession(quiz.id, HOST);
+    const bad = await service.joinByPin(session.pin, { name: "Troll", mascot: "red-0", team: "red", deviceId: "device-A" });
+    const good = await service.joinByPin(session.pin, { name: "Noura", mascot: "blue-0", team: "blue", deviceId: "device-B" });
+    await service.kick(HOST, session.id, bad.id);
+    expect(events.find((e) => e.event === "kicked")?.audience).toEqual({ participantId: bad.id });
+    expect(events.find((e) => e.event === "player_left")).toMatchObject({ payload: { participantId: bad.id, kicked: true }, audience: "host" });
+    await expect(service.participantState(session.id, bad.id)).rejects.toMatchObject({ code: "kicked" });
+    // same device, new name: refused; another device: fine
+    await expect(service.joinByPin(session.pin, { name: "Troll2", mascot: "red-1", team: "red", deviceId: "device-A" })).rejects.toMatchObject({ code: "kicked" });
+    await service.joinByPin(session.pin, { name: "Sara", mascot: "green-0", team: "green", deviceId: "device-C" });
+    const host = await service.hostState(session.id, HOST);
+    expect(host.standings.map((p: { name: string }) => p.name).sort()).toEqual(["Noura", "Sara"]);
+    expect((await service.participantState(session.id, good.id)).participant.name).toBe("Noura");
+  });
+
+  it("during a question: their answer, the answer count, got-it-right, teams and the ranking no longer include them", async () => {
+    const { service, events } = setup();
+    const session = await service.createSession(quiz.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "blue-0", team: "blue" });
+    const b = await service.joinByPin(session.pin, { name: "Ali", mascot: "red-0", team: "red" });
+    const c = await service.joinByPin(session.pin, { name: "Kicked", mascot: "blue-1", team: "blue" });
+    await service.start(HOST, session.id);
+    const q1 = (await until(events, question(0))).payload;
+    await service.answer(session.id, c.id, q1.questionId, { optionId: q1.options[0].id }); // right, then kicked
+    await service.answer(session.id, a.id, q1.questionId, { optionId: q1.options[0].id });
+    await service.kick(HOST, session.id, c.id);
+    const counts = events.filter((e) => e.event === "answer_count").map((e) => e.payload);
+    expect(counts.at(-1)).toMatchObject({ count: 1, total: 2 });
+    // Ali answers: the two remaining players are in, so the question closes early
+    await service.answer(session.id, b.id, q1.questionId, { optionId: q1.options[1].id });
+    const host = (await until(events, (e) => e.event === "reveal_host" && e.payload.index === 0)).payload;
+    expect(host.counts).toEqual([1, 1, 0, 0]);
+    expect(host.total).toBe(2);
+    expect(Object.keys(host.choices).sort()).toEqual([a.id, b.id].sort());
+    expect(host.standings.map((p: { name: string }) => p.name)).toEqual(["Noura", "Ali"]);
+    await expect(service.answer(session.id, c.id, q1.questionId, { optionId: q1.options[0].id })).rejects.toMatchObject({ code: "invalid_phase" });
+    const board = await service.buildLeaderboard(session.id, false);
+    expect(board.players.map((p) => p.name)).toEqual(["Noura", "Ali"]);
+    expect(board.teams.find((t) => t.team === "blue")).toMatchObject({ members: 1 }); // Noura only
+  });
+
+  it("during Reveal: the results on screen are recounted without them", async () => {
+    const { service, events } = setup({ ...FAST, reveal: 5000 });
+    const session = await service.createSession(quiz.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "blue-0", team: "blue" });
+    const b = await service.joinByPin(session.pin, { name: "Ali", mascot: "red-0", team: "red" });
+    await service.start(HOST, session.id);
+    const q1 = (await until(events, question(0))).payload;
+    await service.answer(session.id, a.id, q1.questionId, { optionId: q1.options[0].id });
+    await service.answer(session.id, b.id, q1.questionId, { optionId: q1.options[1].id });
+    await until(events, phase("reveal", 0));
+    await service.kick(HOST, session.id, b.id);
+    const last = events.filter((e) => e.event === "reveal_host").at(-1)!.payload;
+    expect(last).toMatchObject({ counts: [1, 0, 0, 0], total: 1 });
+    expect(last.standings.map((p: { name: string }) => p.name)).toEqual(["Noura"]);
+  });
+
+  it("only the host can kick", async () => {
+    const { service } = setup();
+    const session = await service.createSession(quiz.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "blue-0", team: "blue" });
+    await expect(service.kick("someone-else", session.id, a.id)).rejects.toMatchObject({ code: "session_not_found" });
+    await expect(service.kick(HOST, session.id, "00000000-0000-4000-8000-000000000000")).rejects.toMatchObject({ code: "participant_not_found" });
+  });
+});
+
+describe("players resume their seat", () => {
+  it("a player who left comes back as themselves after Start (same name, score, team); new players are still refused", async () => {
+    const { service, events } = setup({ ...FAST, reveal: 5000 });
+    const session = await service.createSession(quiz.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "red-3", team: "red" });
+    const b = await service.joinByPin(session.pin, { name: "Ali", mascot: "blue-0", team: "blue" });
+    await service.start(HOST, session.id);
+    const q1 = (await until(events, question(0))).payload;
+    await service.answer(session.id, a.id, q1.questionId, { optionId: q1.options[0].id });
+    const scored = (await service.participantState(session.id, a.id)).participant.score;
+    expect(scored).toBeGreaterThan(0);
+    await service.leave(session.id, a.id); // closed the page / went away
+    expect(events.filter((e) => e.event === "player_left").at(-1)?.payload).toMatchObject({ participantId: a.id });
+    const back = await service.participantState(session.id, a.id); // phone comes back with its saved seat
+    expect(back.participant).toMatchObject({ name: "Noura", team: "red", mascot: "red-3", score: scored });
+    expect(events.filter((e) => e.event === "player_joined").at(-1)?.payload.participant.id).toBe(a.id);
+    expect((await service.hostState(session.id, HOST)).standings.map((p: { name: string }) => p.name)).toContain("Noura");
+    // still no new players once the game has started
+    await expect(service.joinByPin(session.pin, { name: "Late", mascot: "green-0", team: "green" })).rejects.toMatchObject({ code: "invalid_phase" });
+    // and a kicked player cannot come back
+    await service.kick(HOST, session.id, b.id);
+    await expect(service.participantState(session.id, b.id)).rejects.toMatchObject({ code: "kicked" });
+  });
+
+  it("no return once the game is over", async () => {
+    const { service, events } = setup();
+    const session = await service.createSession(quiz.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "red-3", team: "red" });
+    await service.start(HOST, session.id);
+    await service.leave(session.id, a.id);
+    for (let i = 0; i < 3; i++) { await until(events, question(i), 3000); await service.skip(HOST, session.id); }
+    await until(events, (e) => e.event === "final", 3000);
+    await expect(service.participantState(session.id, a.id)).rejects.toMatchObject({ code: "participant_not_found" });
+  });
+});
+
+describe("edit name and mascot in the lobby", () => {
+  it("changes name, mascot and team before Start; the host hears it; same duplicate rule; locked after Start", async () => {
+    const { service, events } = setup();
+    const session = await service.createSession(quiz.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "blue-0", team: "blue" });
+    await service.joinByPin(session.pin, { name: "Ali", mascot: "red-0", team: "red" });
+    const updated = await service.updateParticipant(session.id, a.id, { name: "Nouf", mascot: "green-5", team: "green" });
+    expect(updated).toMatchObject({ id: a.id, name: "Nouf", mascot: "green-5", team: "green" });
+    expect(events.find((e) => e.event === "player_updated")).toMatchObject({ payload: { participant: { id: a.id, name: "Nouf", team: "green" } }, audience: "host" });
+    expect((await service.participantState(session.id, a.id)).participant).toMatchObject({ name: "Nouf", team: "green" });
+    // case-insensitive clash with another player; keeping your own name is fine
+    await expect(service.updateParticipant(session.id, a.id, { name: "ALI", mascot: "green-5", team: "green" })).rejects.toMatchObject({ code: "duplicate_participant" });
+    await service.updateParticipant(session.id, a.id, { name: "nouf", mascot: "yellow-1", team: "yellow" });
+    await service.start(HOST, session.id);
+    await expect(service.updateParticipant(session.id, a.id, { name: "Late change", mascot: "blue-0", team: "blue" })).rejects.toMatchObject({ code: "game_started" });
+  });
+});
+
+describe("ranking hidden for the last two questions", () => {
+  const playThrough = async (questions: Quiz["questions"]) => {
+    const q: Quiz = { ...quiz, questions };
+    const events: Ev[] = [];
+    const service = new GameService({ getQuiz: async () => q }, new MemoryGameRepository(), (_s, event, payload, audience) => events.push({ event, payload, audience }), undefined, { ...FAST, reveal: 400 });
+    const session = await service.createSession(q.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "blue-0", team: "blue" });
+    const b = await service.joinByPin(session.pin, { name: "Ali", mascot: "red-0", team: "red" });
+    await service.start(HOST, session.id);
+    const hiddenChecks: string[] = [];
+    for (let i = 0; i < questions.length; i++) {
+      const open = (await until(events, question(i), 3000)).payload;
+      await service.answer(session.id, a.id, open.questionId, { optionId: open.options[0].id });
+      await service.answer(session.id, b.id, open.questionId, { optionId: open.options[1].id });
+      await until(events, (e) => e.event === "reveal_host" && e.payload.index === i);
+      const hidden = i >= questions.length - 2;
+      // while the question's results are up: what the host's refresh and the leaderboard route give
+      const hostNow = await service.hostState(session.id, HOST);
+      if (hidden && hostNow.phase.phase !== "next") {
+        expect(hostNow.phase.rankHidden).toBe(true);
+        expect(hostNow.standings.every((p: Record<string, unknown>) => !("score" in p))).toBe(true);
+        await expect(service.leaderboard(session.id)).rejects.toMatchObject({ code: "invalid_phase" });
+        hiddenChecks.push(`Q${i + 1}`);
+      }
+    }
+    const final = (await until(events, (e) => e.event === "final", 3000)).payload;
+    await until(events, phase("final"), 3000);
+    return { events, a, b, final, hiddenChecks };
+  };
+  const results = (events: Ev[], index: number, questionId: string) => events.filter((e) => e.event === "result" && e.payload.questionId === questionId);
+
+  it("4 questions: leaderboard after Q1 and Q2; Q3 and Q4 get the suspense screen, no rank on phones, no standings for the host", async () => {
+    const qs = [mc(2, 0), mc(6, 1), mc(7, 2), mc(8, 3)];
+    const { events, final, hiddenChecks } = await playThrough(qs);
+    const phases = events.filter((e) => e.event === "phase").map((e) => `${e.payload.phase}:${e.payload.index}`);
+    expect(phases).toContain("leaderboard:0");
+    expect(phases).toContain("leaderboard:1");
+    expect(phases).not.toContain("leaderboard:2");
+    expect(phases).not.toContain("leaderboard:3");
+    expect(phases).toContain("suspense:2");
+    expect(phases).toContain("suspense:3");
+    for (const [i, q] of qs.entries()) {
+      const mine = results(events, i, q.id);
+      const reveal = events.find((e) => e.event === "reveal_host" && e.payload.index === i)!.payload;
+      if (i < 2) {
+        expect(mine.every((e) => typeof e.payload.rank === "number" && e.payload.players === 2)).toBe(true);
+        expect(reveal.standings).toHaveLength(2);
+      } else {
+        expect(mine.every((e) => e.payload.rank === null && e.payload.players === null)).toBe(true);
+        expect(mine.find((e) => e.payload.correct)!.payload.points).toBeGreaterThan(0); // right/wrong and points still shown
+        expect(reveal.standings).toBeUndefined();
+        expect(reveal.counts).toEqual([1, 1, 0, 0]);
+      }
+    }
+    // the phase events tell every screen when the ranking is hidden
+    expect(events.filter((e) => e.event === "phase" && e.payload.index >= 2 && ["question", "reveal", "suspense"].includes(e.payload.phase)).every((e) => e.payload.rankHidden)).toBe(true);
+    expect(events.filter((e) => e.event === "phase" && e.payload.index < 2 && e.payload.phase !== "next").every((e) => !e.payload.rankHidden)).toBe(true);
+    // and the end screens show it all
+    expect(final.ranking.map((p: { name: string }) => p.name)).toEqual(["Noura", "Ali"]);
+    expect(final.top3).toHaveLength(2);
+    expect(hiddenChecks).toEqual(["Q3", "Q4"]);
+  });
+
+  it("2 questions or fewer: no leaderboard at all until the end screens", async () => {
+    const { events, final } = await playThrough([mc(2, 0), mc(6, 1)]);
+    const phases = events.filter((e) => e.event === "phase").map((e) => e.payload.phase);
+    expect(phases).not.toContain("leaderboard");
+    expect(phases.filter((p) => p === "suspense")).toHaveLength(2);
+    expect(events.some((e) => e.event === "leaderboard")).toBe(false);
+    expect(events.filter((e) => e.event === "result").every((e) => e.payload.rank === null)).toBe(true);
+    expect(final.ranking).toHaveLength(2);
+    expect(phases.slice(-3)).toEqual(["teams", "podium", "final"]);
   });
 });
 
