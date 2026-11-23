@@ -161,7 +161,7 @@ export function QKindChip({ qq }) {
   return <TopicChip t={G.quiz.topic} />;
 }
 function QHead({ qq }) {
-  return <div className="card qcard res"><QKindChip qq={qq} /><h1>{qq.text}</h1></div>;
+  return <div className="card qcard res"><QKindChip qq={qq} /><h1 className={qSize(qq.text)} dir="auto">{qq.text}</h1></div>;
 }
 function PicAnswersBlock() {
   const qq = curQ(), total = G.players.length, vals = Object.values(G.answers);
@@ -180,7 +180,7 @@ function PicAnswersBlock() {
         <div key={label} className={`acol ${ansCls(ci)} ${ok ? 'right' : 'wrong'}`} style={{ '--d': `${k * 150}ms` }}>
           <Num className="acount num" to={n} delay={200 + k * 150} dur={1100} />
           <div className="atrack"><div className="abar" style={{ '--h': `${Math.max(4, 100 * n / max)}%` }} /></div>
-          <div className="alabel"><span className="L"><Ico n={ic} s={18} /></span><span className="t">{label}</span></div>
+          <div className="alabel"><span className="L"><Ico n={ic} s={18} /></span><span className="t" dir="auto">{label}</span></div>
         </div>
       ))}
     </div>
@@ -204,7 +204,7 @@ export function AnswersBlock() {
         <div key={i} className={`acol ${ansCls(i)} ${i === qq.correct ? 'right' : 'wrong'}`} style={{ '--d': `${i * 150}ms` }}>
           <Num className="acount num" to={counts[i]} delay={200 + i * 150} dur={1100} />
           <div className="atrack"><div className="abar" style={{ '--h': `${Math.max(4, 100 * counts[i] / max)}%` }} /></div>
-          <div className={`alabel${mono}${tf ? ' tf' : ''}`}><span className="L">{tf ? tfIco(i, 18) : LETTERS[i]}</span><span className="t">{a}</span></div>
+          <div className={`alabel${mono}${tf ? ' tf' : ''}`}><span className="L">{tf ? tfIco(i, 18) : LETTERS[i]}</span><span className="t" dir="auto">{a}</span></div>
         </div>
       ) : null))}
     </div>

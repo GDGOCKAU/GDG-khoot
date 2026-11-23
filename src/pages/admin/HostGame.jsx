@@ -7,7 +7,7 @@ import { qType } from '../../lib/questions';
 import { G, curQ, endGame, exitGame, skip, hostNext, startGame, toggleLock, waitsForHost, live } from '../../lib/engine';
 import { toast, useAnims } from '../../lib/ui';
 import { Answered, ColorBar, Count, Ico, LiveRing, Modal, Secs } from '../../components/common/UI';
-import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, SuspenseBlock, TeamsBlock } from '../../components/game/Blocks';
+import { QKindChip, qSize, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, SuspenseBlock, TeamsBlock } from '../../components/game/Blocks';
 import { HostShell } from '../../components/layout/Shells';
 import { setSettings } from '../../lib/live';
 import ScreenLinkButton from '../../components/common/ScreenLinkButton';
@@ -135,7 +135,7 @@ function HostGame() {
       break;
     }
     case 'reveal':
-      view = shell(<><span className="chip">Question {G.qi + 1} of {n}</span>{pinChip}</>, <AnswersBlock />);
+      view = shell(<><span className="chip">Question {G.qi + 1} of {n}</span>{pinChip}</>, <AnswersBlock />, 'fit');
       break;
     case 'next':
       view = shell(pinChip,
@@ -149,7 +149,7 @@ function HostGame() {
       break;
     case 'question':
       view = shell(<><span className="chip">Question {G.qi + 1} of {n}</span>{pinChip}</>, <>
-        <div className="card qcard"><QKindChip qq={qq} />{qq.points === 2 && <span className="chip chip-red">Double points</span>}<h1>{qq.text}</h1>{qq.img && ['mc', 'tf'].includes(qType(qq)) && <img className="qimg" src={qq.img} alt="" />}</div>
+        <div className="card qcard"><QKindChip qq={qq} />{qq.points === 2 && <span className="chip chip-red">Double points</span>}<h1 className={qSize(qq.text)} dir="auto">{qq.text}</h1>{qq.img && ['mc', 'tf'].includes(qType(qq)) && <img className="qimg" src={qq.img} alt="" />}</div>
         <div className="qbar">
           <div className="tring" style={css('display:flex;align-items:center;gap:16px')}><LiveRing size={104} stroke={10} color="#1a73e8"><span style={{ fontSize: 38 }}><Secs /></span></LiveRing><span className="tlabel" style={{ color: 'var(--muted)', fontSize: 15 }}>seconds left{qType(qq) === 'pic' ? ` · ${qq.word.replace(/[^A-Za-z0-9]/g, '').length} letters` : ''}</span></div>
           <div className="qbar-r" style={css('display:flex;align-items:center;gap:14px')}>
@@ -158,7 +158,7 @@ function HostGame() {
           </div>
         </div>
         <HostAnswerArea qq={qq} />
-      </>);
+      </>, 'fit');
       break;
     case 'leaderboard': view = shell(<span className="chip">After question {G.qi + 1} of {n}</span>, <LbBlock />, 'wide'); break;
     case 'suspense': view = shell(<span className="chip">After question {G.qi + 1} of {n}</span>, <SuspenseBlock />); break;

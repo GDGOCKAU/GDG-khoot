@@ -1234,6 +1234,43 @@ body:has(.live-pill) :is(.host-main, .lap-main, .pl-in) { padding-bottom: 88px; 
 /* when the two cards stack (narrow screens) the players card still gets the rest of the height */
 @media (max-width: 1150px) { .lobby-main .lobby { flex-direction: column; flex-wrap: nowrap; } .lobby-main .lobby .pinbox { flex: 0 0 auto; max-width: none; } .lobby-main .lobby .players { flex: 1 1 0; } }
 
+/* ---------- answer results: the full answer under each bar, never "…" ---------- */
+.alabel .t { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; line-height: 1.25; }
+/* the labels in a row share the tallest one's height, so the bars still stand on one line */
+@supports (grid-template-rows: subgrid) {
+  .achart { grid-template-rows: auto minmax(0, 1fr) auto; align-items: stretch; row-gap: 10px; }
+  .acol { grid-row: span 3; display: grid; grid-template-rows: subgrid; row-gap: normal; }
+  .acol > .atrack { align-self: end; }
+}
+
+/* ---------- host + audience screen: question and results fit one screen ---------- */
+/* laptops, projectors and iPads (phone-width screens keep scrolling as before) */
+@media (min-width: 701px) {
+  .host:has(.host-main.fit) { height: 100vh; height: 100dvh; min-height: 0; }
+  .host-main.fit { min-height: 0; overflow: hidden; gap: clamp(14px, 2.2vh, 28px); }
+  .host-main.fit > * { flex-shrink: 0; }
+  .qcard h1.long { font-size: clamp(26px, 4.4vh, 42px); }
+  .qcard h1.xlong { font-size: clamp(22px, 3.6vh, 34px); }
+  /* a question picture gives up its height first, so the answers always keep theirs */
+  .host-main.fit > .qcard { flex: 0 1 auto; min-height: 0; }
+  .host-main.fit > .qcard > * { flex-shrink: 0; }
+  .host-main.fit > .qcard img.qimg { flex: 0 1 auto; min-height: 0; object-fit: contain; }
+  /* the code box takes the space that is left and scrolls inside itself; the answers stay on screen */
+  .host-main.fit > .codebox { flex: 0 1 auto; min-height: 120px; display: flex; flex-direction: column; }
+  .host-main.fit > .codebox .codebody { flex: 1 1 auto; min-height: 0; max-height: none; }
+  /* answer tiles are never shorter than their text; any room left over goes to them */
+  .host-main.fit > .htiles:not(.code) { flex: 1 0 auto; }
+  /* results: the chart takes what is left (bars shrink, labels keep their text) */
+  .host-main.fit > .achart { flex: 1 0 auto; }
+  .host-main.fit .acol > .atrack { height: 100%; min-height: 40px; }
+}
+/* wide screens: answer text and spacing follow the screen height (narrower screens keep their own sizes) */
+@media (min-width: 901px) {
+  .host-main.fit > .htiles:not(.code) .htile:not(.big) { font-size: clamp(20px, 2.9vh, 30px); padding-top: clamp(14px, 2.2vh, 24px); padding-bottom: clamp(14px, 2.2vh, 24px); min-height: clamp(72px, 11vh, 120px); }
+  /* code answers one size smaller, so the code keeps more lines */
+  .host-main.fit > .htiles.code .htile { font-size: clamp(18px, 2.4vh, 24px); min-height: 64px; padding-top: 12px; padding-bottom: 12px; }
+}
+
 /* ---------- phone question: every answer on the screen (long question + code) ---------- */
 .pq:has(.tiles.code) { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
 .pq:has(.tiles.code) .pq-main { min-height: 0; }
