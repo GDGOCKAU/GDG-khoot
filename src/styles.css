@@ -299,6 +299,16 @@ tr:last-child td { border-bottom: 0; }
 .ans.yel .L { color: #1f2328; }
 .ans input[type=text] { flex: 1; min-width: 0; border: 0; background: transparent; font-size: 16px; font-weight: 500; padding: 8px 4px; }
 .ans input[type=text]:focus { outline: none; }
+/* answers in the editor: a growing text box (wraps between words, direction from the text) + a small counter */
+.ans .ans-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ans textarea { width: 100%; border: 0; background: transparent; font-size: 16px; font-weight: 500; line-height: 1.4; padding: 8px 4px 2px; resize: none; overflow: hidden; white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; }
+.ans textarea:focus { outline: none; }
+.char-count { align-self: flex-end; font-size: 11px; font-weight: 500; line-height: 1.2; color: var(--muted); font-variant-numeric: tabular-nums; }
+.char-count.near { color: var(--yellow-txt); }
+.char-count.full { color: var(--red-txt); }
+.ans .char-count { padding: 0 4px 2px; }
+.field .q-text { resize: none; overflow: hidden; overflow-wrap: break-word; }
+.field .char-count { margin-top: -2px; }
 .ans input[type=radio] { width: 22px; height: 22px; accent-color: #188038; flex-shrink: 0; }
 .img-drop { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 120px; border-radius: 1rem; border: 1px dashed var(--border-strong); background: var(--canvas); color: var(--muted); cursor: pointer; position: relative; }
 .img-drop img { max-height: 200px; max-width: 100%; border-radius: .75rem; }

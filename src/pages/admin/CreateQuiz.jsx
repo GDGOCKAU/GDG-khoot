@@ -1,5 +1,5 @@
 /* Create / edit a quiz: /admin/new and /admin/edit/:quizId. Saves itself as you type. */
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LETTERS, ansCls, css, newPin, uid } from '../../lib/constants';
 import { LANGS, QTYPES, blankQ, norm, normalizeDraft, qProblem, qType, setQType } from '../../lib/questions';
@@ -45,6 +45,38 @@ async function saveBackendNow(d, ed, setSaveState) {
   }
 }
 
+/* a text box that grows with its text (no hidden overflow), so long and mixed Arabic / English text shows in full */
+function useAutoGrow(ref, value) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    // scrollHeight is the text; add the box's own border so nothing is left hidden
+    const fit = () => { el.style.height = 'auto'; el.style.height = `${el.scrollHeight + el.offsetHeight - el.clientHeight}px`; };
+    fit();
+    // the box gets narrower or wider with the window: fit again
+    const ro = window.ResizeObserver ? new ResizeObserver(fit) : null;
+    if (ro && el.parentElement) ro.observe(el.parentElement);
+    return () => { if (ro) ro.disconnect(); };
+  }, [ref, value]);
+}
+/* "37/80": how much of the server's limit is used */
+function CharCount({ n, max }) {
+  return <span className={`char-count${n >= max ? ' full' : n >= max * 0.9 ? ' near' : ''}`} aria-hidden="true">{n}/{max}</span>;
+}
+/* one answer: wraps over several lines, direction from its own text, stays a single paragraph */
+function AnswerText({ value, placeholder, max, onText }) {
+  const ref = useRef(null);
+  useAutoGrow(ref, value);
+  return (
+    <span className="ans-text">
+      <textarea ref={ref} rows={1} dir="auto" value={value} placeholder={placeholder} maxLength={max} aria-label={placeholder}
+        onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault(); }}
+        onChange={(e) => onText(e.target.value.replace(/[\r\n]+/g, ' '))} />
+      <CharCount n={value.length} max={max} />
+    </span>
+  );
+}
+
 function CreateQuiz({ quiz }) {
   const navigate = useNavigate();
   const ed = openEditor(quiz);
@@ -65,6 +97,7 @@ function CreateQuiz({ quiz }) {
 
   if (ed.cur >= d.questions.length) ed.cur = d.questions.length - 1;
   const qq = d.questions[ed.cur];
+  useAutoGrow(textRef, qq.text);
   const T = qType(qq);
   const bad = d.questions.filter(qProblem).length;
 
@@ -169,7 +202,7 @@ function CreateQuiz({ quiz }) {
   const answers = qq.answers.map((a, i) => (
     <label key={i} className={`ans ${ansCls(i)}${qq.correct === i ? ' right' : ''}`}>
       <span className="L">{LETTERS[i]}</span>
-      <input type="text" value={a} placeholder={`${T === 'code' ? 'Output' : 'Answer'} ${i + 1}${i > 1 ? ' (optional)' : ''}`} maxLength={80} onChange={(e) => change(() => { qq.answers[i] = e.target.value; })} />
+      <AnswerText value={a} placeholder={`${T === 'code' ? 'Output' : 'Answer'} ${i + 1}${i > 1 ? ' (optional)' : ''}`} max={80} onText={(v) => change(() => { qq.answers[i] = v; })} />
       <input type="radio" name="correct" checked={qq.correct === i} onChange={() => setQ('correct', i)} aria-label={`Mark ${LETTERS[i]} as correct`} />
     </label>
   ));
@@ -297,8 +330,9 @@ function CreateQuiz({ quiz }) {
             <button type="button" className="icon-btn" style={{ color: 'var(--red-txt)' }} onClick={() => { if (d.questions.length < 2) return; change(() => { d.questions.splice(ed.cur, 1); ed.cur = Math.max(0, ed.cur - 1); }); toast('Question deleted'); }} aria-label="Delete question" disabled={d.questions.length < 2}><Ico n="trash" s={16} /></button>
           </span>
         </div>
-        <label className="field"><span>Question</span><textarea ref={textRef} className="input" rows={2} maxLength={160} value={qq.text} onChange={(e) => setQ('text', e.target.value)}
-          placeholder={T === 'code' ? 'e.g. What does this code print?' : T === 'pic' ? 'e.g. Put the pictures together. What is the word?' : T === 'tf' ? 'Type a statement that is true or false' : 'Type your question'} /></label>
+        <label className="field"><span>Question</span><textarea ref={textRef} className="input q-text" rows={2} dir="auto" maxLength={160} value={qq.text} onChange={(e) => setQ('text', e.target.value)}
+          placeholder={T === 'code' ? 'e.g. What does this code print?' : T === 'pic' ? 'e.g. Put the pictures together. What is the word?' : T === 'tf' ? 'Type a statement that is true or false' : 'Type your question'} />
+          <CharCount n={qq.text.length} max={160} /></label>
         {body}
         <div className="three" style={css('border-top:1px solid var(--border);padding-top:20px')}>
           <label className="field"><span>Time limit</span><select className="input" value={qq.time} onChange={(e) => setQ('time', +e.target.value)}>{[5, 10, 15, 20, 30, 60].map((s) => <option key={s} value={s}>{s} seconds</option>)}</select></label>
