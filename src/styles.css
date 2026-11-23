@@ -491,6 +491,12 @@ html, body { overflow-x: hidden; }
 body:has(.spider-fly) { cursor: grabbing; user-select: none; }
 /* collapsible admin sidebar */
 .adm-side .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+/* the open sidebar is as wide as the logo + toggle need (274px with the design font). The old 280px cap
+   made a wider font (Safari, Google Sans) push the toggle onto "HOOT"; now the sidebar grows instead. */
+@media (min-width: 901px) {
+  .adm-side:not(.closed) { max-width: 360px; }
+  .adm-side .top > a, .adm-side .top .side-tog { flex: 0 0 auto; }
+}
 .side-tog { width: 36px; height: 36px; border: 0; background: transparent; color: var(--muted); }
 .side-tog:hover { background: var(--surface-2); color: var(--ink); }
 .adm-side { transition: flex-basis .25s var(--ease), max-width .25s var(--ease); }
