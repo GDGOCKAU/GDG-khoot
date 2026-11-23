@@ -110,7 +110,7 @@ function HostGame() {
             <div className="pchips" aria-live="polite">{cnt ? G.players.map((p) => <PChip key={p.id} p={p} onRemove={G.liveHost && p.id !== 'me' ? () => setKickTarget(p) : null} />) : <span style={{ color: 'var(--muted)' }}>Waiting for players to join…</span>}</div>
             <div className="lobby-actions" style={css('display:flex;flex-wrap:wrap;gap:12px;align-items:center;border-top:1px solid var(--border);padding-top:16px')}>
               <span style={css('color:var(--muted);font-size:14px;flex:1')}>{G.locked ? 'Game locked. No one else can join.' : cnt ? 'Start when everyone is in.' : 'Waiting for players to join…'}</span>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAskExit(true)}>Cancel game</button>
+              <button type="button" className="btn btn-outline btn-sm btn-outline-red" onClick={() => setAskExit(true)}>Cancel game</button>
               <button type="button" className="btn btn-outline btn-sm" onClick={toggleLock} aria-pressed={G.locked}><Ico n="lock" />{G.locked ? 'Unlock game' : 'Lock game'}</button>
               {G.liveHost && <button type="button" className="btn btn-outline btn-sm" onClick={() => setSettings({ powerUps: !G.powerUps })} aria-pressed={!!G.powerUps}><Ico n="star" />{G.powerUps ? 'Power-ups on' : 'Power-ups off'}</button>}
               <button type="button" className="btn btn-primary" onClick={startGame} disabled={!cnt}>Start game <Ico n="arrow" /></button>

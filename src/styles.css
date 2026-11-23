@@ -48,6 +48,9 @@ a { color: var(--blue-txt); }
 .btn-tonal { background: var(--blue-soft); color: var(--blue-txt); }
 .btn-danger { background: var(--red-soft); color: var(--red-txt); }
 .btn-danger-solid { background: #d93025; color: #fff; }
+/* outlined like "Lock game", red like "Exit game" (lobby: Cancel game) */
+.btn-outline.btn-outline-red { color: var(--red-txt); border-color: color-mix(in srgb, var(--red-txt) 35%, var(--border)); }
+.btn-outline.btn-outline-red:hover { background: var(--red-soft); border-color: var(--red-txt); }
 .btn-ghost { background: transparent; color: var(--muted); }
 .btn-sm { min-height: 34px; padding: 6px 14px; font-size: 13px; }
 .btn-lg { min-height: 56px; font-size: 17px; padding: 14px 28px; }
