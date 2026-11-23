@@ -42,6 +42,8 @@ export interface GameRepository {
   save(session: GameSession): Promise<GameSession>;
   join(sessionId: string, input: { name: string; mascot: string; team: string }): Promise<Participant | "duplicate">;
   leave(sessionId: string, participantId: string): Promise<boolean>;
+  /** Lobby only: a new name and mascot (and so team). "duplicate" when another player has that name. */
+  updateParticipant(sessionId: string, participantId: string, input: { name: string; mascot: string; team: string }): Promise<Participant | "duplicate" | null>;
   /** A player who left comes back to their seat (same name, score and team). */
   rejoin(sessionId: string, participantId: string): Promise<boolean>;
   /** Kick: the player and their answers are removed from the session. */
@@ -97,6 +99,14 @@ export class MemoryGameRepository implements GameRepository {
     if (!participant) return false;
     participant.leftAt = new Date();
     return true;
+  }
+  async updateParticipant(sessionId: string, participantId: string, input: { name: string; mascot: string; team: string }) {
+    const session = this.sessions.get(sessionId);
+    const participant = session?.participants.find((item) => item.id === participantId);
+    if (!session || !participant) return null;
+    if (session.participants.some((item) => item.id !== participantId && !item.leftAt && item.name.toLowerCase() === input.name.toLowerCase())) return "duplicate";
+    Object.assign(participant, { name: input.name, mascot: input.mascot, team: input.team });
+    return participant;
   }
   async rejoin(sessionId: string, participantId: string) {
     const participant = this.sessions.get(sessionId)?.participants.find((item) => item.id === participantId);
@@ -453,6 +463,22 @@ export class GameService {
     // the question may now be complete without them
     const live = this.live.get(sessionId);
     if (live?.phase === "question") await this.maybeCloseEarly(sessionId, live);
+  }
+
+  /** Before Start a player may change their name and mascot (the mascot's colour is the team). */
+  async updateParticipant(sessionId: string, participantId: string, input: { name: string; mascot: string; team: string }) {
+    const session = await this.gameRepository.findById(sessionId);
+    if (!session) throw new GameError("session_not_found");
+    const live = await this.ensureLive(session);
+    if (live.kicked.has(participantId)) throw new GameError("kicked");
+    const participant = session.participants.find((item) => item.id === participantId);
+    if (!participant || participant.leftAt) throw new GameError("participant_not_found");
+    if (session.status !== "LOBBY" || live.phase !== "lobby") throw new GameError("game_started");
+    const updated = await this.gameRepository.updateParticipant(session.id, participantId, { name: input.name, mascot: input.mascot, team: input.team });
+    if (updated === "duplicate") throw new GameError("duplicate_participant");
+    if (!updated) throw new GameError("participant_not_found");
+    this.emit(session.id, "player_updated", { participant: updated }, "host");
+    return updated;
   }
 
   /** Host removes a player (lobby or during the game). Their answers go too, so counts, teams and the

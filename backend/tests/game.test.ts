@@ -379,6 +379,24 @@ describe("players resume their seat", () => {
   });
 });
 
+describe("edit name and mascot in the lobby", () => {
+  it("changes name, mascot and team before Start; the host hears it; same duplicate rule; locked after Start", async () => {
+    const { service, events } = setup();
+    const session = await service.createSession(quiz.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "blue-0", team: "blue" });
+    await service.joinByPin(session.pin, { name: "Ali", mascot: "red-0", team: "red" });
+    const updated = await service.updateParticipant(session.id, a.id, { name: "Nouf", mascot: "green-5", team: "green" });
+    expect(updated).toMatchObject({ id: a.id, name: "Nouf", mascot: "green-5", team: "green" });
+    expect(events.find((e) => e.event === "player_updated")).toMatchObject({ payload: { participant: { id: a.id, name: "Nouf", team: "green" } }, audience: "host" });
+    expect((await service.participantState(session.id, a.id)).participant).toMatchObject({ name: "Nouf", team: "green" });
+    // case-insensitive clash with another player; keeping your own name is fine
+    await expect(service.updateParticipant(session.id, a.id, { name: "ALI", mascot: "green-5", team: "green" })).rejects.toMatchObject({ code: "duplicate_participant" });
+    await service.updateParticipant(session.id, a.id, { name: "nouf", mascot: "yellow-1", team: "yellow" });
+    await service.start(HOST, session.id);
+    await expect(service.updateParticipant(session.id, a.id, { name: "Late change", mascot: "blue-0", team: "blue" })).rejects.toMatchObject({ code: "game_started" });
+  });
+});
+
 describe("power-ups", () => {
   async function inQuestion(powerUps: boolean, index = 0) {
     const ctx = setup({ ...FAST, earlyClose: 10_000 });

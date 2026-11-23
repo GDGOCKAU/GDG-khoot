@@ -86,7 +86,7 @@ export function connectLivePlayer(sessionId, participantId, onFirst) {
       }
       if (res.state.participant && G.me) {
         const p = res.state.participant;
-        Object.assign(G.me, { name: p.name, team: p.team, img: mascot(p.team, mascotIdx(p.mascot)), score: p.score, streak: p.streak });
+        Object.assign(G.me, { name: p.name, team: p.team, mascot: p.mascot, img: mascot(p.team, mascotIdx(p.mascot)), score: p.score, streak: p.streak });
       }
       G.resuming = false;
       if (res.state.answered && !G.answers.me) G.answers.me = { choice: null, t: 0 };
@@ -114,6 +114,30 @@ export function connectLivePlayer(sessionId, participantId, onFirst) {
     });
   };
   return socket;
+}
+
+/* lobby: a new nickname / mascot (the mascot's colour is the team). Resolves '' or an error message. */
+export async function updateLook({ name, team, idx }) {
+  if (!G || !G.live || !G.me) return 'You are not in a game.';
+  try {
+    const p = await apiRequest(`/api/v1/sessions/${G.backendSessionId}/participants/${G.participantId}`, { method: 'PATCH', body: JSON.stringify({ name, mascot: `${team}-${idx}`, team }) });
+    if (G && G.me) { Object.assign(G.me, { name: p.name, team: p.team, mascot: p.mascot, img: mascot(p.team, mascotIdx(p.mascot)) }); notify(); }
+    return '';
+  } catch (error) {
+    const code = error.body?.error;
+    return code === 'duplicate_participant' ? 'That nickname is already in this session. Choose another.'
+      : code === 'game_started' ? 'The game has started, so your look is locked.'
+      : code === 'kicked' ? 'The host removed you from this game.'
+      : 'Could not save your changes.';
+  }
+}
+/* host and audience screen: a lobby player changed their name or mascot */
+function playerUpdated({ participant }) {
+  if (!G || !participant) return;
+  const p = G.players.find((item) => item.id === participant.id);
+  if (!p) return;
+  Object.assign(p, { name: participant.name, team: participant.team, img: mascot(participant.team, mascotIdx(participant.mascot)) });
+  notify();
 }
 
 /* power-ups: the server checks the rules and picks the 50/50 options */
@@ -186,6 +210,7 @@ export function connectLiveHost(sessionId, onFirstState) {
     });
     notify();
   });
+  socket.on('player_updated', playerUpdated);
   socket.on('player_left', ({ participantId }) => {
     if (!G) return;
     G.players = G.players.filter((player) => player.id !== participantId);
@@ -308,6 +333,7 @@ export function connectScreen() {
         notify();
         break;
       case 'player_left': G.players = G.players.filter((p) => p.id !== payload.participantId); notify(); break;
+      case 'player_updated': playerUpdated(payload); break;
       case 'phase': livePhaseEvent(payload); break;
       case 'question': liveQuestion(payload); break;
       case 'answer_count': if (G.phase === 'question') { G.liveAnswered = Math.max(G.liveAnswered || 0, payload.count); notify(); } break;

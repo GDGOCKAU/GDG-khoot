@@ -13,6 +13,7 @@ import { CodeSnack, PokeDevu } from '../../components/player/WaitFun';
 import GameOver from './GameOver';
 import GameClosed from './GameClosed';
 import JoinError from './JoinError';
+import JoinQuiz from './JoinQuiz';
 import { activatePowerUp } from '../../lib/live';
 
 function PlayerGame() {
@@ -197,9 +198,18 @@ export function PlayerLobby() {
         <h1 style={{ fontSize: wide ? 60 : 38 }}>You&apos;re in<span style={{ color: '#34a853' }}>!</span></h1>
         <p style={css('margin:0;color:var(--muted);font-size:18px;max-width:30rem')}>Your nickname is on the host screen. Waiting for the host to start the game<Bounce /></p>
         <span className={`chip chip-${me.team}`}>Team {T.name}</span>
+        <Link className="btn btn-outline" to="/lobby/edit">Change name or look</Link>
       </div>
     </PShell>
   );
+}
+
+/* /lobby/edit — change nickname or mascot (team) until the host presses Start */
+export function LobbyEdit() {
+  useAppState();
+  if (!G || !G.live || !G.me) return UI.kicked ? <JoinError kind="kicked" /> : UI.closed ? <GameClosed /> : <Navigate to="/" replace />;
+  if (G.phase !== 'lobby') return <Navigate to="/play" replace />;
+  return <JoinQuiz key="edit" quiz={G.quiz} live edit />;
 }
 
 /* live power-ups (only when the host switched them on): each one once per game, checked on the server */

@@ -11,7 +11,7 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import Home from './pages/player/Home';
 import JoinQuiz from './pages/player/JoinQuiz';
 import JoinError from './pages/player/JoinError';
-import PlayerGame, { PlayerLobby } from './pages/player/PlayerGame';
+import PlayerGame, { LobbyEdit, PlayerLobby } from './pages/player/PlayerGame';
 
 // Admin pages
 import AdminLogin from './pages/admin/AdminLogin';
@@ -177,6 +177,7 @@ function App() {
       <Route path="/join/:quizId" element={<JoinRoute />} />
       <Route path="/live" element={<LiveRoute />} />
       <Route path="/lobby" element={<PlayerLobby />} />
+      <Route path="/lobby/edit" element={<LobbyEdit />} />
       <Route path="/play" element={<PlayerGame />} />
 
       {/* Audience screen: public, read-only, follows the live game */}

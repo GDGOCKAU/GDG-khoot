@@ -251,6 +251,13 @@ export function buildApp(repository: Repository, jwtSecret: string, gameService?
         return reply.send(await gameService.usePowerUp(request.params.id, body.participantId, body.kind));
       } catch (error) { return gameError(reply, error); }
     });
+    // a player changes their name / mascot (team) while in the lobby; their participant id is the credential
+    app.patch<{ Params: { id: string; participantId: string } }>("/api/v1/sessions/:id/participants/:participantId", async (request, reply) => {
+      try {
+        const body = z.object({ name: z.string().trim().min(1).max(40), mascot: z.string().trim().min(1).max(40), team: z.enum(["blue", "red", "yellow", "green"]) }).parse(request.body);
+        return reply.send(await gameService.updateParticipant(request.params.id, request.params.participantId, body));
+      } catch (error) { return gameError(reply, error); }
+    });
     // host only: remove a player from the lobby or the running game
     app.post<Id>("/api/v1/sessions/:id/kick", host, async (request, reply) => {
       try {

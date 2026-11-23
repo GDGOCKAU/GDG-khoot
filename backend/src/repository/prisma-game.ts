@@ -60,6 +60,20 @@ export class PrismaGameRepository implements GameRepository {
     });
     return result.count === 1;
   }
+  async updateParticipant(sessionId: string, participantId: string, input: { name: string; mascot: string; team: string }) {
+    const clash = await this.prisma.participant.findFirst({
+      where: { sessionId, id: { not: participantId }, leftAt: null, name: { equals: input.name, mode: "insensitive" } },
+    });
+    if (clash) return "duplicate";
+    try {
+      const updated = await this.prisma.participant.update({ where: { id: participantId }, data: { name: input.name, mascot: input.mascot, team: input.team } });
+      return updated.sessionId === sessionId ? this.mapParticipant(updated) : null;
+    } catch (error) {
+      if ((error as { code?: string }).code === "P2002") return "duplicate";
+      if ((error as { code?: string }).code === "P2025") return null;
+      throw error;
+    }
+  }
   async rejoin(sessionId: string, participantId: string) {
     const result = await this.prisma.participant.updateMany({ where: { id: participantId, sessionId }, data: { leftAt: null } });
     return result.count === 1;

@@ -338,4 +338,25 @@ describe("backend API foundation", () => {
     expect(again.json().error).toBe("kicked");
     await app.close();
   });
+  it("PATCH participant: lobby edits by the player, 409 for a taken name or after Start", async () => {
+    const { app } = setup();
+    const token = (await app.inject({ method: "POST", url: "/api/v1/auth/login", payload: { email: "admin@example.com", password: "secret" } })).json().token;
+    const auth = { authorization: `Bearer ${token}` };
+    const quiz = (await app.inject({ method: "POST", url: "/api/v1/quizzes/save", headers: auth, payload: { title: "Edit", isPublished: true, questions: [{
+      text: "Q", order: 0, timeLimitSecs: 20, options: [{ text: "A", isCorrect: true }, { text: "B", isCorrect: false }] }] } })).json();
+    const session = (await app.inject({ method: "POST", url: "/api/v1/sessions", headers: auth, payload: { quizId: quiz.id } })).json();
+    const join = (name: string) => app.inject({ method: "POST", url: "/api/v1/sessions/join", payload: { pin: session.pin, name, mascot: "red-0", team: "red" } }).then((r) => r.json());
+    const me = await join("Reem"); await join("Sara");
+    const edit = (body: object) => app.inject({ method: "PATCH", url: `/api/v1/sessions/${session.id}/participants/${me.id}`, payload: body });
+    const ok = await edit({ name: "Reemo", mascot: "blue-2", team: "blue" });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json()).toMatchObject({ name: "Reemo", mascot: "blue-2", team: "blue" });
+    expect((await edit({ name: "sara", mascot: "blue-2", team: "blue" })).statusCode).toBe(409);
+    expect((await edit({ name: "x", mascot: "blue-2", team: "purple" })).statusCode).toBe(400);
+    await app.inject({ method: "POST", url: `/api/v1/sessions/${session.id}/start`, headers: auth, payload: {} });
+    const late = await edit({ name: "After", mascot: "blue-2", team: "blue" });
+    expect(late.statusCode).toBe(409);
+    expect(late.json().error).toBe("game_started");
+    await app.close();
+  });
 });

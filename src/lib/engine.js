@@ -25,7 +25,7 @@ function makeBot(name) {
   return { id: uid(), name, team, img: mascot(team, Math.floor(Math.random() * 12)), bot: true, skill: rnd(.4, .92), speed: rnd(.25, .8), score: 0, streak: 0, correct: 0, last: null, prevRank: 0 };
 }
 export function addMe(me) {
-  G.me = { id: 'me', name: me.name, team: me.team, img: me.img, bot: false, score: 0, streak: 0, correct: 0, last: null, prevRank: 0 };
+  G.me = { id: 'me', name: me.name, team: me.team, img: me.img, mascot: me.mascot, bot: false, score: 0, streak: 0, correct: 0, last: null, prevRank: 0 };
   G.players.push(G.me);
   UI.showOver = false;
 }
