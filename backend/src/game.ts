@@ -42,6 +42,8 @@ export interface GameRepository {
   save(session: GameSession): Promise<GameSession>;
   join(sessionId: string, input: { name: string; mascot: string; team: string }): Promise<Participant | "duplicate">;
   leave(sessionId: string, participantId: string): Promise<boolean>;
+  /** A player who left comes back to their seat (same name, score and team). */
+  rejoin(sessionId: string, participantId: string): Promise<boolean>;
   /** Kick: the player and their answers are removed from the session. */
   removeParticipant(sessionId: string, participantId: string): Promise<boolean>;
   findParticipant(sessionId: string, participantId: string): Promise<Participant | null>;
@@ -94,6 +96,12 @@ export class MemoryGameRepository implements GameRepository {
     const participant = session?.participants.find((item) => item.id === participantId);
     if (!participant) return false;
     participant.leftAt = new Date();
+    return true;
+  }
+  async rejoin(sessionId: string, participantId: string) {
+    const participant = this.sessions.get(sessionId)?.participants.find((item) => item.id === participantId);
+    if (!participant) return false;
+    participant.leftAt = null;
     return true;
   }
   async removeParticipant(sessionId: string, participantId: string) {
@@ -298,7 +306,14 @@ export class GameService {
     const live = await this.ensureLive(session);
     if (live.kicked.has(participantId)) throw new GameError("kicked");
     const participant = session.participants.find((item) => item.id === participantId);
-    if (!participant || participant.leftAt) throw new GameError("participant_not_found");
+    if (!participant) throw new GameError("participant_not_found");
+    if (participant.leftAt) {
+      // their seat is kept: a player who closed the page or left comes back as themselves, even after Start
+      if (session.status === "FINISHED" || session.status === "CANCELLED") throw new GameError("participant_not_found");
+      await this.gameRepository.rejoin(session.id, participant.id);
+      participant.leftAt = null;
+      this.emit(session.id, "player_joined", { participant }, "host");
+    }
     const current = live.phase === "question" ? live.questions[live.index] : null;
     const answered = current ? !!(await this.gameRepository.findAnswer(participant.id, current.id)) : false;
     return {

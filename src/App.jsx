@@ -22,7 +22,7 @@ import ScreenPage from './pages/screen/ScreenPage';
 import { apiRequest } from './api/client';
 import { syncLiveQuiz } from './lib/liveQuiz';
 import { ensureQuiz } from './lib/serverQuizzes';
-import { connectLiveHost, isKicked, leaveLive, rememberHostSession, resumeLiveHost, resumeLivePlayer } from './lib/live';
+import { connectLiveHost, getSeat, isKicked, leaveLive, rememberHostSession, resumeLiveHost, resumeLivePlayer, resumeSeat } from './lib/live';
 
 function Loading() {
   return <main className="loading" aria-busy="true"><h1>Loading<Bounce /></h1></main>;
@@ -36,12 +36,22 @@ function JoinRoute() {
   const sessionId = searchParams.get('session');
   const [liveQuiz, setLiveQuiz] = useState(null);
   const [liveError, setLiveError] = useState('');
+  const [backTo, setBackTo] = useState('');
   useEffect(() => {
     if (!pin) return;
     let cancelled = false;
-    apiRequest(`/api/v1/sessions/by-pin/${pin}`)
+    /* this browser already has a seat in that game (scanned the QR again): go back to it */
+    const seat = getSeat();
+    const mine = seat && (sessionId ? seat.sessionId === sessionId : seat.pin === pin);
+    (mine ? resumeSeat() : Promise.resolve({ ok: false }))
+      .then((r) => {
+        if (cancelled) return null;
+        if (r.ok) { setBackTo(r.lobby ? '/lobby' : '/play'); return null; }
+        if (r.error === 'kicked') { setLiveError('kicked'); return null; }
+        return apiRequest(`/api/v1/sessions/by-pin/${pin}`);
+      })
       .then((live) => {
-        if (cancelled) return;
+        if (cancelled || !live) return;
         if (live.quiz.id !== quizId) { setLiveError('mismatch'); return; }
         if (sessionId && live.sessionId !== sessionId) { setLiveError('mismatch'); return; }
         if (isKicked(live.sessionId)) { setLiveError('kicked'); return; }
@@ -57,6 +67,7 @@ function JoinRoute() {
     return () => { cancelled = true; };
   }, [pin, sessionId, quizId]);
   if (pin) {
+    if (backTo) return <Navigate to={backTo} replace />;
     if (isKicked(sessionId)) return <JoinError kind="kicked" />;
     if (liveError) return <JoinError kind={liveError} />;
     if (!liveQuiz) return <main className="loading" aria-busy="true"><h1>Joining live session<Bounce /></h1></main>;

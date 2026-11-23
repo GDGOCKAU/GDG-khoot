@@ -7,7 +7,7 @@ import { ColorBar, Hang, Ico, Logo, ThemeButton } from '../../components/common/
 import SiteFooter from '../../components/common/SiteFooter';
 import { apiRequest } from '../../api/client';
 import { syncLiveQuiz } from '../../lib/liveQuiz';
-import { isKicked } from '../../lib/live';
+import { getSeat, isKicked, resumeSeat } from '../../lib/live';
 
 function Home() {
   useAppState();
@@ -38,10 +38,20 @@ function Home() {
     e.preventDefault();
     const p = pin.replace(/\D/g, '');
     if (p.length !== 6) { setPinError('Enter the 6-digit PIN.'); if (pinRef.current) pinRef.current.focus(); return; }
+    /* this browser already has a seat in that game: go back to it (even after Start, same name and points) */
+    const back = async () => {
+      const r = await resumeSeat();
+      if (r.ok) { setPinError(''); navigate(r.lobby ? '/lobby' : '/play'); return true; }
+      if (r.error === 'kicked') { setPinError('The host removed you from this game.'); if (pinRef.current) pinRef.current.focus(); return true; }
+      return false;
+    };
+    const seat = getSeat();
+    if (seat && seat.pin === p && (await back())) return;
     /* the server says whether a live game with this PIN is open */
     try {
       const live = await apiRequest(`/api/v1/sessions/by-pin/${p}`);
       if (isKicked(live.sessionId)) { setPinError('The host removed you from this game.'); if (pinRef.current) pinRef.current.focus(); return; }
+      if (seat && !seat.pin && seat.sessionId === live.sessionId && (await back())) return;
       syncLiveQuiz(live);
       setPinError('');
       UI.look = { key: 'live:' + live.quiz.id, quizId: live.quiz.id, live: true, sessionId: live.sessionId, pin: p, name: UI.look ? UI.look.name : '', team: 'blue', idx: 0 };

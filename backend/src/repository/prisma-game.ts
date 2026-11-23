@@ -60,6 +60,10 @@ export class PrismaGameRepository implements GameRepository {
     });
     return result.count === 1;
   }
+  async rejoin(sessionId: string, participantId: string) {
+    const result = await this.prisma.participant.updateMany({ where: { id: participantId, sessionId }, data: { leftAt: null } });
+    return result.count === 1;
+  }
   async removeParticipant(sessionId: string, participantId: string) {
     // answers go with the participant (onDelete: Cascade)
     const result = await this.prisma.participant.deleteMany({ where: { id: participantId, sessionId } });

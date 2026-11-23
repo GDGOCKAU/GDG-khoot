@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { NICK_A, NICK_B, TEAMS, css, mascot, pick, pinFmt, rnd } from '../../lib/constants';
 import { G, UI, joinGame, newLiveGame } from '../../lib/engine';
-import { connectLivePlayer, deviceId } from '../../lib/live';
+import { connectLivePlayer, deviceId, saveSeat } from '../../lib/live';
 import { toast, useWide } from '../../lib/ui';
 import { Ico } from '../../components/common/UI';
 import { MascotGrid, TeamTabs } from '../../components/player/AvatarPicker';
@@ -43,8 +43,7 @@ function JoinQuiz({ quiz, live }) {
           deviceId: deviceId(),
         }),
       });
-      localStorage.setItem('gdgParticipantId', participant.id);
-      localStorage.setItem('gdgSessionId', participant.sessionId);
+      saveSeat({ sessionId: participant.sessionId, participantId: participant.id, pin: String(pin).replace(/\D/g, '') });
       UI.look = { ...look, participantId: participant.id, sessionId: participant.sessionId };
       /* in: wait in the lobby. /play only opens when the server sends the first question */
       newLiveGame(quiz, { name, team: look.team, img: mascot(look.team, look.idx) }, { sessionId: participant.sessionId, participantId: participant.id });

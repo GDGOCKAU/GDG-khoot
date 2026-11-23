@@ -10,7 +10,20 @@ import { notify } from './store';
 import { toast } from './ui';
 
 const mascotIdx = (m) => { const n = Number(String(m || '').split('-')[1]); return Number.isInteger(n) ? n : 0; };
-const forgetPlayer = () => { localStorage.removeItem('gdgParticipantId'); localStorage.removeItem('gdgSessionId'); };
+/* The player's seat: which session and which player this browser is, plus the PIN it joined with.
+   Kept in localStorage (survives closing the tab or the browser) until the session ends. */
+const SEAT = 'kauhoot.seat';
+export function saveSeat(seat) { try { localStorage.setItem(SEAT, JSON.stringify(seat)); } catch { /* storage blocked */ } }
+export function getSeat() {
+  try {
+    const seat = JSON.parse(localStorage.getItem(SEAT) || 'null');
+    if (seat && seat.sessionId && seat.participantId) return seat;
+    // seats saved by the previous version
+    const sessionId = localStorage.getItem('gdgSessionId'), participantId = localStorage.getItem('gdgParticipantId');
+    return sessionId && participantId ? { sessionId, participantId, pin: null } : null;
+  } catch { return null; }
+}
+const forgetPlayer = () => { try { localStorage.removeItem(SEAT); localStorage.removeItem('gdgParticipantId'); localStorage.removeItem('gdgSessionId'); } catch { /* storage blocked */ } };
 
 /* this browser's id, sent when joining: a device the host kicked cannot join that session again */
 export function deviceId() {
@@ -44,6 +57,7 @@ function applyState(state) {
   if (state.quizTitle) G.quiz.title = state.quizTitle;
   if (state.topic) G.quiz.topic = state.topic;
   if (state.pin) G.pin = state.pin;
+  if (state.quizId && G.quiz) G.quiz.id = state.quizId;
   if (state.question) liveQuestion(state.question);
   if (state.reveal) liveReveal(state.reveal, state.hostReveal || null);
   if (state.result) liveResult(state.result);
@@ -55,17 +69,20 @@ function applyState(state) {
 
 /* ---------- player ---------- */
 
-export function connectLivePlayer(sessionId, participantId) {
+/* onFirst (optional) hears the outcome of the first join: { ok, lobby } or { ok: false, error } */
+export function connectLivePlayer(sessionId, participantId, onFirst) {
   const socket = connectSocket();
   G.socket = socket;
+  let first = true;
+  const report = (outcome) => { if (first) { first = false; if (onFirst) onFirst(outcome); } };
   /* runs on first connect and on every reconnect */
   socket.on('connect', () => {
     socket.emit('game:join', sessionId, participantId, (res) => {
       if (!G) return;
-      if (res && res.error === 'kicked') { kickedOut(sessionId); return; }
+      if (res && res.error === 'kicked') { kickedOut(sessionId); report({ ok: false, error: 'kicked' }); return; }
       if (!res || !res.ok || (G.resuming && ['FINISHED', 'CANCELLED'].includes(res.state.status))) {
-        if (G.resuming) { forgetPlayer(); stopGame(); return; }
-        toast('You are no longer in this game.'); exitGame(); return;
+        if (G.resuming) { forgetPlayer(); socket.disconnect(); stopGame(); report({ ok: false, error: res && res.ok ? 'ended' : (res && res.error) || 'not_found' }); return; }
+        toast('You are no longer in this game.'); exitGame(); report({ ok: false, error: 'gone' }); return;
       }
       if (res.state.participant && G.me) {
         const p = res.state.participant;
@@ -74,9 +91,11 @@ export function connectLivePlayer(sessionId, participantId) {
       G.resuming = false;
       if (res.state.answered && !G.answers.me) G.answers.me = { choice: null, t: 0 };
       applyState(res.state);
+      report({ ok: true, lobby: res.state.phase && res.state.phase.phase === 'lobby' });
     });
   });
-  socket.on('phase', livePhaseEvent);
+  /* the seat is only needed while the session runs */
+  socket.on('phase', (p) => { livePhaseEvent(p); if (p && p.phase === 'final') forgetPlayer(); });
   socket.on('question', (q) => { liveQuestion(q); if (G) G.power = { ...(G.power || {}), enabled: q.powerUps, doubleActive: false }; });
   socket.on('reveal', (r) => liveReveal(r, null));
   socket.on('result', liveResult);
@@ -113,20 +132,33 @@ export async function activatePowerUp(kind) {
   }
 }
 
+/* Back to the saved seat (a refresh, a reopened tab or browser, the same PIN or QR link).
+   Resolves { ok: true, lobby } when the server took the player back, else { ok: false, error }. */
+export function resumeSeat() {
+  const seat = getSeat();
+  if (!seat) return Promise.resolve({ ok: false, error: 'no_seat' });
+  if (G && G.live && G.participantId === seat.participantId && G.socket) return Promise.resolve({ ok: true, lobby: G.phase === 'lobby' });
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (outcome) => { if (!done) { done = true; clearTimeout(timer); resolve(outcome); } };
+    const timer = setTimeout(() => {
+      if (G && G.resuming) { if (G.socket) G.socket.disconnect(); stopGame(); }
+      finish({ ok: false, error: 'timeout' });
+    }, 8000);
+    newLiveGame({ id: 'live', title: '', topic: 'Other', questionCount: 0, questions: [], live: true, livePin: seat.pin }, { name: '', team: 'blue', img: mascot('blue', 0) }, { sessionId: seat.sessionId, participantId: seat.participantId });
+    G.resuming = true;
+    connectLivePlayer(seat.sessionId, seat.participantId, finish);
+  });
+}
 /* a refreshed phone on /lobby or /play picks its seat back up */
 export function resumeLivePlayer() {
-  if (G) return false;
-  const sessionId = localStorage.getItem('gdgSessionId'), participantId = localStorage.getItem('gdgParticipantId');
-  if (!sessionId || !participantId) return false;
-  newLiveGame({ id: 'live', title: '', topic: 'Other', questionCount: 0, questions: [], live: true }, { name: '', team: 'blue', img: mascot('blue', 0) }, { sessionId, participantId });
-  G.resuming = true;
-  connectLivePlayer(sessionId, participantId);
+  if (G || !getSeat()) return false;
+  resumeSeat();
   return true;
 }
 
-/* a live player who leaves the game page frees their seat on the server */
+/* a live player who leaves the game page frees the seat on the server; this browser keeps it to come back */
 export function leaveLive() {
-  if (G && G.live) forgetPlayer();
   if (!G || !G.live || !G.participantId || ['teams', 'podium', 'final'].includes(G.phase)) return;
   apiRequest(`/api/v1/sessions/${G.backendSessionId}/leave`, { method: 'POST', body: JSON.stringify({ participantId: G.participantId }), keepalive: true }).catch(() => {});
 }

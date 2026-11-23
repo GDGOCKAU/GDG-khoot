@@ -343,6 +343,42 @@ describe("kick", () => {
   });
 });
 
+describe("players resume their seat", () => {
+  it("a player who left comes back as themselves after Start (same name, score, team); new players are still refused", async () => {
+    const { service, events } = setup({ ...FAST, reveal: 5000 });
+    const session = await service.createSession(quiz.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "red-3", team: "red" });
+    const b = await service.joinByPin(session.pin, { name: "Ali", mascot: "blue-0", team: "blue" });
+    await service.start(HOST, session.id);
+    const q1 = (await until(events, question(0))).payload;
+    await service.answer(session.id, a.id, q1.questionId, { optionId: q1.options[0].id });
+    const scored = (await service.participantState(session.id, a.id)).participant.score;
+    expect(scored).toBeGreaterThan(0);
+    await service.leave(session.id, a.id); // closed the page / went away
+    expect(events.filter((e) => e.event === "player_left").at(-1)?.payload).toMatchObject({ participantId: a.id });
+    const back = await service.participantState(session.id, a.id); // phone comes back with its saved seat
+    expect(back.participant).toMatchObject({ name: "Noura", team: "red", mascot: "red-3", score: scored });
+    expect(events.filter((e) => e.event === "player_joined").at(-1)?.payload.participant.id).toBe(a.id);
+    expect((await service.hostState(session.id, HOST)).standings.map((p: { name: string }) => p.name)).toContain("Noura");
+    // still no new players once the game has started
+    await expect(service.joinByPin(session.pin, { name: "Late", mascot: "green-0", team: "green" })).rejects.toMatchObject({ code: "invalid_phase" });
+    // and a kicked player cannot come back
+    await service.kick(HOST, session.id, b.id);
+    await expect(service.participantState(session.id, b.id)).rejects.toMatchObject({ code: "kicked" });
+  });
+
+  it("no return once the game is over", async () => {
+    const { service, events } = setup();
+    const session = await service.createSession(quiz.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "red-3", team: "red" });
+    await service.start(HOST, session.id);
+    await service.leave(session.id, a.id);
+    for (let i = 0; i < 3; i++) { await until(events, question(i), 3000); await service.skip(HOST, session.id); }
+    await until(events, (e) => e.event === "final", 3000);
+    await expect(service.participantState(session.id, a.id)).rejects.toMatchObject({ code: "participant_not_found" });
+  });
+});
+
 describe("power-ups", () => {
   async function inQuestion(powerUps: boolean, index = 0) {
     const ctx = setup({ ...FAST, earlyClose: 10_000 });
