@@ -72,7 +72,7 @@ function HostGame() {
       <p>{kickTarget.name} leaves right away and can&apos;t rejoin this game from the same device. Their answers and points are removed from the results.</p>
       <div style={css('display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap')}>
         <button type="button" className="btn btn-outline" onClick={() => setKickTarget(null)} autoFocus>Cancel</button>
-        <button type="button" className="btn btn-danger-solid" onClick={() => { const p = kickTarget; setKickTarget(null); if (live.kick) live.kick(p.id).then((ok) => { if (ok) toast(`${p.name} was removed from the game.`); }); }}>Remove player</button>
+        <button type="button" className="btn btn-danger-solid" onClick={() => { const p = kickTarget; setKickTarget(null); setShowPlayers(false); if (live.kick) live.kick(p.id).then((ok) => { if (ok) toast(`${p.name} was removed from the game.`); }); }}>Remove player</button>
       </div>
     </Modal>
   );
