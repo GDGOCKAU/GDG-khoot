@@ -7,7 +7,7 @@ import { G, UI, answer, curQ, hosted, rankOf, waitsForHost } from '../../lib/eng
 import { notify, useAppState } from '../../lib/store';
 import { toast, useAnims, useWide } from '../../lib/ui';
 import { Bounce, Ico, LiveBar, LiveRing, MePill, Secs, Count, Answered } from '../../components/common/UI';
-import { AnswersBlock, Boxes, ChosenPill, FinalBlock, LbBlock, PlayerAnswerArea, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
+import { AnswersBlock, Boxes, ChosenPill, qSize, FinalBlock, LbBlock, PlayerAnswerArea, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
 import { LapShell, PShell } from '../../components/layout/Shells';
 import { CodeSnack, PokeDevu } from '../../components/player/WaitFun';
 import GameOver from './GameOver';
@@ -119,7 +119,7 @@ function PlayerView() {
         return (
           <div className="pq">
             <div className="pq-top"><span className="chip" style={css('font-size:13px;padding:6px 14px')}>Q{G.qi + 1} of {n}</span><span className="chip chip-blue" style={css('font-size:13px;padding:6px 14px')}><Ico n="clock" s={14} /><span><Secs />s</span></span></div>
-            <p className="pq-text">{qq.text}</p>
+            <p className={`pq-text ${qSize(qq.text)}`} dir="auto">{qq.text}</p>
             <main className="pq-main">
               {qimg && <img src={qq.img} alt="" style={css('max-height:160px;max-width:100%;border-radius:1rem;align-self:center')} />}
               {powers}

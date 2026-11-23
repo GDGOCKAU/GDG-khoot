@@ -1233,3 +1233,22 @@ body:has(.live-pill) :is(.host-main, .lap-main, .pl-in) { padding-bottom: 88px; 
 .pchip.pchip-more { padding: 5px 16px; background: var(--surface-2); color: var(--ink); animation: none; }
 /* when the two cards stack (narrow screens) the players card still gets the rest of the height */
 @media (max-width: 1150px) { .lobby-main .lobby { flex-direction: column; flex-wrap: nowrap; } .lobby-main .lobby .pinbox { flex: 0 0 auto; max-width: none; } .lobby-main .lobby .players { flex: 1 1 0; } }
+
+/* ---------- phone question: every answer on the screen (long question + code) ---------- */
+.pq:has(.tiles.code) { height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+.pq:has(.tiles.code) .pq-main { min-height: 0; }
+.pq-main > .codebox { flex: 0 1 auto; min-height: 72px; display: flex; flex-direction: column; }
+.pq-main > .codebox .codebody { flex: 1 1 auto; min-height: 0; max-height: none; }
+.pq .tiles.code { flex: 0 0 auto; grid-auto-rows: auto; }
+.pq .tiles.code .tile { min-height: 64px; padding: 12px 14px; gap: 8px; }
+.pq .tiles.code .tile .L { width: 34px; height: 34px; font-size: 17px; }
+.pq-text.long { font-size: 16px; padding-bottom: 12px; }
+.pq-text.xlong { font-size: 15px; padding-bottom: 10px; }
+
+/* ---------- phone answer tiles: whole words move to the next line; long text one size smaller ---------- */
+.tile { min-width: 0; }
+.tile > span:not(.L):not(.k) { overflow-wrap: break-word; word-break: normal; hyphens: manual; }
+.tiles:not(.wide) .tile.fs-s { font-size: 16px; }
+.tiles:not(.wide) .tile.fs-xs { font-size: 14px; }
+.tiles:not(.wide) .tile.mono.fs-s { font-size: 14px; }
+.tiles:not(.wide) .tile.mono.fs-xs { font-size: 12px; }

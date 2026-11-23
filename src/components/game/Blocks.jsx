@@ -75,8 +75,8 @@ export function PlayerAnswerArea({ qq, wide, typed, onType, onSubmitPic, onAnswe
   }
   const idx = t === 'tf' ? [0, 1] : [0, 1, 2, 3];
   const tiles = idx.map((i) => ((qq.answers[i] || '').trim() ? (
-    <button key={i} type="button" className={`tile ${ansCls(i)}${t === 'code' ? ' mono' : ''}`} onClick={() => onAnswer(i)}>
-      <span className="L">{t === 'tf' ? tfIco(i, 26) : LETTERS[i]}</span><span>{qq.answers[i]}</span>{wide ? <span className="k" aria-hidden="true">{i + 1}</span> : null}
+    <button key={i} type="button" className={`tile ${ansCls(i)}${t === 'code' ? ' mono' : ''}${t === 'tf' ? '' : fitClass(qq.answers[i], t === 'code')}`} onClick={() => onAnswer(i)}>
+      <span className="L">{t === 'tf' ? tfIco(i, 26) : LETTERS[i]}</span><span dir="auto">{qq.answers[i]}</span>{wide ? <span className="k" aria-hidden="true">{i + 1}</span> : null}
     </button>
   ) : null));
   return <>
@@ -107,6 +107,16 @@ export function HostAnswerArea({ qq }) {
       {idx.map((i) => ((qq.answers[i] || '').trim() ? <div key={i} className={`htile ${ansCls(i)}${t === 'code' ? ' mono' : ''}${t === 'tf' ? ' big' : ''}`}><span className="L">{t === 'tf' ? tfIco(i, 28) : LETTERS[i]}</span><span>{qq.answers[i]}</span></div> : null))}
     </div>
   </>;
+}
+
+/* a long question gets a smaller heading so the answers still fit on the screen */
+export const qSize = (text) => { const n = String(text || '').length; return n > 130 ? 'xlong' : n > 80 ? 'long' : ''; };
+/* phone answer tiles: a size step down when the text (or its longest word) would not fit, so words are
+   never cut in the middle */
+export function fitClass(text, mono) {
+  const s = String(text || ''), longest = Math.max(0, ...s.split(/\s+/).map((w) => w.length));
+  const [one, two] = mono ? [10, 13] : [11, 14];
+  return longest > two || s.length > 70 ? ' fs-xs' : longest > one || s.length > 44 ? ' fs-s' : '';
 }
 
 /* ---------- answer results ---------- */
