@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ICONS, LOGO_SRC } from '../../lib/icons';
-import { TEAMS, TOPICS, SPIDER, css, pinFmt } from '../../lib/constants';
+import { TEAMS, TOPICS, SPIDER, SPIDER_SET, css, pinFmt } from '../../lib/constants';
 import { isDark, toggleTheme } from '../../lib/theme';
 import { G, UI, hosted, liveTime, useTick } from '../../lib/engine';
 import { useAppState } from '../../lib/store';
@@ -62,7 +62,8 @@ export function Hang({ width, style }) {
   return (
     <div className="hang" aria-hidden="true" style={css(style)}>
       <div className="drop"><div className="bob"><span className="thread" />
-        <img className="spider" src={SPIDER} alt="" title="Drag me" draggable="false" style={{ width }} onError={(e) => { e.currentTarget.closest('.hang').style.display = 'none'; }} />
+        {/* pre-scaled copies: the browser no longer shrinks the 560px art 3-8x itself while it sways (jagged outline) */}
+        <img className="spider" src={SPIDER} srcSet={SPIDER_SET} sizes={`${width}px`} alt="" title="Drag me" draggable="false" style={{ width }} onError={(e) => { e.currentTarget.closest('.hang').style.display = 'none'; }} />
       </div></div>
     </div>
   );

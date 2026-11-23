@@ -22,6 +22,7 @@ export const TOPICS = {
 /* Your Devu mascots live in public/mascots */
 export const mascot = (team, i) => `/mascots/${team}_${String(i + 1).padStart(2, '0')}.png`;
 export const SPIDER = '/img/spider_mascot.png';
+export const SPIDER_SET = '/img/spider_mascot-160.png 160w, /img/spider_mascot-240.png 240w, /img/spider_mascot-380.png 380w, /img/spider_mascot.png 560w';
 export const BOT_NAMES = ['Sara', 'CodeQueen', 'Lama_dev', 'Noura', 'FlutterFan', 'Reem', 'byte.me', 'Joud', 'Al_Aseel', 'Hala', '404NotFound', 'Dana', 'NullPointer', 'DartVader', 'GitHappens', 'CloudNine'];
 export const NICK_A = ['Pixel', 'Byte', 'Cloud', 'Dart', 'Swift', 'Kotlin', 'Flutter', 'Debug', 'Neural', 'Turbo'];
 export const NICK_B = ['Queen', 'Ninja', 'Fox', 'Star', 'Wizard', 'Hero', 'Owl', 'Rocket', 'Panda', 'Spark'];
