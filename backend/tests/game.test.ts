@@ -278,6 +278,16 @@ describe("host reveal: counts and why the question closed", () => {
   });
 });
 
+describe("lobby order", () => {
+  it("host and audience screen get the lobby players in join order (the screens show the newest first)", async () => {
+    const { service } = setup();
+    const session = await service.createSession(quiz.id, HOST);
+    for (const name of ["Zed", "Amal", "Mona", "Bader"]) await service.joinByPin(session.pin, { name, mascot: "blue-0", team: "blue" });
+    expect((await service.hostState(session.id, HOST)).standings.map((p: { name: string }) => p.name)).toEqual(["Zed", "Amal", "Mona", "Bader"]);
+    expect((await service.screenState())!.standings.map((p: { name: string }) => p.name)).toEqual(["Zed", "Amal", "Mona", "Bader"]);
+  });
+});
+
 describe("kick", () => {
   it("in the lobby: removed for the host, told on their phone, cannot come back from the same device", async () => {
     const { service, events } = setup();

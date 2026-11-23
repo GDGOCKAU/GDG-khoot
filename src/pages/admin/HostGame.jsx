@@ -11,6 +11,7 @@ import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlo
 import { HostShell } from '../../components/layout/Shells';
 import { setSettings } from '../../lib/live';
 import ScreenLinkButton from '../../components/common/ScreenLinkButton';
+import PlayerChips from '../../components/game/PlayerChips';
 
 function PChip({ p, onRemove }) {
   const t = TEAMS[p.team];
@@ -107,7 +108,7 @@ function HostGame() {
           </div>
           <div className="card players">
             <div style={css('display:flex;justify-content:space-between;align-items:center')}><h2 style={{ margin: 0 }}>Players</h2><span className="chip chip-blue"><Ico n="users" />{cnt} joined</span></div>
-            <div className="pchips" aria-live="polite">{cnt ? G.players.map((p) => <PChip key={p.id} p={p} onRemove={G.liveHost && p.id !== 'me' ? () => setKickTarget(p) : null} />) : <span style={{ color: 'var(--muted)' }}>Waiting for players to join…</span>}</div>
+            <PlayerChips players={G.players} renderChip={(p) => <PChip key={p.id} p={p} onRemove={G.liveHost && p.id !== 'me' ? () => setKickTarget(p) : null} />} empty={<span style={{ color: 'var(--muted)' }}>Waiting for players to join…</span>} />
             <div className="lobby-actions" style={css('display:flex;flex-wrap:wrap;gap:12px;align-items:center;border-top:1px solid var(--border);padding-top:16px')}>
               <span style={css('color:var(--muted);font-size:14px;flex:1')}>{G.locked ? 'Game locked. No one else can join.' : cnt ? 'Start when everyone is in.' : 'Waiting for players to join…'}</span>
               <button type="button" className="btn btn-outline btn-sm btn-outline-red" onClick={() => setAskExit(true)}>Cancel game</button>
@@ -117,7 +118,7 @@ function HostGame() {
             </div>
           </div>
         </div>
-      </>);
+      </>, 'lobby-main');
       break;
     }
     case 'ready': {

@@ -8,6 +8,7 @@ import { G, curQ } from '../../lib/engine';
 import { connectScreen, disconnectScreen } from '../../lib/live';
 import { useAppState } from '../../lib/store';
 import { useAnims } from '../../lib/ui';
+import PlayerChips from '../../components/game/PlayerChips';
 import { Answered, Bounce, Brand, ColorBar, Count, Ico, LiveRing, Secs, ThemeButton } from '../../components/common/UI';
 import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, SuspenseBlock, TeamsBlock } from '../../components/game/Blocks';
 
@@ -80,7 +81,7 @@ function Game() {
   switch (G.phase) {
     case 'lobby': {
       const cnt = G.players.length;
-      return <Shell right={<span className="chip"><i style={css('width:8px;height:8px;border-radius:50%;background:#34a853')} />Live</span>}>
+      return <Shell main="lobby-main" right={<span className="chip"><i style={css('width:8px;height:8px;border-radius:50%;background:#34a853')} />Live</span>}>
         <div><div className="eyebrow">GDG KAUHOOT · Lobby</div><h1 style={{ fontSize: 48, marginTop: 6 }}>{G.quiz.title}</h1></div>
         <div className="lobby">
           <div className="card pinbox">
@@ -94,7 +95,7 @@ function Game() {
           </div>
           <div className="card players">
             <div style={css('display:flex;justify-content:space-between;align-items:center')}><h2 style={{ margin: 0 }}>Players</h2><span className="chip chip-blue"><Ico n="users" />{cnt} joined</span></div>
-            <div className="pchips" aria-live="polite">{cnt ? G.players.map((p) => <PChip key={p.id} p={p} />) : <span style={{ color: 'var(--muted)' }}>Waiting for players to join…</span>}</div>
+            <PlayerChips players={G.players} renderChip={(p) => <PChip key={p.id} p={p} />} empty={<span style={{ color: 'var(--muted)' }}>Waiting for players to join…</span>} />
             <span style={css('color:var(--muted);font-size:14px')}>{G.locked ? 'Game locked. No one else can join.' : cnt ? 'The host starts the game when everyone is in.' : 'Waiting for players to join…'}</span>
           </div>
         </div>

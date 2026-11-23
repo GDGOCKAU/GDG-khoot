@@ -1220,3 +1220,16 @@ body:has(.live-pill) :is(.host-main, .lap-main, .pl-in) { padding-bottom: 88px; 
 .kick-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
 .kick-list li { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 1rem; }
 .kick-list .kick-name { flex: 1; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- lobby (host + audience screen): one screen, never scrolls ---------- */
+/* the page is exactly the screen's height; the players card takes what is left, and PlayerChips
+   shows as many players as fit (newest first) with "+N" for the rest */
+.host:has(.host-main.lobby-main) { height: 100vh; height: 100dvh; min-height: 0; }
+.host-main.lobby-main { min-height: 0; overflow: hidden; }
+.lobby-main .lobby { flex: 1; min-height: 0; align-items: stretch; flex-wrap: nowrap; }
+.lobby-main .lobby .pinbox { min-height: 0; overflow: hidden; }
+.lobby-main .lobby .players { min-height: 0; overflow: hidden; }
+.lobby-main .pchips { position: relative; flex: 1; min-height: 0; overflow: hidden; align-content: flex-start; }
+.pchip.pchip-more { padding: 5px 16px; background: var(--surface-2); color: var(--ink); animation: none; }
+/* when the two cards stack (narrow screens) the players card still gets the rest of the height */
+@media (max-width: 1150px) { .lobby-main .lobby { flex-direction: column; flex-wrap: nowrap; } .lobby-main .lobby .pinbox { flex: 0 0 auto; max-width: none; } .lobby-main .lobby .players { flex: 1 1 0; } }

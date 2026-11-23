@@ -345,7 +345,7 @@ export class GameService {
     return {
       ...this.common(session, live),
       answeredCount: current ? await this.gameRepository.countAnswers(sessionId, current.id) : 0,
-      standings: this.shownStandings(live, (await this.standings(sessionId, null)).standings),
+      standings: this.shownStandings(live, (await this.standings(sessionId, null)).standings, session),
       hostReveal: live.phase === "reveal" || live.phase === "leaderboard" || live.phase === "suspense" ? live.hostReveal : null,
     };
   }
@@ -362,7 +362,7 @@ export class GameService {
     return {
       ...this.common(session, live),
       answeredCount: current ? await this.gameRepository.countAnswers(session.id, current.id) : 0,
-      standings: this.shownStandings(live, (await this.standings(session.id, null)).standings),
+      standings: this.shownStandings(live, (await this.standings(session.id, null)).standings, session),
       hostReveal: reveal ? hostReveal : null,
     };
   }
@@ -669,8 +669,13 @@ export class GameService {
     return live.index >= 0 && live.index >= live.questions.length - 2;
   }
 
-  /** While the ranking is hidden, screens get the player list only (by name, no scores). */
-  private shownStandings(live: Live, standings: Awaited<ReturnType<GameService["standings"]>>["standings"]) {
+  /** While the ranking is hidden, screens get the player list only (by name, no scores).
+      In the lobby the list keeps the join order, so screens can show the newest players first. */
+  private shownStandings(live: Live, standings: Awaited<ReturnType<GameService["standings"]>>["standings"], session?: GameSession) {
+    if (live.phase === "lobby" && session) {
+      const order = new Map(session.participants.map((participant, i) => [participant.id, i]));
+      return standings.slice().sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+    }
     if (!this.rankHidden(live)) return standings;
     return standings.map(({ id, name, team, mascot }) => ({ id, name, team, mascot })).sort((a, b) => a.name.localeCompare(b.name));
   }

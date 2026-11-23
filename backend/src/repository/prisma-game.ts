@@ -6,11 +6,11 @@ export class PrismaGameRepository implements GameRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
   async findByPin(pin: string) {
-    const session = await this.prisma.gameSession.findUnique({ where: { pin }, include: { participants: true } });
+    const session = await this.prisma.gameSession.findUnique({ where: { pin }, include: { participants: { orderBy: { createdAt: "asc" } } } });
     return session ? this.mapSession(session) : null;
   }
   async findById(id: string) {
-    const session = await this.prisma.gameSession.findUnique({ where: { id }, include: { participants: true } });
+    const session = await this.prisma.gameSession.findUnique({ where: { id }, include: { participants: { orderBy: { createdAt: "asc" } } } });
     return session ? this.mapSession(session) : null;
   }
   async create(input: { quizId: string; hostId: string }) {
@@ -22,7 +22,7 @@ export class PrismaGameRepository implements GameRepository {
     }
     const session = await this.prisma.gameSession.create({
       data: { quizId: input.quizId, hostId: input.hostId, pin },
-      include: { participants: true },
+      include: { participants: { orderBy: { createdAt: "asc" } } },
     });
     return this.mapSession(session);
   }
@@ -35,7 +35,7 @@ export class PrismaGameRepository implements GameRepository {
         questionStartedAt: session.questionStartedAt,
         closesAt: session.closesAt,
       },
-      include: { participants: true },
+      include: { participants: { orderBy: { createdAt: "asc" } } },
     });
     return this.mapSession(saved);
   }
@@ -108,7 +108,7 @@ export class PrismaGameRepository implements GameRepository {
     return this.prisma.answer.count({ where: { sessionId, questionId } });
   }
   async listSessions(hostId: string) {
-    const sessions = await this.prisma.gameSession.findMany({ where: { hostId }, include: { participants: true } });
+    const sessions = await this.prisma.gameSession.findMany({ where: { hostId }, include: { participants: { orderBy: { createdAt: "asc" } } } });
     return sessions.map((session) => this.mapSession(session));
   }
   async listAnswers(sessionId: string) {
