@@ -6,6 +6,16 @@ export const norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '
 export const LANGS = ['Dart', 'Python', 'JavaScript', 'Kotlin', 'Java', 'C++', 'Go', 'SQL'];
 export const QTYPES = [['mc', 'Multiple choice'], ['tf', 'True / False'], ['code', '</> Coding'], ['pic', 'Picture']];
 
+/* a long question gets a smaller heading so the answers still fit on the screen */
+export const qSize = (text) => { const n = String(text || '').length; return n > 130 ? 'xlong' : n > 80 ? 'long' : ''; };
+/* phone answer tiles: a size step down when the text (or its longest word) would not fit, so words are
+   never cut in the middle */
+export function fitClass(text, mono) {
+  const s = String(text || ''), longest = Math.max(0, ...s.split(/\s+/).map((w) => w.length));
+  const [one, two] = mono ? [10, 13] : [11, 14];
+  return longest > two || s.length > 70 ? ' fs-xs' : longest > one || s.length > 44 ? ' fs-s' : '';
+}
+
 export function isCorrect(qq, choice) {
   return qType(qq) === 'pic' ? !!norm(qq.word) && norm(choice) === norm(qq.word) : choice === qq.correct;
 }

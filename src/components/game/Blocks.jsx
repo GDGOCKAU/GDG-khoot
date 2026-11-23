@@ -1,6 +1,6 @@
 /* Screens and pieces shared by the host and the player views */
 import { TEAMS, TEAM_KEYS, LETTERS, ansCls, mascot, fmt, ord, css } from '../../lib/constants';
-import { qType, norm, isCorrect, correctLabel, highlight } from '../../lib/questions';
+import { qType, norm, isCorrect, correctLabel, highlight, qSize, fitClass } from '../../lib/questions';
 import { G, curQ, ranked, rankOf, teamStats, hosted, hostNext, waitsForHost } from '../../lib/engine';
 import { isWide } from '../../lib/ui';
 import { Ico, Logo, Dots, Bounce, TopicChip, Avatar, You, Secs } from '../common/UI';
@@ -107,16 +107,6 @@ export function HostAnswerArea({ qq }) {
       {idx.map((i) => ((qq.answers[i] || '').trim() ? <div key={i} className={`htile ${ansCls(i)}${t === 'code' ? ' mono' : ''}${t === 'tf' ? ' big' : ''}`}><span className="L">{t === 'tf' ? tfIco(i, 28) : LETTERS[i]}</span><span>{qq.answers[i]}</span></div> : null))}
     </div>
   </>;
-}
-
-/* a long question gets a smaller heading so the answers still fit on the screen */
-export const qSize = (text) => { const n = String(text || '').length; return n > 130 ? 'xlong' : n > 80 ? 'long' : ''; };
-/* phone answer tiles: a size step down when the text (or its longest word) would not fit, so words are
-   never cut in the middle */
-export function fitClass(text, mono) {
-  const s = String(text || ''), longest = Math.max(0, ...s.split(/\s+/).map((w) => w.length));
-  const [one, two] = mono ? [10, 13] : [11, 14];
-  return longest > two || s.length > 70 ? ' fs-xs' : longest > one || s.length > 44 ? ' fs-s' : '';
 }
 
 /* ---------- answer results ---------- */

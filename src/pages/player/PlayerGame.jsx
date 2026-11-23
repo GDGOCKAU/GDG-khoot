@@ -2,12 +2,12 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { TEAMS, css, fmt, ord } from '../../lib/constants';
-import { qType, norm } from '../../lib/questions';
+import { qType, norm, qSize } from '../../lib/questions';
 import { G, UI, answer, curQ, hosted, rankOf, waitsForHost } from '../../lib/engine';
 import { notify, useAppState } from '../../lib/store';
 import { toast, useAnims, useWide } from '../../lib/ui';
 import { Bounce, Ico, LiveBar, LiveRing, MePill, Secs, Count, Answered } from '../../components/common/UI';
-import { AnswersBlock, Boxes, ChosenPill, qSize, FinalBlock, LbBlock, PlayerAnswerArea, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
+import { AnswersBlock, Boxes, ChosenPill, FinalBlock, LbBlock, PlayerAnswerArea, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
 import { LapShell, PShell } from '../../components/layout/Shells';
 import { CodeSnack, PokeDevu } from '../../components/player/WaitFun';
 import GameOver from './GameOver';

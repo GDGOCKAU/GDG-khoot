@@ -3,14 +3,14 @@
 import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { LETTERS, TEAMS, ansCls, css, pinFmt } from '../../lib/constants';
-import { qType } from '../../lib/questions';
+import { qType, qSize } from '../../lib/questions';
 import { G, curQ } from '../../lib/engine';
 import { connectScreen, disconnectScreen } from '../../lib/live';
 import { useAppState } from '../../lib/store';
 import { useAnims } from '../../lib/ui';
 import PlayerChips from '../../components/game/PlayerChips';
 import { Answered, Bounce, Brand, ColorBar, Count, Ico, LiveRing, Secs, ThemeButton } from '../../components/common/UI';
-import { QKindChip, qSize, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, SuspenseBlock, TeamsBlock } from '../../components/game/Blocks';
+import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, SuspenseBlock, TeamsBlock } from '../../components/game/Blocks';
 
 const bigRing = <LiveRing size={220} stroke={17} color="#1a73e8"><span style={{ fontSize: 112, color: '#1a73e8' }}><Count /></span></LiveRing>;
 
