@@ -9,7 +9,7 @@ import { connectScreen, disconnectScreen } from '../../lib/live';
 import { useAppState } from '../../lib/store';
 import { useAnims } from '../../lib/ui';
 import { Answered, Bounce, Brand, ColorBar, Count, Ico, LiveRing, Secs, ThemeButton } from '../../components/common/UI';
-import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
+import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, SuspenseBlock, TeamsBlock } from '../../components/game/Blocks';
 
 const bigRing = <LiveRing size={220} stroke={17} color="#1a73e8"><span style={{ fontSize: 112, color: '#1a73e8' }}><Count /></span></LiveRing>;
 
@@ -125,6 +125,7 @@ function Game() {
     case 'reveal':
       return <Shell right={<><span className="chip">Question {G.qi + 1} of {n}</span>{pinChip}</>}><AnswersBlock /></Shell>;
     case 'leaderboard': return <Shell right={<span className="chip">After question {G.qi + 1} of {n}</span>} main="wide"><LbBlock /></Shell>;
+    case 'suspense': return <Shell right={<span className="chip">After question {G.qi + 1} of {n}</span>}><SuspenseBlock /></Shell>;
     case 'teams': return <Shell right={over} main="mid"><TeamsBlock /></Shell>;
     case 'podium': return <Shell right={over} main="narrow"><PodiumBlock /></Shell>;
     case 'final': return <Shell right={over}><FinalBlock /></Shell>;

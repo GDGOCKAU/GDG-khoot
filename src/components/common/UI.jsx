@@ -81,7 +81,7 @@ export function MePill({ p }) {
 }
 export function You() { return <> <span className="you">You</span></>; }
 
-const PHASE_LABEL = { lobby: 'In the lobby', ready: 'Starting', question: 'Question live', reveal: 'Showing answers', answers: 'Showing answers', next: 'Next question', leaderboard: 'Leaderboard', teams: 'Team results', podium: 'Top 3', final: 'Final leaderboard' };
+const PHASE_LABEL = { lobby: 'In the lobby', ready: 'Starting', question: 'Question live', reveal: 'Showing answers', answers: 'Showing answers', next: 'Next question', leaderboard: 'Leaderboard', suspense: 'Final questions', teams: 'Team results', podium: 'Top 3', final: 'Final leaderboard' };
 
 /* floating pill that links the host screen and the player screen */
 export function LivePill() {

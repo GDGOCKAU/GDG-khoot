@@ -92,9 +92,11 @@ describe("audience screen", () => {
     // a screen that opens mid-reveal catches up from the snapshot
     const late = (await watch(open(url))).state!;
     expect(late.phase.phase).toBe("reveal");
-    expect(late.standings[0]).toMatchObject({ name: "Noura", score: expect.any(Number) });
+    // a one-question quiz keeps the ranking secret until the end screens: names only, no scores or standings
+    expect(late.phase.rankHidden).toBe(true);
+    expect(late.standings[0]).toEqual({ id: player.id, name: "Noura", team: "blue", mascot: "blue-0" });
     expect(late.hostReveal.choices).toBeUndefined();
-    expect(late.hostReveal.standings).toBeDefined();
+    expect(late.hostReveal.standings).toBeUndefined();
   });
 
   it("switches to the next session and goes idle when the host closes it", async () => {

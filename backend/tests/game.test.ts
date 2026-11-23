@@ -26,7 +26,7 @@ const quiz: Quiz = {
     { id: ids(5), quizId: ids(1), text: "", order: 3, timeLimitSecs: 10, type: "mc", options: [] },
   ],
 };
-const FAST = { ready: 5, reveal: 5, leaderboard: 5, next: 5, teams: 5, podium: 5, earlyClose: 5 };
+const FAST = { ready: 5, reveal: 5, leaderboard: 5, suspense: 5, next: 5, teams: 5, podium: 5, earlyClose: 5 };
 
 type Ev = { event: string; payload: any; audience?: EventAudience };
 function setup(timings: Partial<typeof FAST> = FAST, gameRepository = new MemoryGameRepository()) {
@@ -244,9 +244,13 @@ describe("host reveal: counts and why the question closed", () => {
       expect(host.counts).toEqual(expected[i].counts);
       expect(host.choices).toEqual(expected[i].choices);
       expect(host.total).toBe(2);
-      // the right player is credited, the wrong one is not
-      expect(host.standings.find((p: { id: string }) => p.id === right.id).lastOk).toBe(true);
-      expect(host.standings.find((p: { id: string }) => p.id === wrong.id).lastOk).toBe(false);
+      if (i === 0) {
+        // the right player is credited, the wrong one is not
+        expect(host.standings.find((p: { id: string }) => p.id === right.id).lastOk).toBe(true);
+        expect(host.standings.find((p: { id: string }) => p.id === wrong.id).lastOk).toBe(false);
+      } else {
+        expect(host.standings).toBeUndefined(); // the last two questions: no ranking sent
+      }
       // phones see the same reason (no host-only data)
       expect(events.find((e) => e.event === "reveal" && e.payload.index === i)!.payload.closedBy).toBe("all_answered");
     }
@@ -394,6 +398,81 @@ describe("edit name and mascot in the lobby", () => {
     await service.updateParticipant(session.id, a.id, { name: "nouf", mascot: "yellow-1", team: "yellow" });
     await service.start(HOST, session.id);
     await expect(service.updateParticipant(session.id, a.id, { name: "Late change", mascot: "blue-0", team: "blue" })).rejects.toMatchObject({ code: "game_started" });
+  });
+});
+
+describe("ranking hidden for the last two questions", () => {
+  const playThrough = async (questions: Quiz["questions"]) => {
+    const q: Quiz = { ...quiz, questions };
+    const events: Ev[] = [];
+    const service = new GameService({ getQuiz: async () => q }, new MemoryGameRepository(), (_s, event, payload, audience) => events.push({ event, payload, audience }), undefined, { ...FAST, reveal: 400 });
+    const session = await service.createSession(q.id, HOST);
+    const a = await service.joinByPin(session.pin, { name: "Noura", mascot: "blue-0", team: "blue" });
+    const b = await service.joinByPin(session.pin, { name: "Ali", mascot: "red-0", team: "red" });
+    await service.start(HOST, session.id);
+    const hiddenChecks: string[] = [];
+    for (let i = 0; i < questions.length; i++) {
+      const open = (await until(events, question(i), 3000)).payload;
+      await service.answer(session.id, a.id, open.questionId, { optionId: open.options[0].id });
+      await service.answer(session.id, b.id, open.questionId, { optionId: open.options[1].id });
+      await until(events, (e) => e.event === "reveal_host" && e.payload.index === i);
+      const hidden = i >= questions.length - 2;
+      // while the question's results are up: what the host's refresh and the leaderboard route give
+      const hostNow = await service.hostState(session.id, HOST);
+      if (hidden && hostNow.phase.phase !== "next") {
+        expect(hostNow.phase.rankHidden).toBe(true);
+        expect(hostNow.standings.every((p: Record<string, unknown>) => !("score" in p))).toBe(true);
+        await expect(service.leaderboard(session.id)).rejects.toMatchObject({ code: "invalid_phase" });
+        hiddenChecks.push(`Q${i + 1}`);
+      }
+    }
+    const final = (await until(events, (e) => e.event === "final", 3000)).payload;
+    await until(events, phase("final"), 3000);
+    return { events, a, b, final, hiddenChecks };
+  };
+  const results = (events: Ev[], index: number, questionId: string) => events.filter((e) => e.event === "result" && e.payload.questionId === questionId);
+
+  it("4 questions: leaderboard after Q1 and Q2; Q3 and Q4 get the suspense screen, no rank on phones, no standings for the host", async () => {
+    const qs = [mc(2, 0), mc(6, 1), mc(7, 2), mc(8, 3)];
+    const { events, final, hiddenChecks } = await playThrough(qs);
+    const phases = events.filter((e) => e.event === "phase").map((e) => `${e.payload.phase}:${e.payload.index}`);
+    expect(phases).toContain("leaderboard:0");
+    expect(phases).toContain("leaderboard:1");
+    expect(phases).not.toContain("leaderboard:2");
+    expect(phases).not.toContain("leaderboard:3");
+    expect(phases).toContain("suspense:2");
+    expect(phases).toContain("suspense:3");
+    for (const [i, q] of qs.entries()) {
+      const mine = results(events, i, q.id);
+      const reveal = events.find((e) => e.event === "reveal_host" && e.payload.index === i)!.payload;
+      if (i < 2) {
+        expect(mine.every((e) => typeof e.payload.rank === "number" && e.payload.players === 2)).toBe(true);
+        expect(reveal.standings).toHaveLength(2);
+      } else {
+        expect(mine.every((e) => e.payload.rank === null && e.payload.players === null)).toBe(true);
+        expect(mine.find((e) => e.payload.correct)!.payload.points).toBeGreaterThan(0); // right/wrong and points still shown
+        expect(reveal.standings).toBeUndefined();
+        expect(reveal.counts).toEqual([1, 1, 0, 0]);
+      }
+    }
+    // the phase events tell every screen when the ranking is hidden
+    expect(events.filter((e) => e.event === "phase" && e.payload.index >= 2 && ["question", "reveal", "suspense"].includes(e.payload.phase)).every((e) => e.payload.rankHidden)).toBe(true);
+    expect(events.filter((e) => e.event === "phase" && e.payload.index < 2 && e.payload.phase !== "next").every((e) => !e.payload.rankHidden)).toBe(true);
+    // and the end screens show it all
+    expect(final.ranking.map((p: { name: string }) => p.name)).toEqual(["Noura", "Ali"]);
+    expect(final.top3).toHaveLength(2);
+    expect(hiddenChecks).toEqual(["Q3", "Q4"]);
+  });
+
+  it("2 questions or fewer: no leaderboard at all until the end screens", async () => {
+    const { events, final } = await playThrough([mc(2, 0), mc(6, 1)]);
+    const phases = events.filter((e) => e.event === "phase").map((e) => e.payload.phase);
+    expect(phases).not.toContain("leaderboard");
+    expect(phases.filter((p) => p === "suspense")).toHaveLength(2);
+    expect(events.some((e) => e.event === "leaderboard")).toBe(false);
+    expect(events.filter((e) => e.event === "result").every((e) => e.payload.rank === null)).toBe(true);
+    expect(final.ranking).toHaveLength(2);
+    expect(phases.slice(-3)).toEqual(["teams", "podium", "final"]);
   });
 });
 

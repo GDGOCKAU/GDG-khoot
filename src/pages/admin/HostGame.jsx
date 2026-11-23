@@ -7,7 +7,7 @@ import { qType } from '../../lib/questions';
 import { G, curQ, endGame, exitGame, skip, hostNext, startGame, toggleLock, waitsForHost, live } from '../../lib/engine';
 import { toast, useAnims } from '../../lib/ui';
 import { Answered, ColorBar, Count, Ico, LiveRing, Modal, Secs } from '../../components/common/UI';
-import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, TeamsBlock } from '../../components/game/Blocks';
+import { QKindChip, AnswersBlock, FinalBlock, HostAnswerArea, LbBlock, PodiumBlock, SuspenseBlock, TeamsBlock } from '../../components/game/Blocks';
 import { HostShell } from '../../components/layout/Shells';
 import { setSettings } from '../../lib/live';
 import ScreenLinkButton from '../../components/common/ScreenLinkButton';
@@ -160,6 +160,7 @@ function HostGame() {
       </>);
       break;
     case 'leaderboard': view = shell(<span className="chip">After question {G.qi + 1} of {n}</span>, <LbBlock />, 'wide'); break;
+    case 'suspense': view = shell(<span className="chip">After question {G.qi + 1} of {n}</span>, <SuspenseBlock />); break;
     case 'teams': view = shell(over, <TeamsBlock />, 'mid'); break;
     case 'podium': view = shell(over, <PodiumBlock />, 'narrow'); break;
     case 'final': view = shell(over, <FinalBlock action={<button type="button" className="btn btn-primary" onClick={() => { endGame(); navigate('/admin'); }}>End game</button>} />); break;

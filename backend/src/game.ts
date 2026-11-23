@@ -165,9 +165,10 @@ export type EventSink = (sessionId: string, event: string, payload: unknown, aud
 type QuizQuestion = Quiz["questions"][number];
 
 /** Phases the server owns (handoff "Game flow"); every screen just shows the current one. */
-export type Phase = "lobby" | "ready" | "question" | "reveal" | "leaderboard" | "next" | "teams" | "podium" | "final" | "cancelled";
-export type Timings = { ready: number; reveal: number; leaderboard: number; next: number; teams: number; podium: number; earlyClose: number };
-export const DEFAULT_TIMINGS: Timings = { ready: 3000, reveal: 5500, leaderboard: 7000, next: 3000, teams: 8000, podium: 9000, earlyClose: 600 };
+/** "suspense" replaces "leaderboard" after the last two questions: the ranking stays secret until the end screens. */
+export type Phase = "lobby" | "ready" | "question" | "reveal" | "leaderboard" | "suspense" | "next" | "teams" | "podium" | "final" | "cancelled";
+export type Timings = { ready: number; reveal: number; leaderboard: number; suspense: number; next: number; teams: number; podium: number; earlyClose: number };
+export const DEFAULT_TIMINGS: Timings = { ready: 3000, reveal: 5500, leaderboard: 7000, suspense: 4000, next: 3000, teams: 8000, podium: 9000, earlyClose: 600 };
 export type PowerUpKind = "double" | "fifty";
 type PowerState = { double: boolean; fifty: boolean; doubleOn: string | null; removed: { questionId: string; optionIds: string[] } | null };
 
@@ -330,7 +331,7 @@ export class GameService {
       ...this.common(session, live),
       answered,
       participant: { id: participant.id, name: participant.name, team: participant.team, mascot: participant.mascot, score: participant.score, streak: participant.streak },
-      result: live.phase === "reveal" || live.phase === "leaderboard" ? live.results.get(participant.id) ?? null : null,
+      result: live.phase === "reveal" || live.phase === "leaderboard" || live.phase === "suspense" ? live.results.get(participant.id) ?? null : null,
       powerUps: this.powerView(live, participant.id),
     };
   }
@@ -344,8 +345,8 @@ export class GameService {
     return {
       ...this.common(session, live),
       answeredCount: current ? await this.gameRepository.countAnswers(sessionId, current.id) : 0,
-      standings: (await this.standings(sessionId, null)).standings,
-      hostReveal: live.phase === "reveal" || live.phase === "leaderboard" ? live.hostReveal : null,
+      standings: this.shownStandings(live, (await this.standings(sessionId, null)).standings),
+      hostReveal: live.phase === "reveal" || live.phase === "leaderboard" || live.phase === "suspense" ? live.hostReveal : null,
     };
   }
 
@@ -356,12 +357,12 @@ export class GameService {
     if (!session || session.status === "CANCELLED") { this.screenSessionId = null; return null; }
     const live = await this.ensureLive(session);
     const current = live.phase === "question" ? live.questions[live.index] : null;
-    const reveal = live.phase === "reveal" || live.phase === "leaderboard" ? live.hostReveal as { choices?: unknown } | null : null;
+    const reveal = live.phase === "reveal" || live.phase === "leaderboard" || live.phase === "suspense" ? live.hostReveal as { choices?: unknown } | null : null;
     const { choices: _choices, ...hostReveal } = reveal ?? {};
     return {
       ...this.common(session, live),
       answeredCount: current ? await this.gameRepository.countAnswers(session.id, current.id) : 0,
-      standings: (await this.standings(session.id, null)).standings,
+      standings: this.shownStandings(live, (await this.standings(session.id, null)).standings),
       hostReveal: reveal ? hostReveal : null,
     };
   }
@@ -379,7 +380,7 @@ export class GameService {
       phase: this.phasePayload(session.id, live),
       // only an open question is ever exposed, and only in its public shape
       question: live.phase === "question" && current ? publicQuestion(current, live.index, live.questions.length, session.closesAt, live.powerUps) : null,
-      reveal: live.phase === "reveal" || live.phase === "leaderboard" ? live.reveal : null,
+      reveal: live.phase === "reveal" || live.phase === "leaderboard" || live.phase === "suspense" ? live.reveal : null,
       final: live.phase === "teams" || live.phase === "podium" || live.phase === "final" ? live.final : null,
     };
   }
@@ -507,7 +508,11 @@ export class GameService {
     return { participantId };
   }
 
-  leaderboard(sessionId: string) {
+  /** Host's leaderboard on demand; refused while the ranking is hidden (the last two questions). */
+  async leaderboard(sessionId: string) {
+    const session = await this.gameRepository.findById(sessionId);
+    if (!session) throw new GameError("session_not_found");
+    if (this.rankHidden(await this.ensureLive(session))) throw new GameError("invalid_phase");
     return this.buildLeaderboard(sessionId);
   }
 
@@ -620,7 +625,8 @@ export class GameService {
     } else if (session.status === "ACTIVE") {
       this.setPhase(session.id, live, "ready", this.timings.ready, () => this.openQuestion(session.id, 0));
     } else if (session.status === "REVEAL") {
-      this.setPhase(session.id, live, "leaderboard", this.hold(live, this.timings.leaderboard), () => this.afterLeaderboard(session.id));
+      if (this.rankHidden(live)) this.setPhase(session.id, live, "suspense", this.hold(live, this.timings.suspense), () => this.afterLeaderboard(session.id));
+      else this.setPhase(session.id, live, "leaderboard", this.hold(live, this.timings.leaderboard), () => this.afterLeaderboard(session.id));
     } else if (session.status === "FINISHED") {
       live.phase = "final";
       live.final = await this.finalPayload(session.id);
@@ -652,7 +658,21 @@ export class GameService {
       powerUps: live.powerUps,
       // false: Reveal and Leaderboard wait for the host's Next (POST /skip) instead of a timer
       autoAdvance: live.quiz.autoAdvance !== false,
+      // the last two questions: no ranking anywhere until the end screens
+      rankHidden: this.rankHidden(live),
     };
+  }
+
+  /** True from the second-to-last question until the end screens (every question when there are two or fewer). */
+  private rankHidden(live: Live) {
+    if (["lobby", "teams", "podium", "final", "cancelled"].includes(live.phase)) return false;
+    return live.index >= 0 && live.index >= live.questions.length - 2;
+  }
+
+  /** While the ranking is hidden, screens get the player list only (by name, no scores). */
+  private shownStandings(live: Live, standings: Awaited<ReturnType<GameService["standings"]>>["standings"]) {
+    if (!this.rankHidden(live)) return standings;
+    return standings.map(({ id, name, team, mascot }) => ({ id, name, team, mascot })).sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /** How long Reveal / Leaderboard stay up: their timing, or no timer when the host moves on by hand. */
@@ -748,7 +768,8 @@ export class GameService {
     const everyone = standings.length > 0 && standings.every((player) => answers.some((answer) => answer.participantId === player.id));
     const closedBy: "all_answered" | "time" | "skip" = everyone ? "all_answered" : elapsedMs < question.timeLimitSecs * 1000 - 250 ? "skip" : "time";
     live.reveal = { ...this.revealPayload(question, index, answers, standings.length), closedBy };
-    // each phone gets only its own result
+    const hidden = this.rankHidden(live);
+    // each phone gets only its own result (no rank in the last two questions)
     standings.forEach((player, i) => {
       const answer = answers.find((item) => item.participantId === player.id);
       const result = {
@@ -759,9 +780,9 @@ export class GameService {
         points: answer?.points ?? 0,
         doubled: !!answer && live.power.get(player.id)?.doubleOn === question.id && answer.points > 0,
         streak: player.streak,
-        rank: i + 1,
+        rank: hidden ? null : i + 1,
         total: player.score,
-        players: standings.length,
+        players: hidden ? null : standings.length,
       };
       live.results.set(player.id, result);
       this.emit(sessionId, "result", result, { participantId: player.id });
@@ -771,9 +792,11 @@ export class GameService {
     for (const answer of answers) {
       choices[answer.participantId] = question.type === "pic" ? answer.isCorrect : question.options.findIndex((option) => option.id === answer.optionId);
     }
-    live.hostReveal = { ...live.reveal, choices, standings };
+    // hidden: the host sees who picked what, but no standings, and a short suspense screen instead of the leaderboard
+    live.hostReveal = hidden ? { ...live.reveal, choices } : { ...live.reveal, choices, standings };
     this.setPhase(sessionId, live, "reveal", this.hold(live, this.timings.reveal), async () => {
-      this.setPhase(sessionId, live, "leaderboard", this.hold(live, this.timings.leaderboard), () => this.afterLeaderboard(sessionId));
+      if (hidden) this.setPhase(sessionId, live, "suspense", this.hold(live, this.timings.suspense), () => this.afterLeaderboard(sessionId));
+      else this.setPhase(sessionId, live, "leaderboard", this.hold(live, this.timings.leaderboard), () => this.afterLeaderboard(sessionId));
     });
     this.emit(sessionId, "reveal", live.reveal);
     this.emit(sessionId, "reveal_host", live.hostReveal, "host");
@@ -787,7 +810,7 @@ export class GameService {
     for (const answer of answers) {
       choices[answer.participantId] = question.type === "pic" ? answer.isCorrect : question.options.findIndex((option) => option.id === answer.optionId);
     }
-    live.hostReveal = { ...live.reveal, choices, standings };
+    live.hostReveal = this.rankHidden(live) ? { ...live.reveal, choices } : { ...live.reveal, choices, standings };
     this.emit(sessionId, "reveal", live.reveal);
     this.emit(sessionId, "reveal_host", live.hostReveal, "host");
   }

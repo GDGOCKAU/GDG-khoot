@@ -172,7 +172,7 @@ export function exitGame() {
 }
 
 /* the quiz has auto-advance off: Reveal / Leaderboard stay until the host presses Next (no timer) */
-export const waitsForHost = () => !!G && G.autoAdvance === false && !G.phaseEnd && (G.phase === 'reveal' || G.phase === 'leaderboard');
+export const waitsForHost = () => !!G && G.autoAdvance === false && !G.phaseEnd && (G.phase === 'reveal' || G.phase === 'leaderboard' || G.phase === 'suspense');
 /* the host's Next; a quick double click must not skip the leaderboard too */
 let lastNext = 0;
 export function hostNext() {
@@ -257,8 +257,10 @@ export function livePhaseEvent(p) {
   G.locked = !!p.locked;
   G.powerUps = !!p.powerUps;
   G.autoAdvance = p.autoAdvance !== false;
-  /* players stay on their result while the host shows the leaderboard */
-  const phase = G.live && p.phase === 'leaderboard' ? 'reveal' : p.phase;
+  /* the last two questions: the server sends no ranking, and the screens show none */
+  G.rankHidden = !!p.rankHidden;
+  /* players stay on their result while the host shows the leaderboard (or the suspense screen) */
+  const phase = G.live && (p.phase === 'leaderboard' || p.phase === 'suspense') ? 'reveal' : p.phase;
   if (phase === 'cancelled') { exitGame(); return; }
   if (phase === 'question' && G.phase !== 'question') G.answers = {};
   G.phase = phase;
@@ -313,6 +315,14 @@ export function liveFinal(f) {
 /* standings -> the players the shared screens rank and animate */
 export function applyStandings(standings, choices, qq) {
   if (!G) return;
+  /* no standings (the ranking is hidden): only who picked what changes */
+  if (!standings) {
+    if (choices && qq) {
+      G.answers = {};
+      Object.entries(choices).forEach(([pid, c]) => { G.answers[pid] = { choice: typeof c === 'boolean' ? (c ? qq.word : '') : c, t: 0 }; });
+    }
+    return;
+  }
   G.prevIdx = {}; G.prevTeams = {};
   ranked().forEach((p, i) => { p.prevRank = i + 1; G.prevIdx[p.id] = i; p.prevScore = p.score; });
   teamStats().forEach((t, i) => { G.prevTeams[t.key] = { idx: i, avg: t.avg }; });
@@ -325,7 +335,8 @@ export function applyStandings(standings, choices, qq) {
     const id = G.live && st.id === G.participantId ? 'me' : st.id;
     const p = byId.get(id) || { id, bot: false, prevRank: 0, img: mascot(st.team, mascotIdx(st.mascot)) };
     const choice = G.answers[id === 'me' ? 'me' : st.id] ? G.answers[id === 'me' ? 'me' : st.id].choice : null;
-    Object.assign(p, { name: st.name, team: st.team, score: st.score, streak: st.streak, correct: st.correct,
+    /* a names-only list (hidden ranking) keeps the scores this screen already had */
+    Object.assign(p, { name: st.name, team: st.team, score: st.score ?? p.score ?? 0, streak: st.streak ?? p.streak ?? 0, correct: st.correct ?? p.correct ?? 0,
       last: choices ? { choice: st.answered ? choice : null, ok: st.lastOk, pts: st.lastPts } : p.last });
     return p;
   });

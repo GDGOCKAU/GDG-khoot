@@ -155,8 +155,11 @@ function PlayerView() {
           {ok
             ? <div style={css('display:flex;flex-wrap:wrap;gap:10px;justify-content:center')}><span className="pts-pill num">+{fmt(L.pts)} points</span>{L.doubled && <span className="pts-pill" style={css('font-size:16px;display:flex;align-items:center;gap:6px;color:var(--blue-txt)')}><Ico n="star" />Double points</span>}{me.streak > 1 && <span className="pts-pill" style={css('font-size:16px;display:flex;align-items:center;gap:6px;color:var(--green-txt)')}><Ico n="flame" />Streak: {me.streak}</span>}</div>
             : <><span style={{ color: 'var(--muted)' }}>The answer was</span>{qType(qq) === 'pic' ? <div className="boxes reveal"><Boxes word={qq.word} mode="reveal" /></div> : <ChosenPill qq={qq} choice={qq.correct} />}</>}
-          <div className={`stat-card${wide ? ' big' : ''}`} style={{ width: 'min(380px,100%)', ...(wide ? { width: '100%' } : {}) }}><div style={{ textAlign: 'left' }}><small>Your rank</small><strong>{ord(rankOf(me))} place</strong></div><div style={{ textAlign: 'right' }}><small>Total</small><strong className="num">{fmt(me.score)}</strong></div></div>
-          <p style={css('margin:0;font-size:13px;color:var(--muted)')}>{wide ? 'Look at the big screen for the leaderboard.' : waitsForHost() ? 'Answers and leaderboard on the host screen' : <>{hosted() || G.live ? 'Answers on the host screen · leaderboard' : 'Answer results'} in <Secs />s</>}</p>
+          {/* the last two questions: right/wrong and points only, the rank stays secret until the end */}
+          {G.rankHidden
+            ? <div className={`stat-card${wide ? ' big' : ''}`} style={{ width: 'min(380px,100%)', ...(wide ? { width: '100%' } : {}) }}><div style={{ textAlign: 'left' }}><small>Total</small><strong className="num">{fmt(me.score)}</strong></div></div>
+            : <div className={`stat-card${wide ? ' big' : ''}`} style={{ width: 'min(380px,100%)', ...(wide ? { width: '100%' } : {}) }}><div style={{ textAlign: 'left' }}><small>Your rank</small><strong>{ord(rankOf(me))} place</strong></div><div style={{ textAlign: 'right' }}><small>Total</small><strong className="num">{fmt(me.score)}</strong></div></div>}
+          <p style={css('margin:0;font-size:13px;color:var(--muted)')}>{G.rankHidden ? 'The leaderboard stays hidden until the end.' : wide ? 'Look at the big screen for the leaderboard.' : waitsForHost() ? 'Answers and leaderboard on the host screen' : <>{hosted() || G.live ? 'Answers on the host screen · leaderboard' : 'Answer results'} in <Secs />s</>}</p>
         </div>, stateOpts(ok ? '#34a853' : timeUp ? '#f9ab00' : '#ea4335', { bg: ok ? 'var(--green-soft)' : timeUp ? 'var(--yellow-soft)' : 'var(--red-soft)' }));
     }
     case 'answers':
@@ -168,7 +171,7 @@ function PlayerView() {
           {av(wide ? 170 : 100)}
           <h1 style={{ fontSize: wide ? 64 : 40 }}>Next question<span style={{ color: '#ea4335' }}>!</span></h1>
           <div>{ringCount}</div>
-          <p style={css('margin:0;color:var(--muted)')}>You&apos;re {ord(rankOf(me))} with {fmt(me.score)} points. Get ready!</p>
+          <p style={css('margin:0;color:var(--muted)')}>{G.rankHidden ? <>You have {fmt(me.score)} points. Get ready!</> : <>You&apos;re {ord(rankOf(me))} with {fmt(me.score)} points. Get ready!</>}</p>
         </div>, stateOpts('#4285f4'));
     case 'leaderboard':
       return shell(<LbBlock forPlayer />, { phoneRight: <span className="chip">After Q{G.qi + 1} of {n}</span> });
