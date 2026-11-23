@@ -511,7 +511,8 @@ body:has(.spider-fly) { cursor: grabbing; user-select: none; }
 /* the open sidebar is as wide as the logo + toggle need (274px with the design font). The old 280px cap
    made a wider font (Safari, Google Sans) push the toggle onto "HOOT"; now the sidebar grows instead. */
 @media (min-width: 901px) {
-  .adm-side:not(.closed) { max-width: 360px; }
+  /* as wide as its content in every browser (Safari kept it at 240px and the toggle stuck out of the edge) */
+  .adm-side:not(.closed) { flex: 0 0 auto; width: max-content; min-width: 240px; max-width: 360px; }
   .adm-side .top > a, .adm-side .top .side-tog { flex: 0 0 auto; }
 }
 .side-tog { width: 36px; height: 36px; border: 0; background: transparent; color: var(--muted); }
